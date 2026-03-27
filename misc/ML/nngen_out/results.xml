@@ -1,0 +1,8 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1772565446" />
+    <testcase name="load_weights_and_infer_once" classname="ml_tb" file="/home/jfriday/sensorsoc/ML/nngen_out/ml_tb.py" lineno="31" time="2425.5484623908997" sim_time_ns="108340.0" ratio_time="44.66618650579656">
+      <failure error_type="SimFailure" error_msg="cocotb expected it would shut down the simulation, but the simulation ended prematurely. This could be due to an assertion failure or a call to an exit routine in the HDL, or due to the simulator running out of events to process (is your clock running?)." />
+    </testcase>
+  </testsuite>
+</testsuites>

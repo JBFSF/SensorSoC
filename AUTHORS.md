@@ -6,4 +6,9 @@ All categories arranged alphabetically.
 > significant portions of the code. See the contributors graph for a full list of
 > human authors.
 
-* Leo Moser \<leo.moser@pm.me\>
+* Ananya Manduva \<amanduva@ucsc.edu\>
+* Jackson Friday \<jfriday@ucsc.edu\>
+* Nathan Nakamoto \<nnakamot@ucsc.edu\>
+* Nithin Duvvuru \<nduvvuru@ucsc.edu\>
+* Rishi Govindan \<rigovind@ucsc.edu\>
+* Shane Stearns \<sgstearn@ucsc.edu\>
