@@ -1,6 +1,6 @@
 # RTL
 
-This directory contains the main SystemVerilog RTL for `sleep_soc`, including the sensor-processing pipeline and feature extraction blocks.
+This directory contains the main SystemVerilog RTL for `SensorSoC`, including the sensor-processing pipeline and feature extraction blocks.
 
 # Inside this Directory
 * ppg_fifo_reader.sv

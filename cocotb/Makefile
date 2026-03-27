@@ -88,7 +88,7 @@ RISCV_OBJCOPY?= $(RISCV_PREFIX)objcopy
 # ----------------------------
 # Paths
 # ----------------------------
-RTL_DIR      := rtl
+RTL_DIR      := ../src
 TB_DIR       := sim/tb
 SIM_BUILD    := sim/build
 FW_DIR       := firmware
@@ -257,7 +257,7 @@ $(SOC_VVP): $(SOC_TB_SRCS) $(SOC_RTL_SRCS)
 # Example:
 #   make sim-soc FW_VARIANT=test_gpio
 #   make sim-soc FW_VARIANT=test_sleepwake_periodic
-#   make sim-soc FW_VARIANT=test_ml_weights WEIGHT_INIT_HEX=rtl/taketwo_params.hex
+#   make sim-soc FW_VARIANT=test_ml_weights WEIGHT_INIT_HEX=$(RTL_DIR)/taketwo_params.hex
 sim-soc: $(SOC_VVP) firmware | $(SIM_BUILD)
 	@echo "[SIM] Running tb_soc (FW=$(FW_HEX))"
 	$(VVP) $(SOC_VVP)
@@ -266,7 +266,7 @@ sim-soc: $(SOC_VVP) firmware | $(SIM_BUILD)
 .PHONY: sim-ml-weights
 sim-ml-weights:
 	@$(MAKE) FW_VARIANT=test_ml_weights \
-	         WEIGHT_INIT_HEX=rtl/taketwo_params.hex \
+	         WEIGHT_INIT_HEX=$(RTL_DIR)/taketwo_params.hex \
 	         CHECK_SLEEP_WAKE=0 \
 	         sim-soc
 
@@ -478,7 +478,7 @@ test-ml:
 
 RESET_CTRL_TOP     := reset_ctrl_tb
 RESET_CTRL_VVP     := $(BUILD_DIR)/$(RESET_CTRL_TOP).vvp
-RESET_CTRL_SOURCES := sim/tb/reset_ctrl_tb.sv rtl/reset_ctrl.v
+RESET_CTRL_SOURCES := sim/tb/reset_ctrl_tb.sv $(RTL_DIR)/reset_ctrl.v
 RESET_CTRL_VCD     := $(WAVE_DIR)/reset_ctrl.vcd
 
 $(RESET_CTRL_VVP): $(RESET_CTRL_SOURCES) | $(BUILD_DIR)
@@ -500,7 +500,7 @@ clean-reset-ctrl:
 
 MOTION_PREPROCESS_TOP     := motion_preprocess_tb
 MOTION_PREPROCESS_VVP     := $(BUILD_DIR)/$(MOTION_PREPROCESS_TOP).vvp
-MOTION_PREPROCESS_SOURCES := sim/tb/motion_preprocess_tb.sv rtl/sensor_processing/motion_preprocess.sv
+MOTION_PREPROCESS_SOURCES := sim/tb/motion_preprocess_tb.sv $(RTL_DIR)/motion_preprocess.sv
 MOTION_PREPROCESS_VCD     := $(WAVE_DIR)/motion_preprocess_tb.vcd
 
 $(MOTION_PREPROCESS_VVP): $(MOTION_PREPROCESS_SOURCES)
@@ -518,7 +518,7 @@ sim-motion-preprocess: $(MOTION_PREPROCESS_VVP)
 
 PPG_FIFO_READER_TOP     := ppg_fifo_reader_tb
 PPG_FIFO_READER_VVP     := $(BUILD_DIR)/$(PPG_FIFO_READER_TOP).vvp
-PPG_FIFO_READER_SOURCES := sim/tb/ppg_fifo_reader_tb.sv rtl/sensor_processing/ppg_fifo_reader.sv
+PPG_FIFO_READER_SOURCES := sim/tb/ppg_fifo_reader_tb.sv $(RTL_DIR)/ppg_fifo_reader.sv
 PPG_FIFO_READER_VCD     := $(WAVE_DIR)/ppg_fifo_reader_tb.vcd
 
 $(PPG_FIFO_READER_VVP): $(PPG_FIFO_READER_SOURCES)
@@ -536,7 +536,7 @@ sim-ppg-fifo-reader: $(PPG_FIFO_READER_VVP)
 
 PPG_BEAT_RR_TOP     := ppg_beat_detect_rr_calc_tb
 PPG_BEAT_RR_VVP     := $(BUILD_DIR)/$(PPG_BEAT_RR_TOP).vvp
-PPG_BEAT_RR_SOURCES := sim/tb/ppg_beat_detect_rr_calc_tb.sv rtl/sensor_processing/ppg_beat_detect_rr_calc.sv rtl/sensor_processing/ewma_baseline.sv
+PPG_BEAT_RR_SOURCES := sim/tb/ppg_beat_detect_rr_calc_tb.sv $(RTL_DIR)/ppg_beat_detect_rr_calc.sv $(RTL_DIR)/ewma_baseline.sv
 PPG_BEAT_RR_VCD     := $(WAVE_DIR)/ppg_beat_detect_rr_calc_tb.vcd
 
 $(PPG_BEAT_RR_VVP): $(PPG_BEAT_RR_SOURCES)
@@ -554,7 +554,7 @@ sim-ppg-beat-rr: $(PPG_BEAT_RR_VVP)
 
 ACCEL_READER_TOP     := accel_reader_tb
 ACCEL_READER_VVP     := $(BUILD_DIR)/$(ACCEL_READER_TOP).vvp
-ACCEL_READER_SOURCES := sim/tb/accel_reader_tb.sv rtl/sensor_processing/accel_reader.sv
+ACCEL_READER_SOURCES := sim/tb/accel_reader_tb.sv $(RTL_DIR)/accel_reader.sv
 ACCEL_READER_VCD     := $(WAVE_DIR)/accel_reader_tb.vcd
 
 $(ACCEL_READER_VVP): $(ACCEL_READER_SOURCES)
@@ -572,7 +572,7 @@ sim-accel-reader: $(ACCEL_READER_VVP)
 
 RMSSD_ENGINE_TOP     := rmssd_engine_tb
 RMSSD_ENGINE_VVP     := $(BUILD_DIR)/$(RMSSD_ENGINE_TOP).vvp
-RMSSD_ENGINE_SOURCES := sim/tb/rmssd_engine_tb.sv rtl/sensor_processing/rmssd_engine.sv rtl/sensor_processing/ewma_baseline.sv
+RMSSD_ENGINE_SOURCES := sim/tb/rmssd_engine_tb.sv $(RTL_DIR)/rmssd_engine.sv $(RTL_DIR)/ewma_baseline.sv
 RMSSD_ENGINE_VCD     := $(WAVE_DIR)/rmssd_engine_tb.vcd
 
 $(RMSSD_ENGINE_VVP): $(RMSSD_ENGINE_SOURCES)
@@ -590,7 +590,7 @@ sim-rmssd-engine: $(RMSSD_ENGINE_VVP)
 
 SIGNAL_QUALITY_TOP     := signal_quality_tb
 SIGNAL_QUALITY_VVP     := $(BUILD_DIR)/$(SIGNAL_QUALITY_TOP).vvp
-SIGNAL_QUALITY_SOURCES := sim/tb/signal_quality_tb.sv rtl/sensor_processing/signal_quality.sv
+SIGNAL_QUALITY_SOURCES := sim/tb/signal_quality_tb.sv $(RTL_DIR)/signal_quality.sv
 SIGNAL_QUALITY_VCD     := $(WAVE_DIR)/signal_quality_tb.vcd
 
 $(SIGNAL_QUALITY_VVP): $(SIGNAL_QUALITY_SOURCES)
@@ -608,7 +608,7 @@ sim-signal-quality: $(SIGNAL_QUALITY_VVP)
 
 COS_LUT_TIMER_TOP     := cos_lut_timer_tb
 COS_LUT_TIMER_VVP     := $(BUILD_DIR)/$(COS_LUT_TIMER_TOP).vvp
-COS_LUT_TIMER_SOURCES := sim/tb/cos_lut_timer_tb.sv rtl/cos_lut_timer.sv
+COS_LUT_TIMER_SOURCES := sim/tb/cos_lut_timer_tb.sv $(RTL_DIR)/cos_lut_timer.sv
 COS_LUT_TIMER_VCD     := $(WAVE_DIR)/cos_lut_timer_tb.vcd
 
 $(COS_LUT_TIMER_VVP): $(COS_LUT_TIMER_SOURCES)
@@ -627,19 +627,19 @@ sim-cos-lut-timer: $(COS_LUT_TIMER_VVP)
 TOP_PIPELINE_TOP     := top_pipeline_tb
 TOP_PIPELINE_VVP     := $(BUILD_DIR)/$(TOP_PIPELINE_TOP).vvp
 TOP_PIPELINE_SOURCES := sim/tb/top_pipeline_tb.sv \
-                        rtl/top.sv \
-                        rtl/i2c_master.sv \
-                        rtl/accel_reader.sv \
-                        rtl/motion_preprocess.sv \
-                        rtl/ppg_fifo_reader.sv \
-                        rtl/ppg_beat_detect_rr_calc.sv \
-                        rtl/rmssd_engine.sv \
-                        rtl/signal_quality.sv \
-                        rtl/feature_engine.sv \
-                        rtl/cos_lut_timer.sv \
-                        rtl/globaltimer.sv \
-                        sim/sensors/i2c_slave_lis2dw12.sv \
-                        sim/sensors/i2c_slave_adpd144ri.sv
+                        $(RTL_DIR)/top.sv \
+                        $(RTL_DIR)/i2c_master.sv \
+                        $(RTL_DIR)/accel_reader.sv \
+                        $(RTL_DIR)/motion_preprocess.sv \
+                        $(RTL_DIR)/ppg_fifo_reader.sv \
+                        $(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
+                        $(RTL_DIR)/rmssd_engine.sv \
+                        $(RTL_DIR)/signal_quality.sv \
+                        $(RTL_DIR)/feature_engine.sv \
+                        $(RTL_DIR)/cos_lut_timer.sv \
+                        $(RTL_DIR)/globaltimer.sv \
+                        sensors/i2c_slave_lis2dw12.sv \
+                        sensors/i2c_slave_adpd144ri.sv
 TOP_PIPELINE_VCD     := $(WAVE_DIR)/top_pipeline_tb.vcd
 
 $(TOP_PIPELINE_VVP): $(TOP_PIPELINE_SOURCES)
@@ -659,8 +659,8 @@ sim-top-pipeline: $(TOP_PIPELINE_VVP)
 HOST_I2C_TARGET_TOP     := tb_host_i2c_target
 HOST_I2C_TARGET_VVP     := $(BUILD_DIR)/$(HOST_I2C_TARGET_TOP).vvp
 HOST_I2C_TARGET_SOURCES := sim/tb/tb_host_i2c_target.sv \
-                           rtl/host_i2c_target.v \
-                           rtl/host_i2c_bridge_regs.v
+                           $(RTL_DIR)/host_i2c_target.v \
+                           $(RTL_DIR)/host_i2c_bridge_regs.v
 
 $(HOST_I2C_TARGET_VVP): $(HOST_I2C_TARGET_SOURCES)
 	$(IVERILOG) -g2012 -s $(HOST_I2C_TARGET_TOP) -o $@ $^
@@ -693,7 +693,7 @@ sim-soc-host-i2c-irq: $(SOC_I2C_IRQ_VVP)
 
 HOST_I2C_IRQC_PROXY_TOP     := tb_host_i2c_irqc_proxy
 HOST_I2C_IRQC_PROXY_VVP     := $(BUILD_DIR)/$(HOST_I2C_IRQC_PROXY_TOP).vvp
-HOST_I2C_IRQC_PROXY_SOURCES := rtl/tb_host_i2c_irqc_proxy.sv \
+HOST_I2C_IRQC_PROXY_SOURCES := sim/tb/tb_host_i2c_irqc_proxy.sv \
                                $(SOC_RTL_SRCS)
 
 $(HOST_I2C_IRQC_PROXY_VVP): $(HOST_I2C_IRQC_PROXY_SOURCES)
@@ -710,7 +710,7 @@ sim-host-i2c-irqc-proxy: $(HOST_I2C_IRQC_PROXY_VVP)
 
 GLOBALTIMER_TOP     := globaltimer_tb
 GLOBALTIMER_VVP     := $(BUILD_DIR)/$(GLOBALTIMER_TOP).vvp
-GLOBALTIMER_SOURCES := sim/tb/globaltimer_tb.sv rtl/globaltimer.sv
+GLOBALTIMER_SOURCES := sim/tb/globaltimer_tb.sv $(RTL_DIR)/globaltimer.sv
 GLOBALTIMER_VCD     := $(WAVE_DIR)/globaltimer_tb.vcd
 
 $(GLOBALTIMER_VVP): $(GLOBALTIMER_SOURCES)
@@ -728,7 +728,7 @@ sim-globaltimer: $(GLOBALTIMER_VVP)
 
 LOGIT_TO_CONF_TOP     := logit_to_confidence_tb
 LOGIT_TO_CONF_VVP     := $(BUILD_DIR)/$(LOGIT_TO_CONF_TOP).vvp
-LOGIT_TO_CONF_SOURCES := sim/tb/logit_to_confidence_tb.sv rtl/logit_to_confidence.sv
+LOGIT_TO_CONF_SOURCES := sim/tb/logit_to_confidence_tb.sv $(RTL_DIR)/logit_to_confidence.sv
 LOGIT_TO_CONF_VCD     := $(WAVE_DIR)/logit_to_confidence_tb.vcd
 
 $(LOGIT_TO_CONF_VVP): $(LOGIT_TO_CONF_SOURCES)
@@ -765,7 +765,7 @@ test-weight-placement: $(WPLACEMENT_VVP)
 
 ML_LOGIT_SRAM_MMIO_TOP     := ml_logit_sram_mmio
 ML_LOGIT_SRAM_MMIO_VVP     := $(BUILD_DIR)/$(ML_LOGIT_SRAM_MMIO_TOP).vvp
-ML_LOGIT_SRAM_MMIO_SOURCES := rtl/ml_logit_sram_mmio.v
+ML_LOGIT_SRAM_MMIO_SOURCES := $(RTL_DIR)/ml_logit_sram_mmio.v
 
 $(ML_LOGIT_SRAM_MMIO_VVP): $(ML_LOGIT_SRAM_MMIO_SOURCES) | $(BUILD_DIR)
 	$(IVERILOG) -g2012 -s $(ML_LOGIT_SRAM_MMIO_TOP) -o $@ $^
@@ -781,13 +781,13 @@ check-ml-logit-sram-mmio: $(ML_LOGIT_SRAM_MMIO_VVP)
 SENSOR_PIPELINE_TOP     := tb_sensor_pipeline
 SENSOR_PIPELINE_VVP     := $(BUILD_DIR)/$(SENSOR_PIPELINE_TOP).vvp
 SENSOR_PIPELINE_SOURCES := sim/tb/tb_sensor_pipeline.sv \
-                           rtl/i2c_master.sv \
-                           rtl/accel_reader.sv \
-                           rtl/ppg_fifo_reader.sv \
-                           rtl/motion_preprocess.sv \
-                           rtl/globaltimer.sv \
-                           sim/sensors/i2c_slave_lis2dw12.sv \
-                           sim/sensors/i2c_slave_adpd144ri.sv
+                           $(RTL_DIR)/i2c_master.sv \
+                           $(RTL_DIR)/accel_reader.sv \
+                           $(RTL_DIR)/ppg_fifo_reader.sv \
+                           $(RTL_DIR)/motion_preprocess.sv \
+                           $(RTL_DIR)/globaltimer.sv \
+                           sensors/i2c_slave_lis2dw12.sv \
+                           sensors/i2c_slave_adpd144ri.sv
 SENSOR_PIPELINE_VCD     := $(WAVE_DIR)/sensor_pipeline.vcd
 
 $(SENSOR_PIPELINE_VVP): $(SENSOR_PIPELINE_SOURCES) | $(BUILD_DIR)
