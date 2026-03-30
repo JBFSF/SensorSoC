@@ -151,6 +151,10 @@ module top_pipeline_tb;
   integer beat_cnt;
   integer rr_valid_cnt;
   integer rmssd_valid_cnt;
+  integer axi_aw_cnt;
+  integer axi_w_cnt;
+  integer axi_b_cnt;
+  integer axi_feat_write_cnt;
   integer last_sec_cycle;
   integer last_epoch_cycle;
 
@@ -163,6 +167,14 @@ module top_pipeline_tb;
   logic signed [15:0] time_feat_min;
   logic signed [15:0] time_feat_max;
   integer signed time_feat_span;
+
+  bit axi_expect_active;
+  logic [31:0] axi_expected_w0;
+  logic [31:0] axi_expected_w1;
+  logic [31:0] axi_seen_w0;
+  logic [31:0] axi_seen_w1;
+  bit axi_seen_first_word;
+  bit axi_seen_second_word;
 
   task automatic check_no_x16(input logic signed [15:0] v, input [255:0] name);
     begin
@@ -230,6 +242,16 @@ module top_pipeline_tb;
       check_no_x16(delta_hr_feat, "delta_hr_feat");
       check_no_x16(rmssd_feat, "rmssd_feat");
 
+      if (dut.axi_busy_w) begin
+        $fatal(1, "feat_valid asserted while axi_interface is still busy");
+      end
+
+      axi_expect_active <= 1'b1;
+      axi_expected_w0 <= {time_feat[15:0], motion_feat[15:0]};
+      axi_expected_w1 <= {rmssd_feat[15:0], delta_hr_feat[15:0]};
+      axi_seen_first_word <= 1'b0;
+      axi_seen_second_word <= 1'b0;
+
       if (!saw_time_feat) begin
         saw_time_feat <= 1'b1;
         time_feat_min <= time_feat;
@@ -238,6 +260,47 @@ module top_pipeline_tb;
         if (time_feat < time_feat_min) time_feat_min <= time_feat;
         if (time_feat > time_feat_max) time_feat_max <= time_feat;
       end
+    end
+
+    if (!reset && dut.maxi_awvalid_w && dut.maxi_awready_w) begin
+      axi_aw_cnt <= axi_aw_cnt + 1;
+      if (dut.maxi_awaddr_w != 32'h0000_0000 && dut.maxi_awaddr_w != 32'h0000_0004) begin
+        $fatal(1, "unexpected AXI write address 0x%08x", dut.maxi_awaddr_w);
+      end
+    end
+
+    if (!reset && dut.maxi_wvalid_w && dut.maxi_wready_w) begin
+      axi_w_cnt <= axi_w_cnt + 1;
+      if (!axi_expect_active) begin
+        $fatal(1, "AXI write data observed without a preceding feat_valid");
+      end
+
+      if (!axi_seen_first_word) begin
+        axi_seen_w0 <= dut.maxi_wdata_w;
+        axi_seen_first_word <= 1'b1;
+        if (dut.maxi_wdata_w !== axi_expected_w0) begin
+          $fatal(1, "AXI word0 mismatch exp=0x%08x got=0x%08x",
+                 axi_expected_w0, dut.maxi_wdata_w);
+        end
+      end else if (!axi_seen_second_word) begin
+        axi_seen_w1 <= dut.maxi_wdata_w;
+        axi_seen_second_word <= 1'b1;
+        if (dut.maxi_wdata_w !== axi_expected_w1) begin
+          $fatal(1, "AXI word1 mismatch exp=0x%08x got=0x%08x",
+                 axi_expected_w1, dut.maxi_wdata_w);
+        end
+      end else begin
+        $fatal(1, "saw more than two AXI data beats for one feature vector");
+      end
+    end
+
+    if (!reset && dut.maxi_bvalid_w && dut.maxi_bready_w) begin
+      axi_b_cnt <= axi_b_cnt + 1;
+    end
+
+    if (!reset && dut.axi_done_w) begin
+      axi_feat_write_cnt <= axi_feat_write_cnt + 1;
+      axi_expect_active <= 1'b0;
     end
 
     prev_seconds <= dut.seconds_w;
@@ -253,6 +316,10 @@ module top_pipeline_tb;
     beat_cnt = 0;
     rr_valid_cnt = 0;
     rmssd_valid_cnt = 0;
+    axi_aw_cnt = 0;
+    axi_w_cnt = 0;
+    axi_b_cnt = 0;
+    axi_feat_write_cnt = 0;
     last_sec_cycle = 0;
     last_epoch_cycle = 0;
     saw_first_ppg = 1'b0;
@@ -263,6 +330,18 @@ module top_pipeline_tb;
     time_feat_min = 16'sd0;
     time_feat_max = 16'sd0;
     time_feat_span = 0;
+    axi_expect_active = 1'b0;
+    axi_expected_w0 = 32'd0;
+    axi_expected_w1 = 32'd0;
+    axi_seen_w0 = 32'd0;
+    axi_seen_w1 = 32'd0;
+    axi_seen_first_word = 1'b0;
+    axi_seen_second_word = 1'b0;
+
+    force dut.maxi_awready_w = 1'b1;
+    force dut.maxi_wready_w  = 1'b1;
+    force dut.maxi_bvalid_w  = 1'b1;
+    force dut.maxi_bresp_w   = 2'b00;
 
     repeat (20) @(posedge clk);
     reset = 1'b0;
@@ -275,6 +354,16 @@ module top_pipeline_tb;
     if (rr_valid_cnt == 0) $fatal(1, "no valid RR intervals");
     if (rmssd_valid_cnt == 0) $fatal(1, "rmssd_valid never asserted");
     if (feat_cnt == 0) $fatal(1, "feat_valid never asserted");
+    if (axi_feat_write_cnt == 0) $fatal(1, "axi_interface never completed a feature write");
+    if (axi_feat_write_cnt != feat_cnt) begin
+      $fatal(1, "axi feature write count mismatch: feat=%0d axi=%0d", feat_cnt, axi_feat_write_cnt);
+    end
+    if (axi_aw_cnt != (2 * feat_cnt)) begin
+      $fatal(1, "axi address beat count mismatch: aw=%0d expected=%0d", axi_aw_cnt, (2 * feat_cnt));
+    end
+    if (axi_w_cnt != (2 * feat_cnt)) begin
+      $fatal(1, "axi data beat count mismatch: w=%0d expected=%0d", axi_w_cnt, (2 * feat_cnt));
+    end
 
     if (!saw_time_feat) $fatal(1, "time feature never captured on feat_valid");
     time_feat_span = $signed({{16{time_feat_max[15]}}, time_feat_max}) -
@@ -283,8 +372,8 @@ module top_pipeline_tb;
       $fatal(1, "time_feat did not move enough: min=%0d max=%0d", time_feat_min, time_feat_max);
     end
 
-    $display("PASS: epochs=%0d accel=%0d ppg=%0d beats=%0d rr=%0d rmssd_valid=%0d feat=%0d invalid_reason=0x%02x",
-             epoch_cnt, accel_cnt, ppg_cnt, beat_cnt, rr_valid_cnt, rmssd_valid_cnt, feat_cnt, invalid_reason);
+    $display("PASS: epochs=%0d accel=%0d ppg=%0d beats=%0d rr=%0d rmssd_valid=%0d feat=%0d axi_feat_writes=%0d invalid_reason=0x%02x",
+             epoch_cnt, accel_cnt, ppg_cnt, beat_cnt, rr_valid_cnt, rmssd_valid_cnt, feat_cnt, axi_feat_write_cnt, invalid_reason);
     $finish;
   end
 
