@@ -404,6 +404,87 @@ module top #(
         .ml_update_gate_i(ml_update_gate_o)     // gate emission/update when signal quality is poor
     );
 
+    // -------------------------------------------------------------------------
+    // AXI interface – writes the four feature scalars to memory each epoch.
+    // Dummy wires for AXI bus outputs (to be connected to top-level ports later).
+    // -------------------------------------------------------------------------
+    logic [31:0] axi_x_addr_w;       // destination address for feature writes (placeholder)
+    logic        axi_done_w;         // one-cycle pulse when writes complete
+    logic        axi_busy_w;         // high while writes are in progress
+
+    logic [31:0] maxi_awaddr_w;
+    logic [7:0]  maxi_awlen_w;
+    logic [2:0]  maxi_awsize_w;
+    logic [1:0]  maxi_awburst_w;
+    logic        maxi_awlock_w;
+    logic [3:0]  maxi_awcache_w;
+    logic [2:0]  maxi_awprot_w;
+    logic [3:0]  maxi_awqos_w;
+    logic [1:0]  maxi_awuser_w;
+    logic        maxi_awvalid_w;
+    logic        maxi_awready_w;
+
+    logic [31:0] maxi_wdata_w;
+    logic [3:0]  maxi_wstrb_w;
+    logic        maxi_wlast_w;
+    logic        maxi_wvalid_w;
+    logic        maxi_wready_w;
+
+    logic [1:0]  maxi_bresp_w;
+    logic        maxi_bvalid_w;
+    logic        maxi_bready_w;
+
+    // Tie AXI slave-side dummy inputs low until connected to a real bus.
+    assign axi_x_addr_w  = 32'h0000_0000;
+    assign maxi_awready_w = 1'b0;
+    assign maxi_wready_w  = 1'b0;
+    assign maxi_bresp_w   = 2'b00;
+    assign maxi_bvalid_w  = 1'b0;
+
+    axi_interface u_axi_interface (
+        .CLK         (clk_i),
+        .RESETN      (~reset_i),
+
+        // Control – trigger a write burst on every valid feature vector.
+        .start       (feat_valid_o),        // feat_valid_o from feature_engine
+        .x_addr      (axi_x_addr_w),
+
+        // Feature inputs (match axi_interface port comments: x0=movement, x1=cosine, x2=delta_hr, x3=rmssd).
+        .x0          (motion_feat_o),       // movement
+        .x1          (time_feat_o),         // cosine time feature
+        .x2          (delta_hr_feat_o),     // delta HR
+        .x3          (rmssd_feat_o),        // RMSSD
+
+        // Status outputs.
+        .done        (axi_done_w),
+        .busy        (axi_busy_w),
+
+        // AXI4 write address channel.
+        .maxi_awaddr (maxi_awaddr_w),
+        .maxi_awlen  (maxi_awlen_w),
+        .maxi_awsize (maxi_awsize_w),
+        .maxi_awburst(maxi_awburst_w),
+        .maxi_awlock (maxi_awlock_w),
+        .maxi_awcache(maxi_awcache_w),
+        .maxi_awprot (maxi_awprot_w),
+        .maxi_awqos  (maxi_awqos_w),
+        .maxi_awuser (maxi_awuser_w),
+        .maxi_awvalid(maxi_awvalid_w),
+        .maxi_awready(maxi_awready_w),
+
+        // AXI4 write data channel.
+        .maxi_wdata  (maxi_wdata_w),
+        .maxi_wstrb  (maxi_wstrb_w),
+        .maxi_wlast  (maxi_wlast_w),
+        .maxi_wvalid (maxi_wvalid_w),
+        .maxi_wready (maxi_wready_w),
+
+        // AXI4 write response channel.
+        .maxi_bresp  (maxi_bresp_w),
+        .maxi_bvalid (maxi_bvalid_w),
+        .maxi_bready (maxi_bready_w)
+    );
+
     assign epoch_end_o = epoch_end_w;
     assign alarm_o = 1'b0;
 
