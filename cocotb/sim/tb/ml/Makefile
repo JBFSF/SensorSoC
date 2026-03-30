@@ -2,7 +2,7 @@ SIM ?= icarus
 TOPLEVEL_LANG ?= verilog
 
 # RTL path relative to sim/tb/ml
-RTL_DIR := ../../../rtl
+RTL_DIR := ../../../../src
 
 VERILOG_SOURCES := \
     $(RTL_DIR)/taketwo.v \
