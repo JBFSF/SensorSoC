@@ -34,7 +34,7 @@
 #
 # NOTE:
 #   This Makefile expects a small helper script at:
-#     tools/bin2hex.py
+#     scripts/bin2hex.py
 #   which converts firmware/build/firmware.bin -> firmware/build/firmware.hex
 #   as 32-bit little-endian words (one word per line), suitable for $readmemh.
 
@@ -99,8 +99,9 @@ FW_DIR       := $(MAKEFILE_DIR)/firmware
 FW_BUILD     := $(FW_DIR)/build
 FW_TESTS     := $(FW_DIR)/tests
 TOOLS_DIR    := $(MAKEFILE_DIR)/tools
+SCRIPTS_DIR  := $(MAKEFILE_DIR)/../scripts
 
-BIN2HEX_PY   := $(TOOLS_DIR)/bin2hex.py
+BIN2HEX_PY   := $(SCRIPTS_DIR)/bin2hex.py
 HEX2CHDR_PY  := $(TOOLS_DIR)/hex_to_c_header.py
 FW_GEN_DIR   := $(FW_DIR)/build/generated
 FW_ML_W_HDR  := $(FW_GEN_DIR)/ml_weights_full.h
