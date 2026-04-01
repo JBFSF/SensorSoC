@@ -30,7 +30,7 @@ rishigovindan@Rishis-MacBook-Pro firmware % cd ..
 rishigovindan@Rishis-MacBook-Pro sleep_soc % iverilog -g2012 -s tb_soc -o sim_soc.vvp \                        
   sim/tb/tb_soc.sv \
   rtl/soc_top.v \
-  rtl/third_party/picorv32.v \
+  ip/picorv32.v \
   rtl/gpio_mmio.v \
   rtl/test_mmio.v \
   rtl/timer_mmio.v \

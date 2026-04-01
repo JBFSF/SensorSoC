@@ -117,7 +117,7 @@ $(SIM_BUILD) $(FW_BUILD) $(FW_GEN_DIR):
 SOC_RTL_SRCS := \
   $(RTL_DIR)/soc_top.v \
   $(RTL_DIR)/simple_sram.v \
-  $(RTL_DIR)/third_party/picorv32.v \
+  $(MAKEFILE_DIR)/../ip/picorv32.v \
   $(RTL_DIR)/gpio_mmio.v \
   $(RTL_DIR)/test_mmio.v \
   $(RTL_DIR)/timer_mmio.v \
