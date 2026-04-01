@@ -40,6 +40,10 @@
 
 SHELL := /bin/bash
 
+MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+THIS_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
+SELF_MAKE := $(MAKE) -f $(THIS_MAKEFILE)
+
 # ----------------------------
 # Tools
 IVERILOG ?= iverilog
@@ -57,18 +61,18 @@ COCOTB_LIBDIR := $(shell $(PYTHON) -c "import cocotb, os; print(os.path.join(os.
 PYGPI_PYTHON_BIN := $(shell $(PYTHON) -c "import sys; print(sys.executable)")
 
 # Build directory
-BUILD_DIR := sim/build
+BUILD_DIR := $(MAKEFILE_DIR)/sim/build
 
 # Ensure build directory exists
 $(shell mkdir -p $(BUILD_DIR))
 
-WAVE_DIR := sim/waves
+WAVE_DIR := $(MAKEFILE_DIR)/sim/waves
 
 # ------------------------------------------------------------
 # Common cocotb environment (v2 naming)
 # ------------------------------------------------------------
 export PYGPI_PYTHON_BIN := $(PYGPI_PYTHON_BIN)
-export PYTHONPATH       := $(PWD)/sim/tb
+export PYTHONPATH       := $(MAKEFILE_DIR)/sim/tb
 export COCOTB_LOG_LEVEL ?= INFO
 
 # ============================================================
@@ -88,18 +92,20 @@ RISCV_OBJCOPY?= $(RISCV_PREFIX)objcopy
 # ----------------------------
 # Paths
 # ----------------------------
-RTL_DIR      := ../src
-TB_DIR       := sim/tb
-SIM_BUILD    := sim/build
-FW_DIR       := firmware
+RTL_DIR      := $(MAKEFILE_DIR)/../src
+TB_DIR       := $(MAKEFILE_DIR)/sim/tb
+SIM_BUILD    := $(MAKEFILE_DIR)/sim/build
+FW_DIR       := $(MAKEFILE_DIR)/firmware
 FW_BUILD     := $(FW_DIR)/build
 FW_TESTS     := $(FW_DIR)/tests
-TOOLS_DIR    := tools
+TOOLS_DIR    := $(MAKEFILE_DIR)/tools
 
 BIN2HEX_PY   := $(TOOLS_DIR)/bin2hex.py
 HEX2CHDR_PY  := $(TOOLS_DIR)/hex_to_c_header.py
 FW_GEN_DIR   := $(FW_DIR)/build/generated
 FW_ML_W_HDR  := $(FW_GEN_DIR)/ml_weights_full.h
+TAKETWO_PARAMS_BIN := $(MAKEFILE_DIR)/sim/tb/ml/taketwo_params.bin
+TAKETWO_PARAMS_HEX := $(FW_GEN_DIR)/taketwo_params.hex
 
 # Ensure output dirs exist
 $(SIM_BUILD) $(FW_BUILD) $(FW_GEN_DIR):
@@ -190,12 +196,16 @@ FW_BIN    := $(FW_OUTDIR)/firmware.bin
 FW_HEX    := $(FW_OUTDIR)/firmware.hex
 FW_HEX_MAIN := $(FW_DIR)/build/main/firmware.hex
 
-$(FW_ML_W_HDR): $(RTL_DIR)/taketwo_params.hex $(HEX2CHDR_PY) | $(FW_GEN_DIR)
+$(TAKETWO_PARAMS_HEX): $(TAKETWO_PARAMS_BIN) $(BIN2HEX_PY) | $(FW_GEN_DIR)
+	@echo "[FW] Generating weight hex: $@"
+	@$(PYTHON) $(BIN2HEX_PY) $< $@
+
+$(FW_ML_W_HDR): $(TAKETWO_PARAMS_HEX) $(HEX2CHDR_PY) | $(FW_GEN_DIR)
 	@echo "[FW] Generating full-weight header: $@"
 	@$(PYTHON) $(HEX2CHDR_PY) $< $@ ml_weights_full
 
 # Build rule
-$(FW_HEX): $(FW_DIR)/start.S $(FW_LDSCRIPT) $(FW_SRC) $(BIN2HEX_PY) $(FW_EXTRA_DEPS)
+$(FW_HEX): $(THIS_MAKEFILE) $(FW_DIR)/start.S $(FW_LDSCRIPT) $(FW_SRC) $(BIN2HEX_PY) $(FW_EXTRA_DEPS)
 	@mkdir -p $(FW_OUTDIR)
 	@echo "[FW] Building $(FW_SRC) -> $(FW_HEX) (LD=$(FW_LDSCRIPT))"
 	$(RISCV_GCC) \
@@ -210,28 +220,32 @@ $(FW_HEX): $(FW_DIR)/start.S $(FW_LDSCRIPT) $(FW_SRC) $(BIN2HEX_PY) $(FW_EXTRA_D
 	@echo "[FW] Converting $(FW_BIN) -> $(FW_HEX) (32-bit little-endian words)"
 	@$(PYTHON) $(BIN2HEX_PY) $(FW_BIN) $(FW_HEX)
 
-.PHONY: firmware firmware-main firmware-sleepwake firmware-gpio firmware-sleepwake-periodic
+.PHONY: firmware firmware-main firmware-sleepwake firmware-gpio firmware-sleepwake-periodic firmware-rebuild
 
 # Generic "firmware" builds whatever FW_VARIANT is set to
 firmware: $(FW_HEX)
 
+firmware-rebuild:
+	@rm -f $(FW_ELF) $(FW_BIN) $(FW_HEX)
+	@$(SELF_MAKE) FW_VARIANT=$(FW_VARIANT) firmware
+
 firmware-main:
-	@$(MAKE) FW_VARIANT=main firmware
+	@$(SELF_MAKE) FW_VARIANT=main firmware
 
 firmware-sleepwake:
-	@$(MAKE) FW_VARIANT=test_sleepwake firmware
+	@$(SELF_MAKE) FW_VARIANT=test_sleepwake firmware
 
 firmware-gpio:
-	@$(MAKE) FW_VARIANT=test_gpio firmware
+	@$(SELF_MAKE) FW_VARIANT=test_gpio firmware
 
 firmware-sleepwake-periodic:
-	@$(MAKE) FW_VARIANT=test_sleepwake_periodic firmware
+	@$(SELF_MAKE) FW_VARIANT=test_sleepwake_periodic firmware
 
 firmware-ml-weights:
-	@$(MAKE) FW_VARIANT=test_ml_weights firmware
+	@$(SELF_MAKE) FW_VARIANT=test_ml_weights firmware
 
 firmware-ml-cpu-wake-i2c:
-	@$(MAKE) FW_VARIANT=test_ml_cpu_wake_i2c firmware
+	@$(SELF_MAKE) FW_VARIANT=test_ml_cpu_wake_i2c firmware
 
 
 
@@ -258,15 +272,16 @@ $(SOC_VVP): $(SOC_TB_SRCS) $(SOC_RTL_SRCS)
 #   make sim-soc FW_VARIANT=test_gpio
 #   make sim-soc FW_VARIANT=test_sleepwake_periodic
 #   make sim-soc FW_VARIANT=test_ml_weights WEIGHT_INIT_HEX=$(RTL_DIR)/taketwo_params.hex
-sim-soc: $(SOC_VVP) firmware | $(SIM_BUILD)
+sim-soc: $(SOC_VVP) | $(SIM_BUILD)
+	@$(SELF_MAKE) FW_VARIANT=$(FW_VARIANT) firmware-rebuild
 	@echo "[SIM] Running tb_soc (FW=$(FW_HEX))"
 	$(VVP) $(SOC_VVP)
 
 # Convenience: build + run ML weights inference test
 .PHONY: sim-ml-weights
 sim-ml-weights:
-	@$(MAKE) FW_VARIANT=test_ml_weights \
-	         WEIGHT_INIT_HEX=$(RTL_DIR)/taketwo_params.hex \
+	@$(SELF_MAKE) FW_VARIANT=test_ml_weights \
+	         WEIGHT_INIT_HEX=$(TAKETWO_PARAMS_HEX) \
 	         CHECK_SLEEP_WAKE=0 \
 	         sim-soc
 
@@ -283,7 +298,7 @@ $(SOC_ML_CPU_WAKE_I2C_VVP): $(SOC_ML_CPU_WAKE_I2C_SOURCES)
 
 .PHONY: sim-ml-cpu-wake-i2c
 sim-ml-cpu-wake-i2c: $(SOC_ML_CPU_WAKE_I2C_VVP) | $(SIM_BUILD)
-	@$(MAKE) FW_VARIANT=test_ml_cpu_wake_i2c firmware
+	@$(SELF_MAKE) FW_VARIANT=test_ml_cpu_wake_i2c firmware
 	@echo "== Running $(SOC_ML_CPU_WAKE_I2C_TOP) (FW=$(FW_DIR)/build/test_ml_cpu_wake_i2c/firmware.hex) =="
 	$(VVP) $(SOC_ML_CPU_WAKE_I2C_VVP)
 
@@ -300,22 +315,22 @@ $(SOC_ML_WEIGHT_LOAD_VVP): $(SOC_ML_WEIGHT_LOAD_SOURCES)
 
 .PHONY: sim-ml-weight-load
 sim-ml-weight-load: $(SOC_ML_WEIGHT_LOAD_VVP) | $(SIM_BUILD)
-	@$(MAKE) FW_VARIANT=test_ml_weights firmware
+	@$(SELF_MAKE) FW_VARIANT=test_ml_weights firmware
 	@echo "== Running $(SOC_ML_WEIGHT_LOAD_TOP) (FW=$(FW_DIR)/build/test_ml_weights/firmware.hex) =="
 	$(VVP) $(SOC_ML_WEIGHT_LOAD_VVP)
 
 .PHONY: test-cpu-ml-pipeline
 test-cpu-ml-pipeline:
-	@$(MAKE) test-cpu-ml
-	@$(MAKE) sim-ml-weight-load
+	@$(SELF_MAKE) test-cpu-ml
+	@$(SELF_MAKE) sim-ml-weight-load
 
 .PHONY: test-soc-wake-e2e-p0
 test-soc-wake-e2e-p0:
-	@$(MAKE) test-cpu-ml
-	@$(MAKE) sim-ml-weight-load
-	@$(MAKE) sim-ml-cpu-wake-i2c
-	@$(MAKE) test-host-i2c-bridge
-	@$(MAKE) test-irq-ctrl-races
+	@$(SELF_MAKE) test-cpu-ml
+	@$(SELF_MAKE) sim-ml-weight-load
+	@$(SELF_MAKE) sim-ml-cpu-wake-i2c
+	@$(SELF_MAKE) test-host-i2c-bridge
+	@$(SELF_MAKE) test-irq-ctrl-races
 
 .PHONY: test-functional-matrix
 test-functional-matrix:
@@ -332,7 +347,8 @@ $(IRQ_VVP): $(IRQ_TB_SRCS) $(SOC_RTL_SRCS)
 	  $(IRQ_TB_SRCS) \
 	  $(SOC_RTL_SRCS)
 
-sim-irq: $(IRQ_VVP) firmware-main | $(SIM_BUILD)
+sim-irq: $(IRQ_VVP) | $(SIM_BUILD)
+	@$(SELF_MAKE) FW_VARIANT=main firmware-rebuild
 	@echo "[SIM] Running tb_irq (will read $(FW_HEX_MAIN))"
 	$(VVP) $(IRQ_VVP)
 
@@ -470,7 +486,7 @@ test-irq-ctrl-races: $(IRQ_CTRL_VVP)
 
 .PHONY: test-ml
 test-ml:
-	$(MAKE) -C sim/tb/ml
+	$(MAKE) -C $(MAKEFILE_DIR)/sim/tb/ml
 
 # ============================================================
 # RESET CONTROLLER TB (reset_ctrl_tb)
