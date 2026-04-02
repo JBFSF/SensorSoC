@@ -6,7 +6,8 @@ RTL_DIR := ../../../../src
 
 VERILOG_SOURCES := \
     $(RTL_DIR)/taketwo.v \
-    $(RTL_DIR)/taketwo_wrap.v
+    $(RTL_DIR)/taketwo_wrap.v \
+    $(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v 
 
 TOPLEVEL := taketwo_wrap
 MODULE := ml_tb
