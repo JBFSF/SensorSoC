@@ -33,7 +33,7 @@ STEP_SEC = 300                         # Compute every 5 minutes
 WINDOW_SAMPLES = WINDOW_SEC            
 STEP_SAMPLES = STEP_SEC                
 
-SEED = 16                              # Random seed
+SEED = 39                              # Random seed
 EPOCHS = 50                            # How many times the data is passed through the model
 LR = 1e-3                              # Learning rate, or how much the model updates weights each time
 
@@ -208,11 +208,11 @@ class TransitionMLP(nn.Module):
     def __init__(self, in_dim):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(in_dim, 64),
+            nn.Linear(in_dim, 16),
             nn.ReLU(),
-            nn.Linear(64, 32),
+            nn.Linear(16, 8),
             nn.ReLU(),
-            nn.Linear(32, 2),
+            nn.Linear(8, 2),
         )
 
     def forward(self, x):

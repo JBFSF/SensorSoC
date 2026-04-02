@@ -845,9 +845,9 @@ module taketwo
 
   wire [1-1:0] cparam_matmul_11_act_num_col;
   wire [1-1:0] cparam_matmul_11_act_num_row;
-  wire [7-1:0] cparam_matmul_11_filter_num_och;
+  wire [5-1:0] cparam_matmul_11_filter_num_och;
   wire [1-1:0] cparam_matmul_11_bias_scala;
-  wire [7-1:0] cparam_matmul_11_bias_num;
+  wire [5-1:0] cparam_matmul_11_bias_num;
   wire [1-1:0] cparam_matmul_11_scale_scala;
   wire [1-1:0] cparam_matmul_11_scale_num;
   wire [1-1:0] cparam_matmul_11_vshamt_mul_scala;
@@ -867,36 +867,36 @@ module taketwo
   wire [1-1:0] cparam_matmul_11_max_col_count;
   wire [1-1:0] cparam_matmul_11_max_row_count;
   wire [1-1:0] cparam_matmul_11_max_bat_count;
-  wire [5-1:0] cparam_matmul_11_max_och_count;
+  wire [1-1:0] cparam_matmul_11_max_och_count;
   wire [7-1:0] cparam_matmul_11_och_count_step;
   wire [1-1:0] cparam_matmul_11_dma_flag_conds_0;
   wire signed [32-1:0] cparam_matmul_11_act_offset_values_0;
-  wire [8-1:0] cparam_matmul_11_act_row_step;
-  wire [8-1:0] cparam_matmul_11_act_bat_step;
-  wire [7-1:0] cparam_matmul_11_act_read_size;
-  wire [7-1:0] cparam_matmul_11_act_read_block;
-  wire [7-1:0] cparam_matmul_11_act_read_step;
-  wire [10-1:0] cparam_matmul_11_filter_base_step;
-  wire [9-1:0] cparam_matmul_11_filter_read_size;
-  wire [7-1:0] cparam_matmul_11_filter_read_block;
-  wire [9-1:0] cparam_matmul_11_filter_read_step;
+  wire [6-1:0] cparam_matmul_11_act_row_step;
+  wire [6-1:0] cparam_matmul_11_act_bat_step;
+  wire [5-1:0] cparam_matmul_11_act_read_size;
+  wire [5-1:0] cparam_matmul_11_act_read_block;
+  wire [5-1:0] cparam_matmul_11_act_read_step;
+  wire [9-1:0] cparam_matmul_11_filter_base_step;
+  wire [8-1:0] cparam_matmul_11_filter_read_size;
+  wire [5-1:0] cparam_matmul_11_filter_read_block;
+  wire [8-1:0] cparam_matmul_11_filter_read_step;
   wire [1-1:0] cparam_matmul_11_out_offset_values_0;
-  wire [8-1:0] cparam_matmul_11_out_col_step;
-  wire [8-1:0] cparam_matmul_11_out_row_step;
-  wire [8-1:0] cparam_matmul_11_out_bat_step;
-  wire [8-1:0] cparam_matmul_11_out_och_step;
-  wire [7-1:0] cparam_matmul_11_out_write_size;
-  wire [7-1:0] cparam_matmul_11_out_write_size_res;
-  wire [7-1:0] cparam_matmul_11_out_write_block;
+  wire [6-1:0] cparam_matmul_11_out_col_step;
+  wire [6-1:0] cparam_matmul_11_out_row_step;
+  wire [6-1:0] cparam_matmul_11_out_bat_step;
+  wire [6-1:0] cparam_matmul_11_out_och_step;
+  wire [5-1:0] cparam_matmul_11_out_write_size;
+  wire [5-1:0] cparam_matmul_11_out_write_size_res;
+  wire [5-1:0] cparam_matmul_11_out_write_block;
   wire [1-1:0] cparam_matmul_11_keep_filter;
   wire [1-1:0] cparam_matmul_11_keep_input;
   wire [1-1:0] cparam_matmul_11_data_stationary;
-  wire [7-1:0] cparam_matmul_11_stream_num_ops;
-  wire [7-1:0] cparam_matmul_11_stream_num_ops_res;
-  wire [7-1:0] cparam_matmul_11_stream_num_ops_par;
-  wire [7-1:0] cparam_matmul_11_stream_num_ops_res_par;
-  wire [7-1:0] cparam_matmul_11_stream_reduce_size;
-  wire [7-1:0] cparam_matmul_11_stream_aligned_reduce_size;
+  wire [5-1:0] cparam_matmul_11_stream_num_ops;
+  wire [5-1:0] cparam_matmul_11_stream_num_ops_res;
+  wire [5-1:0] cparam_matmul_11_stream_num_ops_par;
+  wire [5-1:0] cparam_matmul_11_stream_num_ops_res_par;
+  wire [5-1:0] cparam_matmul_11_stream_reduce_size;
+  wire [5-1:0] cparam_matmul_11_stream_aligned_reduce_size;
   wire [1-1:0] cparam_matmul_11_stream_omit_mask;
   wire [1-1:0] cparam_matmul_11_col_select_initval;
   wire [1-1:0] cparam_matmul_11_stride_col_par_col;
@@ -904,9 +904,9 @@ module taketwo
   wire [1-1:0] cparam_matmul_11_stride_col_mod_filter_num;
   wire [1-1:0] cparam_matmul_11_filter_num_col_minus_stride_col_mod;
   wire [1-1:0] cparam_matmul_11_inc_act_laddr_conds_0;
-  wire [7-1:0] cparam_matmul_11_inc_act_laddr_small;
-  wire [7-1:0] cparam_matmul_11_inc_act_laddr_large;
-  wire [7-1:0] cparam_matmul_11_inc_out_laddr_col;
+  wire [5-1:0] cparam_matmul_11_inc_act_laddr_small;
+  wire [5-1:0] cparam_matmul_11_inc_act_laddr_large;
+  wire [5-1:0] cparam_matmul_11_inc_out_laddr_col;
   wire [1-1:0] cparam_matmul_11_stream_act_local_small_offset;
   wire [1-1:0] cparam_matmul_11_stream_act_local_large_offset;
   wire [1-1:0] cparam_matmul_11_stream_act_local_small_flags_0;
@@ -918,12 +918,12 @@ module taketwo
                                         (matmul_11_control_param_index == 1)? 32'h1 : 32'h1;
   assign cparam_matmul_11_act_num_row = (matmul_11_control_param_index == 0)? 32'h1 : 
                                         (matmul_11_control_param_index == 1)? 32'h1 : 32'h1;
-  assign cparam_matmul_11_filter_num_och = (matmul_11_control_param_index == 0)? 32'h40 : 
-                                           (matmul_11_control_param_index == 1)? 32'h20 : 32'h2;
+  assign cparam_matmul_11_filter_num_och = (matmul_11_control_param_index == 0)? 32'h10 : 
+                                           (matmul_11_control_param_index == 1)? 32'h8 : 32'h2;
   assign cparam_matmul_11_bias_scala = (matmul_11_control_param_index == 0)? 32'h0 : 
                                        (matmul_11_control_param_index == 1)? 32'h0 : 32'h0;
-  assign cparam_matmul_11_bias_num = (matmul_11_control_param_index == 0)? 32'h40 : 
-                                     (matmul_11_control_param_index == 1)? 32'h20 : 32'h2;
+  assign cparam_matmul_11_bias_num = (matmul_11_control_param_index == 0)? 32'h10 : 
+                                     (matmul_11_control_param_index == 1)? 32'h8 : 32'h2;
   assign cparam_matmul_11_scale_scala = (matmul_11_control_param_index == 0)? 32'h1 : 
                                         (matmul_11_control_param_index == 1)? 32'h1 : 32'h1;
   assign cparam_matmul_11_scale_num = (matmul_11_control_param_index == 0)? 32'h1 : 
@@ -945,7 +945,7 @@ module taketwo
   assign cparam_matmul_11_cshamt_sum_value = (matmul_11_control_param_index == 0)? 32'h0 : 
                                              (matmul_11_control_param_index == 1)? 32'h0 : 32'h0;
   assign cparam_matmul_11_cshamt_out_value = (matmul_11_control_param_index == 0)? 32'h1e : 
-                                             (matmul_11_control_param_index == 1)? 32'h1c : 32'h1f;
+                                             (matmul_11_control_param_index == 1)? 32'h1e : 32'h1f;
   assign cparam_matmul_11_act_func_index = (matmul_11_control_param_index == 0)? 32'h0 : 
                                            (matmul_11_control_param_index == 1)? 32'h0 : 32'h1;
   assign cparam_matmul_11_out_num_col = (matmul_11_control_param_index == 0)? 32'h1 : 
@@ -963,65 +963,65 @@ module taketwo
   assign cparam_matmul_11_max_bat_count = (matmul_11_control_param_index == 0)? 32'h0 : 
                                           (matmul_11_control_param_index == 1)? 32'h0 : 32'h0;
   assign cparam_matmul_11_max_och_count = (matmul_11_control_param_index == 0)? 32'h0 : 
-                                          (matmul_11_control_param_index == 1)? 32'h1c : 32'h0;
+                                          (matmul_11_control_param_index == 1)? 32'h0 : 32'h0;
   assign cparam_matmul_11_och_count_step = (matmul_11_control_param_index == 0)? 32'h40 : 
-                                           (matmul_11_control_param_index == 1)? 32'h4 : 32'h8;
+                                           (matmul_11_control_param_index == 1)? 32'h10 : 32'h20;
   assign cparam_matmul_11_dma_flag_conds_0 = (matmul_11_control_param_index == 0)? 32'h1 : 
                                              (matmul_11_control_param_index == 1)? 32'h1 : 32'h1;
   assign cparam_matmul_11_act_offset_values_0 = (matmul_11_control_param_index == 0)? 32'h0 : 
                                                 (matmul_11_control_param_index == 1)? 32'h0 : 32'h0;
   assign cparam_matmul_11_act_row_step = (matmul_11_control_param_index == 0)? 32'h8 : 
-                                         (matmul_11_control_param_index == 1)? 32'h80 : 32'h40;
+                                         (matmul_11_control_param_index == 1)? 32'h20 : 32'h10;
   assign cparam_matmul_11_act_bat_step = (matmul_11_control_param_index == 0)? 32'h8 : 
-                                         (matmul_11_control_param_index == 1)? 32'h80 : 32'h40;
+                                         (matmul_11_control_param_index == 1)? 32'h20 : 32'h10;
   assign cparam_matmul_11_act_read_size = (matmul_11_control_param_index == 0)? 32'h4 : 
-                                          (matmul_11_control_param_index == 1)? 32'h40 : 32'h20;
+                                          (matmul_11_control_param_index == 1)? 32'h10 : 32'h8;
   assign cparam_matmul_11_act_read_block = (matmul_11_control_param_index == 0)? 32'h4 : 
-                                           (matmul_11_control_param_index == 1)? 32'h40 : 32'h20;
+                                           (matmul_11_control_param_index == 1)? 32'h10 : 32'h8;
   assign cparam_matmul_11_act_read_step = (matmul_11_control_param_index == 0)? 32'h4 : 
-                                          (matmul_11_control_param_index == 1)? 32'h40 : 32'h20;
-  assign cparam_matmul_11_filter_base_step = (matmul_11_control_param_index == 0)? 32'h200 : 
-                                             (matmul_11_control_param_index == 1)? 32'h200 : 32'h80;
-  assign cparam_matmul_11_filter_read_size = (matmul_11_control_param_index == 0)? 32'h100 : 
-                                             (matmul_11_control_param_index == 1)? 32'h100 : 32'h40;
+                                          (matmul_11_control_param_index == 1)? 32'h10 : 32'h8;
+  assign cparam_matmul_11_filter_base_step = (matmul_11_control_param_index == 0)? 32'h80 : 
+                                             (matmul_11_control_param_index == 1)? 32'h100 : 32'h20;
+  assign cparam_matmul_11_filter_read_size = (matmul_11_control_param_index == 0)? 32'h40 : 
+                                             (matmul_11_control_param_index == 1)? 32'h80 : 32'h10;
   assign cparam_matmul_11_filter_read_block = (matmul_11_control_param_index == 0)? 32'h4 : 
-                                              (matmul_11_control_param_index == 1)? 32'h40 : 32'h20;
-  assign cparam_matmul_11_filter_read_step = (matmul_11_control_param_index == 0)? 32'h100 : 
-                                             (matmul_11_control_param_index == 1)? 32'h100 : 32'h40;
+                                              (matmul_11_control_param_index == 1)? 32'h10 : 32'h8;
+  assign cparam_matmul_11_filter_read_step = (matmul_11_control_param_index == 0)? 32'h40 : 
+                                             (matmul_11_control_param_index == 1)? 32'h80 : 32'h10;
   assign cparam_matmul_11_out_offset_values_0 = (matmul_11_control_param_index == 0)? 32'h0 : 
                                                 (matmul_11_control_param_index == 1)? 32'h0 : 32'h0;
-  assign cparam_matmul_11_out_col_step = (matmul_11_control_param_index == 0)? 32'h80 : 
-                                         (matmul_11_control_param_index == 1)? 32'h40 : 32'h4;
-  assign cparam_matmul_11_out_row_step = (matmul_11_control_param_index == 0)? 32'h80 : 
-                                         (matmul_11_control_param_index == 1)? 32'h40 : 32'h4;
-  assign cparam_matmul_11_out_bat_step = (matmul_11_control_param_index == 0)? 32'h80 : 
-                                         (matmul_11_control_param_index == 1)? 32'h40 : 32'h4;
-  assign cparam_matmul_11_out_och_step = (matmul_11_control_param_index == 0)? 32'h80 : 
-                                         (matmul_11_control_param_index == 1)? 32'h8 : 32'h4;
-  assign cparam_matmul_11_out_write_size = (matmul_11_control_param_index == 0)? 32'h40 : 
-                                           (matmul_11_control_param_index == 1)? 32'h4 : 32'h2;
-  assign cparam_matmul_11_out_write_size_res = (matmul_11_control_param_index == 0)? 32'h40 : 
-                                               (matmul_11_control_param_index == 1)? 32'h4 : 32'h2;
-  assign cparam_matmul_11_out_write_block = (matmul_11_control_param_index == 0)? 32'h40 : 
-                                            (matmul_11_control_param_index == 1)? 32'h0 : 32'h2;
+  assign cparam_matmul_11_out_col_step = (matmul_11_control_param_index == 0)? 32'h20 : 
+                                         (matmul_11_control_param_index == 1)? 32'h10 : 32'h4;
+  assign cparam_matmul_11_out_row_step = (matmul_11_control_param_index == 0)? 32'h20 : 
+                                         (matmul_11_control_param_index == 1)? 32'h10 : 32'h4;
+  assign cparam_matmul_11_out_bat_step = (matmul_11_control_param_index == 0)? 32'h20 : 
+                                         (matmul_11_control_param_index == 1)? 32'h10 : 32'h4;
+  assign cparam_matmul_11_out_och_step = (matmul_11_control_param_index == 0)? 32'h20 : 
+                                         (matmul_11_control_param_index == 1)? 32'h10 : 32'h4;
+  assign cparam_matmul_11_out_write_size = (matmul_11_control_param_index == 0)? 32'h10 : 
+                                           (matmul_11_control_param_index == 1)? 32'h8 : 32'h2;
+  assign cparam_matmul_11_out_write_size_res = (matmul_11_control_param_index == 0)? 32'h10 : 
+                                               (matmul_11_control_param_index == 1)? 32'h8 : 32'h2;
+  assign cparam_matmul_11_out_write_block = (matmul_11_control_param_index == 0)? 32'h10 : 
+                                            (matmul_11_control_param_index == 1)? 32'h8 : 32'h2;
   assign cparam_matmul_11_keep_filter = (matmul_11_control_param_index == 0)? 32'h1 : 
-                                        (matmul_11_control_param_index == 1)? 32'h0 : 32'h1;
+                                        (matmul_11_control_param_index == 1)? 32'h1 : 32'h1;
   assign cparam_matmul_11_keep_input = (matmul_11_control_param_index == 0)? 32'h1 : 
                                        (matmul_11_control_param_index == 1)? 32'h1 : 32'h1;
   assign cparam_matmul_11_data_stationary = (matmul_11_control_param_index == 0)? 32'h0 : 
                                             (matmul_11_control_param_index == 1)? 32'h0 : 32'h0;
-  assign cparam_matmul_11_stream_num_ops = (matmul_11_control_param_index == 0)? 32'h40 : 
-                                           (matmul_11_control_param_index == 1)? 32'h4 : 32'h2;
-  assign cparam_matmul_11_stream_num_ops_res = (matmul_11_control_param_index == 0)? 32'h40 : 
-                                               (matmul_11_control_param_index == 1)? 32'h4 : 32'h2;
-  assign cparam_matmul_11_stream_num_ops_par = (matmul_11_control_param_index == 0)? 32'h40 : 
-                                               (matmul_11_control_param_index == 1)? 32'h4 : 32'h2;
-  assign cparam_matmul_11_stream_num_ops_res_par = (matmul_11_control_param_index == 0)? 32'h40 : 
-                                                   (matmul_11_control_param_index == 1)? 32'h4 : 32'h2;
+  assign cparam_matmul_11_stream_num_ops = (matmul_11_control_param_index == 0)? 32'h10 : 
+                                           (matmul_11_control_param_index == 1)? 32'h8 : 32'h2;
+  assign cparam_matmul_11_stream_num_ops_res = (matmul_11_control_param_index == 0)? 32'h10 : 
+                                               (matmul_11_control_param_index == 1)? 32'h8 : 32'h2;
+  assign cparam_matmul_11_stream_num_ops_par = (matmul_11_control_param_index == 0)? 32'h10 : 
+                                               (matmul_11_control_param_index == 1)? 32'h8 : 32'h2;
+  assign cparam_matmul_11_stream_num_ops_res_par = (matmul_11_control_param_index == 0)? 32'h10 : 
+                                                   (matmul_11_control_param_index == 1)? 32'h8 : 32'h2;
   assign cparam_matmul_11_stream_reduce_size = (matmul_11_control_param_index == 0)? 32'h4 : 
-                                               (matmul_11_control_param_index == 1)? 32'h40 : 32'h20;
+                                               (matmul_11_control_param_index == 1)? 32'h10 : 32'h8;
   assign cparam_matmul_11_stream_aligned_reduce_size = (matmul_11_control_param_index == 0)? 32'h4 : 
-                                                       (matmul_11_control_param_index == 1)? 32'h40 : 32'h20;
+                                                       (matmul_11_control_param_index == 1)? 32'h10 : 32'h8;
   assign cparam_matmul_11_stream_omit_mask = (matmul_11_control_param_index == 0)? 32'h0 : 
                                              (matmul_11_control_param_index == 1)? 32'h0 : 32'h0;
   assign cparam_matmul_11_col_select_initval = (matmul_11_control_param_index == 0)? 32'h0 : 
@@ -1037,11 +1037,11 @@ module taketwo
   assign cparam_matmul_11_inc_act_laddr_conds_0 = (matmul_11_control_param_index == 0)? 32'h0 : 
                                                   (matmul_11_control_param_index == 1)? 32'h0 : 32'h0;
   assign cparam_matmul_11_inc_act_laddr_small = (matmul_11_control_param_index == 0)? 32'h4 : 
-                                                (matmul_11_control_param_index == 1)? 32'h40 : 32'h20;
+                                                (matmul_11_control_param_index == 1)? 32'h10 : 32'h8;
   assign cparam_matmul_11_inc_act_laddr_large = (matmul_11_control_param_index == 0)? 32'h4 : 
-                                                (matmul_11_control_param_index == 1)? 32'h40 : 32'h20;
-  assign cparam_matmul_11_inc_out_laddr_col = (matmul_11_control_param_index == 0)? 32'h40 : 
-                                              (matmul_11_control_param_index == 1)? 32'h20 : 32'h2;
+                                                (matmul_11_control_param_index == 1)? 32'h10 : 32'h8;
+  assign cparam_matmul_11_inc_out_laddr_col = (matmul_11_control_param_index == 0)? 32'h10 : 
+                                              (matmul_11_control_param_index == 1)? 32'h8 : 32'h2;
   assign cparam_matmul_11_stream_act_local_small_offset = (matmul_11_control_param_index == 0)? 32'h0 : 
                                                           (matmul_11_control_param_index == 1)? 32'h0 : 32'h0;
   assign cparam_matmul_11_stream_act_local_large_offset = (matmul_11_control_param_index == 0)? 32'h0 : 
@@ -1373,7 +1373,7 @@ module taketwo
   reg _stream_matmul_11_busy_reg;
   wire _stream_matmul_11_is_root;
   assign _stream_matmul_11_is_root = 1;
-  reg [7-1:0] _stream_matmul_11_parameter_0_next_parameter_data;
+  reg [5-1:0] _stream_matmul_11_parameter_0_next_parameter_data;
   reg [1-1:0] _stream_matmul_11_parameter_1_next_parameter_data;
   reg [1-1:0] _stream_matmul_11_parameter_2_next_parameter_data;
   reg [1-1:0] _stream_matmul_11_parameter_3_next_parameter_data;
@@ -1777,11 +1777,11 @@ module taketwo
   reg matmul_11_skip_read_act;
   reg matmul_11_skip_comp;
   reg matmul_11_skip_write_out;
-  wire [7-1:0] _dma_read_packed_high_local_size_54;
+  wire [5-1:0] _dma_read_packed_high_local_size_54;
   assign _dma_read_packed_high_local_size_54 = cparam_matmul_11_bias_num >> 1;
   wire [1-1:0] _dma_read_packed_low_local_size_55;
   assign _dma_read_packed_low_local_size_55 = cparam_matmul_11_bias_num & { 1{ 1'd1 } };
-  wire [7-1:0] _dma_read_packed_local_packed_size_56;
+  wire [5-1:0] _dma_read_packed_local_packed_size_56;
   assign _dma_read_packed_local_packed_size_56 = (_dma_read_packed_low_local_size_55 > 0)? _dma_read_packed_high_local_size_54 + 1 : _dma_read_packed_high_local_size_54;
   wire [32-1:0] mask_addr_shifted_57;
   assign mask_addr_shifted_57 = matmul_11_arg_objaddr_2 + _maxi_global_base_addr >> 2;
@@ -1890,11 +1890,11 @@ module taketwo
   assign ram_w16_l512_id0_1_1_wdata = ((write_burst_packed_fsm_1 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_wdata_99 : 'hx;
   assign ram_w16_l512_id0_1_1_wenable = ((write_burst_packed_fsm_1 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
   assign ram_w16_l512_id0_1_1_enable = ((write_burst_packed_fsm_1 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
-  wire [9-1:0] _dma_read_packed_high_local_size_100;
+  wire [8-1:0] _dma_read_packed_high_local_size_100;
   assign _dma_read_packed_high_local_size_100 = cparam_matmul_11_filter_read_size >> 1;
   wire [1-1:0] _dma_read_packed_low_local_size_101;
   assign _dma_read_packed_low_local_size_101 = cparam_matmul_11_filter_read_size & { 1{ 1'd1 } };
-  wire [9-1:0] _dma_read_packed_local_packed_size_102;
+  wire [8-1:0] _dma_read_packed_local_packed_size_102;
   assign _dma_read_packed_local_packed_size_102 = (_dma_read_packed_low_local_size_101 > 0)? _dma_read_packed_high_local_size_100 + 1 : _dma_read_packed_high_local_size_100;
   wire [32-1:0] mask_addr_shifted_103;
   assign mask_addr_shifted_103 = matmul_11_arg_objaddr_1 + matmul_11_filter_base_offset + _maxi_global_base_addr >> 2;
@@ -1930,11 +1930,11 @@ module taketwo
   assign matmul_11_mux_dma_pad_mask_0 = (matmul_11_row_select == 0)? matmul_11_dma_pad_mask_0 : 1'd0;
   wire matmul_11_mux_dma_flag_0;
   assign matmul_11_mux_dma_flag_0 = (matmul_11_prev_row_select == 0)? matmul_11_dma_flag_0 : 1'd0;
-  wire [7-1:0] _dma_read_packed_high_local_size_113;
+  wire [5-1:0] _dma_read_packed_high_local_size_113;
   assign _dma_read_packed_high_local_size_113 = cparam_matmul_11_act_read_size >> 1;
   wire [1-1:0] _dma_read_packed_low_local_size_114;
   assign _dma_read_packed_low_local_size_114 = cparam_matmul_11_act_read_size & { 1{ 1'd1 } };
-  wire [7-1:0] _dma_read_packed_local_packed_size_115;
+  wire [5-1:0] _dma_read_packed_local_packed_size_115;
   assign _dma_read_packed_local_packed_size_115 = (_dma_read_packed_low_local_size_114 > 0)? _dma_read_packed_high_local_size_113 + 1 : _dma_read_packed_high_local_size_113;
   wire [32-1:0] mask_addr_shifted_116;
   assign mask_addr_shifted_116 = matmul_11_mux_act_gaddr_0 + _maxi_global_base_addr >> 2;
@@ -1978,7 +1978,7 @@ module taketwo
   wire matmul_11_stream_pad_mask_0_0;
   assign matmul_11_stream_pad_mask_0_0 = (matmul_11_col_count + 0 < cparam_matmul_11_pad_col_left) || (matmul_11_col_count + 0 >= cparam_matmul_11_act_num_col + cparam_matmul_11_pad_col_left) || (matmul_11_row_count_buf + 0 < cparam_matmul_11_pad_row_top) || (matmul_11_row_count_buf + 0 >= cparam_matmul_11_act_num_row + cparam_matmul_11_pad_row_top);
   reg [1-1:0] matmul_11_stream_pad_masks;
-  wire [7-1:0] stream_matmul_11_parameter_0_data;
+  wire [5-1:0] stream_matmul_11_parameter_0_data;
   wire [1-1:0] stream_matmul_11_parameter_1_data;
   wire [1-1:0] stream_matmul_11_parameter_2_data;
   wire [1-1:0] stream_matmul_11_parameter_3_data;
@@ -2086,7 +2086,7 @@ module taketwo
   reg [1-1:0] __delay_data_223_pointer_153;
   reg signed [16-1:0] __delay_data_224_reinterpretcast_152;
   reg [1-1:0] __delay_data_225__variable_84;
-  reg [7-1:0] __delay_data_246__variable_79;
+  reg [5-1:0] __delay_data_246__variable_79;
   reg signed [16-1:0] __delay_data_257_cond_100;
   reg signed [16-1:0] __delay_data_274_cond_107;
   wire signed [16-1:0] _cond_data_136;
@@ -2109,7 +2109,7 @@ module taketwo
   assign _mul_3_stream_oready = ((_stream_matmul_11_busy)? _stream_matmul_11_stream_oready : 1) && _mul_3_stream_internal_oready;
   reg [1-1:0] __delay_data_226__delay_225__variable_84;
   reg [16-1:0] __delay_data_236_plus_190;
-  reg [7-1:0] __delay_data_247__delay_246__variable_79;
+  reg [5-1:0] __delay_data_247__delay_246__variable_79;
   reg signed [16-1:0] __delay_data_258__delay_257_cond_100;
   reg signed [16-1:0] __delay_data_275__delay_274_cond_107;
   reg [16-1:0] __delay_data_292_plus_209;
@@ -2117,7 +2117,7 @@ module taketwo
   reg [1-1:0] __delay_data_339_eq_218;
   reg [1-1:0] __delay_data_227__delay_226__delay_225__variable_84;
   reg [16-1:0] __delay_data_237__delay_236_plus_190;
-  reg [7-1:0] __delay_data_248__delay_247__delay_246__variable_79;
+  reg [5-1:0] __delay_data_248__delay_247__delay_246__variable_79;
   reg signed [16-1:0] __delay_data_259__delay_258__delay_257_cond_100;
   reg signed [16-1:0] __delay_data_276__delay_275__delay_274_cond_107;
   reg [16-1:0] __delay_data_293__delay_292_plus_209;
@@ -2125,7 +2125,7 @@ module taketwo
   reg [1-1:0] __delay_data_340__delay_339_eq_218;
   reg [1-1:0] __delay_data_228__delay_227__delay_226__delay_225__variable_84;
   reg [16-1:0] __delay_data_238__delay_237__delay_236_plus_190;
-  reg [7-1:0] __delay_data_249__delay_248__delay_247__delay_246__variable_79;
+  reg [5-1:0] __delay_data_249__delay_248__delay_247__delay_246__variable_79;
   reg signed [16-1:0] __delay_data_260__delay_259__delay_258__delay_257_cond_100;
   reg signed [16-1:0] __delay_data_277__delay_276__delay_275__delay_274_cond_107;
   reg [16-1:0] __delay_data_294__delay_293__delay_292_plus_209;
@@ -2133,7 +2133,7 @@ module taketwo
   reg [1-1:0] __delay_data_341__delay_340__delay_339_eq_218;
   reg [1-1:0] __delay_data_229__delay_228__delay_227__delay_226____variable_84;
   reg [16-1:0] __delay_data_239__delay_238__delay_237__delay_236_plus_190;
-  reg [7-1:0] __delay_data_250__delay_249__delay_248__delay_247____variable_79;
+  reg [5-1:0] __delay_data_250__delay_249__delay_248__delay_247____variable_79;
   reg signed [16-1:0] __delay_data_261__delay_260__delay_259__delay_258___cond_100;
   reg signed [16-1:0] __delay_data_278__delay_277__delay_276__delay_275___cond_107;
   reg [16-1:0] __delay_data_295__delay_294__delay_293__delay_292_plus_209;
@@ -2141,7 +2141,7 @@ module taketwo
   reg [1-1:0] __delay_data_342__delay_341__delay_340__delay_339_eq_218;
   reg [1-1:0] __delay_data_230__delay_229__delay_228__delay_227____variable_84;
   reg [16-1:0] __delay_data_240__delay_239__delay_238__delay_237___plus_190;
-  reg [7-1:0] __delay_data_251__delay_250__delay_249__delay_248____variable_79;
+  reg [5-1:0] __delay_data_251__delay_250__delay_249__delay_248____variable_79;
   reg signed [16-1:0] __delay_data_262__delay_261__delay_260__delay_259___cond_100;
   reg signed [16-1:0] __delay_data_279__delay_278__delay_277__delay_276___cond_107;
   reg [16-1:0] __delay_data_296__delay_295__delay_294__delay_293___plus_209;
@@ -2149,7 +2149,7 @@ module taketwo
   reg [1-1:0] __delay_data_343__delay_342__delay_341__delay_340___eq_218;
   reg [1-1:0] __delay_data_231__delay_230__delay_229__delay_228____variable_84;
   reg [16-1:0] __delay_data_241__delay_240__delay_239__delay_238___plus_190;
-  reg [7-1:0] __delay_data_252__delay_251__delay_250__delay_249____variable_79;
+  reg [5-1:0] __delay_data_252__delay_251__delay_250__delay_249____variable_79;
   reg signed [16-1:0] __delay_data_263__delay_262__delay_261__delay_260___cond_100;
   reg signed [16-1:0] __delay_data_280__delay_279__delay_278__delay_277___cond_107;
   reg [16-1:0] __delay_data_297__delay_296__delay_295__delay_294___plus_209;
@@ -2157,7 +2157,7 @@ module taketwo
   reg [1-1:0] __delay_data_344__delay_343__delay_342__delay_341___eq_218;
   reg [1-1:0] __delay_data_232__delay_231__delay_230__delay_229____variable_84;
   reg [16-1:0] __delay_data_242__delay_241__delay_240__delay_239___plus_190;
-  reg [7-1:0] __delay_data_253__delay_252__delay_251__delay_250____variable_79;
+  reg [5-1:0] __delay_data_253__delay_252__delay_251__delay_250____variable_79;
   reg signed [16-1:0] __delay_data_264__delay_263__delay_262__delay_261___cond_100;
   reg signed [16-1:0] __delay_data_281__delay_280__delay_279__delay_278___cond_107;
   reg [16-1:0] __delay_data_298__delay_297__delay_296__delay_295___plus_209;
@@ -2165,7 +2165,7 @@ module taketwo
   reg [1-1:0] __delay_data_345__delay_344__delay_343__delay_342___eq_218;
   reg [1-1:0] __delay_data_233__delay_232__delay_231__delay_230____variable_84;
   reg [16-1:0] __delay_data_243__delay_242__delay_241__delay_240___plus_190;
-  reg [7-1:0] __delay_data_254__delay_253__delay_252__delay_251____variable_79;
+  reg [5-1:0] __delay_data_254__delay_253__delay_252__delay_251____variable_79;
   reg signed [16-1:0] __delay_data_265__delay_264__delay_263__delay_262___cond_100;
   reg signed [16-1:0] __delay_data_282__delay_281__delay_280__delay_279___cond_107;
   reg [16-1:0] __delay_data_299__delay_298__delay_297__delay_296___plus_209;
@@ -2173,7 +2173,7 @@ module taketwo
   reg [1-1:0] __delay_data_346__delay_345__delay_344__delay_343___eq_218;
   reg [1-1:0] __delay_data_234__delay_233__delay_232__delay_231____variable_84;
   reg [16-1:0] __delay_data_244__delay_243__delay_242__delay_241___plus_190;
-  reg [7-1:0] __delay_data_255__delay_254__delay_253__delay_252____variable_79;
+  reg [5-1:0] __delay_data_255__delay_254__delay_253__delay_252____variable_79;
   reg signed [16-1:0] __delay_data_266__delay_265__delay_264__delay_263___cond_100;
   reg signed [16-1:0] __delay_data_283__delay_282__delay_281__delay_280___cond_107;
   reg [16-1:0] __delay_data_300__delay_299__delay_298__delay_297___plus_209;
@@ -2187,7 +2187,7 @@ module taketwo
   assign _add_tree_1_stream_oready = ((_stream_matmul_11_busy)? _stream_matmul_11_stream_oready : 1) && _add_tree_1_stream_internal_oready;
   reg [1-1:0] __delay_data_235__delay_234__delay_233__delay_232____variable_84;
   reg [16-1:0] __delay_data_245__delay_244__delay_243__delay_242___plus_190;
-  reg [7-1:0] __delay_data_256__delay_255__delay_254__delay_253____variable_79;
+  reg [5-1:0] __delay_data_256__delay_255__delay_254__delay_253____variable_79;
   reg signed [16-1:0] __delay_data_267__delay_266__delay_265__delay_264___cond_100;
   reg signed [16-1:0] __delay_data_284__delay_283__delay_282__delay_281___cond_107;
   reg [16-1:0] __delay_data_301__delay_300__delay_299__delay_298___plus_209;
@@ -2307,7 +2307,7 @@ module taketwo
   assign stream_matmul_11_sink_27_data = __delay_data_378__delay_377__delay_376____substreamoutput_192;
   wire _set_flag_126;
   assign _set_flag_126 = matmul_11_comp_fsm == 3;
-  reg [7-1:0] __variable_wdata_79;
+  reg [5-1:0] __variable_wdata_79;
   assign stream_matmul_11_parameter_0_data = __variable_wdata_79;
   wire _set_flag_127;
   assign _set_flag_127 = matmul_11_comp_fsm == 3;
@@ -3544,11 +3544,11 @@ module taketwo
       _saxi_flag_29 <= 0;
       _saxi_register_30 <= 0;
       _saxi_flag_30 <= 0;
-      _saxi_register_31 <= 5504;
+      _saxi_register_31 <= 1088;
       _saxi_flag_31 <= 0;
       _saxi_register_32 <= 0;
       _saxi_flag_32 <= 0;
-      _saxi_register_33 <= 5312;
+      _saxi_register_33 <= 960;
       _saxi_flag_33 <= 0;
       _saxi_register_34 <= 0;
       _saxi_flag_34 <= 0;
@@ -8555,11 +8555,11 @@ module taketwo
           main_fsm <= main_fsm_12;
         end
         main_fsm_12: begin
-          matmul_11_arg_objaddr_2 <= _saxi_register_36 + 512;
+          matmul_11_arg_objaddr_2 <= _saxi_register_36 + 128;
           main_fsm <= main_fsm_13;
         end
         main_fsm_13: begin
-          matmul_11_arg_objaddr_3 <= _saxi_register_36 + 640;
+          matmul_11_arg_objaddr_3 <= _saxi_register_36 + 192;
           main_fsm <= main_fsm_14;
         end
         main_fsm_14: begin
@@ -8581,7 +8581,7 @@ module taketwo
           main_fsm <= main_fsm_19;
         end
         main_fsm_19: begin
-          matmul_11_objaddr <= _saxi_register_33 + 128;
+          matmul_11_objaddr <= _saxi_register_33 + 64;
           main_fsm <= main_fsm_20;
         end
         main_fsm_20: begin
@@ -8589,15 +8589,15 @@ module taketwo
           main_fsm <= main_fsm_21;
         end
         main_fsm_21: begin
-          matmul_11_arg_objaddr_1 <= _saxi_register_36 + 704;
+          matmul_11_arg_objaddr_1 <= _saxi_register_36 + 256;
           main_fsm <= main_fsm_22;
         end
         main_fsm_22: begin
-          matmul_11_arg_objaddr_2 <= _saxi_register_36 + 4800;
+          matmul_11_arg_objaddr_2 <= _saxi_register_36 + 512;
           main_fsm <= main_fsm_23;
         end
         main_fsm_23: begin
-          matmul_11_arg_objaddr_3 <= _saxi_register_36 + 4864;
+          matmul_11_arg_objaddr_3 <= _saxi_register_36 + 576;
           main_fsm <= main_fsm_24;
         end
         main_fsm_24: begin
@@ -8623,19 +8623,19 @@ module taketwo
           main_fsm <= main_fsm_30;
         end
         main_fsm_30: begin
-          matmul_11_arg_objaddr_0 <= _saxi_register_33 + 128;
+          matmul_11_arg_objaddr_0 <= _saxi_register_33 + 64;
           main_fsm <= main_fsm_31;
         end
         main_fsm_31: begin
-          matmul_11_arg_objaddr_1 <= _saxi_register_36 + 4928;
+          matmul_11_arg_objaddr_1 <= _saxi_register_36 + 640;
           main_fsm <= main_fsm_32;
         end
         main_fsm_32: begin
-          matmul_11_arg_objaddr_2 <= _saxi_register_36 + 5056;
+          matmul_11_arg_objaddr_2 <= _saxi_register_36 + 704;
           main_fsm <= main_fsm_33;
         end
         main_fsm_33: begin
-          matmul_11_arg_objaddr_3 <= _saxi_register_36 + 5120;
+          matmul_11_arg_objaddr_3 <= _saxi_register_36 + 768;
           main_fsm <= main_fsm_34;
         end
         main_fsm_34: begin
@@ -9959,7 +9959,7 @@ endmodule
 
 
 
-module ram_w16_l512_id0_0
+module ram_w16_l512_id0_0 //PORT 0 is read, PORT 1 is write  
 (
   input CLK,
   input [8-1:0] ram_w16_l512_id0_0_0_addr,
@@ -9973,35 +9973,71 @@ module ram_w16_l512_id0_0
   input ram_w16_l512_id0_0_1_wenable,
   input ram_w16_l512_id0_0_1_enable
 );
+  
+  //for simming vdd and vss for ram
+  supply1 vdd;
+  supply0 vss;
 
-  reg [16-1:0] ram_w16_l512_id0_0_0_rdata_out;
-  assign ram_w16_l512_id0_0_0_rdata = ram_w16_l512_id0_0_0_rdata_out;
-  reg [16-1:0] ram_w16_l512_id0_0_1_rdata_out;
-  assign ram_w16_l512_id0_0_1_rdata = ram_w16_l512_id0_0_1_rdata_out;
-  reg [16-1:0] mem [0:256-1];
-
-  always @(posedge CLK) begin
-    if(ram_w16_l512_id0_0_0_enable) begin
-      if(ram_w16_l512_id0_0_0_wenable) begin
-        mem[ram_w16_l512_id0_0_0_addr] <= ram_w16_l512_id0_0_0_wdata;
-        ram_w16_l512_id0_0_0_rdata_out <= ram_w16_l512_id0_0_0_wdata;
-      end else begin
-        ram_w16_l512_id0_0_0_rdata_out <= mem[ram_w16_l512_id0_0_0_addr];
-      end
-    end 
-  end
+  wire write_en_n;
+  wire [8:0] addr;
+  assign write_en_n = ~(ram_w16_l512_id0_0_1_wenable && ram_w16_l512_id0_0_1_enable);
+  assign addr = {1'b0,(ram_w16_l512_id0_0_1_enable) ? ram_w16_l512_id0_0_1_addr : ram_w16_l512_id0_0_0_addr};
 
 
-  always @(posedge CLK) begin
-    if(ram_w16_l512_id0_0_1_enable) begin
-      if(ram_w16_l512_id0_0_1_wenable) begin
-        mem[ram_w16_l512_id0_0_1_addr] <= ram_w16_l512_id0_0_1_wdata;
-        ram_w16_l512_id0_0_1_rdata_out <= ram_w16_l512_id0_0_1_wdata;
-      end else begin
-        ram_w16_l512_id0_0_1_rdata_out <= mem[ram_w16_l512_id0_0_1_addr];
-      end
-    end 
-  end
+  gf180mcu_fd_ip_sram__sram512x8m8wm1 
+  mem_top (
+    .CLK(CLK), 
+    .CEN(1'b0), //chip enable, just hardcoded one for now
+    .GWEN(write_en_n),
+    .WEN(8'b00000000), 
+    .A(addr),
+    .D(ram_w16_l512_id0_0_1_wdata[15:8]),
+    .Q(ram_w16_l512_id0_0_0_rdata[15:8]),
+    .VDD(VDD), 
+    .VSS(VSS)
+  );
+
+  gf180mcu_fd_ip_sram__sram512x8m8wm1 
+  mem_bot (
+    .CLK(CLK), 
+    .CEN(1'b0), 
+    .GWEN(write_en_n),
+    .WEN(8'b00000000), 
+    .A(addr),
+    .D(ram_w16_l512_id0_0_1_wdata[7:0]),
+    .Q(ram_w16_l512_id0_0_0_rdata[7:0]),
+    .VDD(vdd), 
+    .VSS(vss)
+  );
+
+  // reg [16-1:0] ram_w16_l512_id0_0_0_rdata_out;
+  // assign ram_w16_l512_id0_0_0_rdata = ram_w16_l512_id0_0_0_rdata_out;
+  // reg [16-1:0] ram_w16_l512_id0_0_1_rdata_out;
+  // assign ram_w16_l512_id0_0_1_rdata = ram_w16_l512_id0_0_1_rdata_out;
+  // reg [16-1:0] mem [0:256-1];
+
+  // always @(posedge CLK) begin
+  //   if(ram_w16_l512_id0_0_0_enable) begin
+  //     if(ram_w16_l512_id0_0_0_wenable) begin
+  //       mem[ram_w16_l512_id0_0_0_addr] <= ram_w16_l512_id0_0_0_wdata;
+  //       ram_w16_l512_id0_0_0_rdata_out <= ram_w16_l512_id0_0_0_wdata;
+  //     end else begin
+  //       ram_w16_l512_id0_0_0_rdata_out <= mem[ram_w16_l512_id0_0_0_addr];
+  //     end
+  //   end 
+  // end
+
+
+  // always @(posedge CLK) begin
+  //   if(ram_w16_l512_id0_0_1_enable) begin
+  //     if(ram_w16_l512_id0_0_1_wenable) begin
+  //       mem[ram_w16_l512_id0_0_1_addr] <= ram_w16_l512_id0_0_1_wdata;
+  //       ram_w16_l512_id0_0_1_rdata_out <= ram_w16_l512_id0_0_1_wdata;
+  //     end else begin
+  //       ram_w16_l512_id0_0_1_rdata_out <= mem[ram_w16_l512_id0_0_1_addr];
+  //     end
+  //   end 
+  // end
 
 
 endmodule

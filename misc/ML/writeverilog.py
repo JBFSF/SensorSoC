@@ -33,7 +33,7 @@ PROJECT    = "taketwo"
 CHUNK_SIZE = 64
 
 # input quantization: x_int = round(x_float * X_SCALE)
-X_SCALE    = 8192 #Q3.13
+X_SCALE =  512 #Q3.13, this is maybe 6.9 now
 
 # RTL simulator: "iverilog" or "verilator"
 SIMTYPE    = os.environ.get("SIM", "verilator")
