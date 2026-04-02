@@ -727,6 +727,64 @@ module taketwo
     .ram_w16_l512_id2_1_1_enable(ram_w16_l512_id2_1_1_enable)
   );
 
+  wire [8-1:0] ram_w16_l512_id3_0_0_addr;
+  wire [16-1:0] ram_w16_l512_id3_0_0_rdata;
+  wire [16-1:0] ram_w16_l512_id3_0_0_wdata;
+  wire ram_w16_l512_id3_0_0_wenable;
+  wire ram_w16_l512_id3_0_0_enable;
+  wire [8-1:0] ram_w16_l512_id3_0_1_addr;
+  wire [16-1:0] ram_w16_l512_id3_0_1_rdata;
+  wire [16-1:0] ram_w16_l512_id3_0_1_wdata;
+  wire ram_w16_l512_id3_0_1_wenable;
+  wire ram_w16_l512_id3_0_1_enable;
+  assign ram_w16_l512_id3_0_0_wdata = 'hx;
+  assign ram_w16_l512_id3_0_0_wenable = 0;
+
+  ram_w16_l512_id3_0
+  inst_ram_w16_l512_id3_0
+  (
+    .CLK(CLK),
+    .ram_w16_l512_id3_0_0_addr(ram_w16_l512_id3_0_0_addr),
+    .ram_w16_l512_id3_0_0_rdata(ram_w16_l512_id3_0_0_rdata),
+    .ram_w16_l512_id3_0_0_wdata(ram_w16_l512_id3_0_0_wdata),
+    .ram_w16_l512_id3_0_0_wenable(ram_w16_l512_id3_0_0_wenable),
+    .ram_w16_l512_id3_0_0_enable(ram_w16_l512_id3_0_0_enable),
+    .ram_w16_l512_id3_0_1_addr(ram_w16_l512_id3_0_1_addr),
+    .ram_w16_l512_id3_0_1_rdata(ram_w16_l512_id3_0_1_rdata),
+    .ram_w16_l512_id3_0_1_wdata(ram_w16_l512_id3_0_1_wdata),
+    .ram_w16_l512_id3_0_1_wenable(ram_w16_l512_id3_0_1_wenable),
+    .ram_w16_l512_id3_0_1_enable(ram_w16_l512_id3_0_1_enable)
+  );
+
+  wire [8-1:0] ram_w16_l512_id3_1_0_addr;
+  wire [16-1:0] ram_w16_l512_id3_1_0_rdata;
+  wire [16-1:0] ram_w16_l512_id3_1_0_wdata;
+  wire ram_w16_l512_id3_1_0_wenable;
+  wire ram_w16_l512_id3_1_0_enable;
+  wire [8-1:0] ram_w16_l512_id3_1_1_addr;
+  wire [16-1:0] ram_w16_l512_id3_1_1_rdata;
+  wire [16-1:0] ram_w16_l512_id3_1_1_wdata;
+  wire ram_w16_l512_id3_1_1_wenable;
+  wire ram_w16_l512_id3_1_1_enable;
+  assign ram_w16_l512_id3_1_0_wdata = 'hx;
+  assign ram_w16_l512_id3_1_0_wenable = 0;
+
+  ram_w16_l512_id3_1
+  inst_ram_w16_l512_id3_1
+  (
+    .CLK(CLK),
+    .ram_w16_l512_id3_1_0_addr(ram_w16_l512_id3_1_0_addr),
+    .ram_w16_l512_id3_1_0_rdata(ram_w16_l512_id3_1_0_rdata),
+    .ram_w16_l512_id3_1_0_wdata(ram_w16_l512_id3_1_0_wdata),
+    .ram_w16_l512_id3_1_0_wenable(ram_w16_l512_id3_1_0_wenable),
+    .ram_w16_l512_id3_1_0_enable(ram_w16_l512_id3_1_0_enable),
+    .ram_w16_l512_id3_1_1_addr(ram_w16_l512_id3_1_1_addr),
+    .ram_w16_l512_id3_1_1_rdata(ram_w16_l512_id3_1_1_rdata),
+    .ram_w16_l512_id3_1_1_wdata(ram_w16_l512_id3_1_1_wdata),
+    .ram_w16_l512_id3_1_1_wenable(ram_w16_l512_id3_1_1_wenable),
+    .ram_w16_l512_id3_1_1_enable(ram_w16_l512_id3_1_1_enable)
+  );
+
   wire [7-1:0] ram_w32_l128_id0_0_addr;
   wire [32-1:0] ram_w32_l128_id0_0_rdata;
   wire [32-1:0] ram_w32_l128_id0_0_wdata;
@@ -754,35 +812,6 @@ module taketwo
     .ram_w32_l128_id0_1_wdata(ram_w32_l128_id0_1_wdata),
     .ram_w32_l128_id0_1_wenable(ram_w32_l128_id0_1_wenable),
     .ram_w32_l128_id0_1_enable(ram_w32_l128_id0_1_enable)
-  );
-
-  wire [7-1:0] ram_w32_l128_id1_0_addr;
-  wire [32-1:0] ram_w32_l128_id1_0_rdata;
-  wire [32-1:0] ram_w32_l128_id1_0_wdata;
-  wire ram_w32_l128_id1_0_wenable;
-  wire ram_w32_l128_id1_0_enable;
-  wire [7-1:0] ram_w32_l128_id1_1_addr;
-  wire [32-1:0] ram_w32_l128_id1_1_rdata;
-  wire [32-1:0] ram_w32_l128_id1_1_wdata;
-  wire ram_w32_l128_id1_1_wenable;
-  wire ram_w32_l128_id1_1_enable;
-  assign ram_w32_l128_id1_0_wdata = 'hx;
-  assign ram_w32_l128_id1_0_wenable = 0;
-
-  ram_w32_l128_id1
-  inst_ram_w32_l128_id1
-  (
-    .CLK(CLK),
-    .ram_w32_l128_id1_0_addr(ram_w32_l128_id1_0_addr),
-    .ram_w32_l128_id1_0_rdata(ram_w32_l128_id1_0_rdata),
-    .ram_w32_l128_id1_0_wdata(ram_w32_l128_id1_0_wdata),
-    .ram_w32_l128_id1_0_wenable(ram_w32_l128_id1_0_wenable),
-    .ram_w32_l128_id1_0_enable(ram_w32_l128_id1_0_enable),
-    .ram_w32_l128_id1_1_addr(ram_w32_l128_id1_1_addr),
-    .ram_w32_l128_id1_1_rdata(ram_w32_l128_id1_1_rdata),
-    .ram_w32_l128_id1_1_wdata(ram_w32_l128_id1_1_wdata),
-    .ram_w32_l128_id1_1_wenable(ram_w32_l128_id1_1_wenable),
-    .ram_w32_l128_id1_1_enable(ram_w32_l128_id1_1_enable)
   );
 
   wire [1-1:0] cparam_matmul_11_act_num_col;
@@ -1334,10 +1363,10 @@ module taketwo
   reg [8-1:0] _stream_matmul_11_source_7_source_sel;
   reg [32-1:0] _stream_matmul_11_source_7_source_ram_raddr;
   reg _stream_matmul_11_source_7_source_ram_renable;
-  wire [32-1:0] _stream_matmul_11_source_7_source_ram_rdata;
+  wire [16-1:0] _stream_matmul_11_source_7_source_ram_rdata;
   reg _stream_matmul_11_source_7_source_fifo_deq;
-  wire [32-1:0] _stream_matmul_11_source_7_source_fifo_rdata;
-  reg [32-1:0] _stream_matmul_11_source_7_source_empty_data;
+  wire [16-1:0] _stream_matmul_11_source_7_source_fifo_rdata;
+  reg [16-1:0] _stream_matmul_11_source_7_source_empty_data;
   reg [1-1:0] _stream_matmul_11_parameter_8_next_parameter_data;
   reg _stream_matmul_11_source_9_idle;
   reg [33-1:0] _stream_matmul_11_source_9_source_count;
@@ -1719,115 +1748,133 @@ module taketwo
   reg matmul_11_skip_read_act;
   reg matmul_11_skip_comp;
   reg matmul_11_skip_write_out;
-  wire [32-1:0] mask_addr_shifted_54;
-  assign mask_addr_shifted_54 = matmul_11_arg_objaddr_2 + _maxi_global_base_addr >> 2;
-  wire [32-1:0] mask_addr_masked_55;
-  assign mask_addr_masked_55 = mask_addr_shifted_54 << 2;
+  wire [7-1:0] _dma_read_packed_high_local_size_54;
+  assign _dma_read_packed_high_local_size_54 = cparam_matmul_11_bias_num >> 1;
+  wire [1-1:0] _dma_read_packed_low_local_size_55;
+  assign _dma_read_packed_low_local_size_55 = cparam_matmul_11_bias_num & { 1{ 1'd1 } };
+  wire [7-1:0] _dma_read_packed_local_packed_size_56;
+  assign _dma_read_packed_local_packed_size_56 = (_dma_read_packed_low_local_size_55 > 0)? _dma_read_packed_high_local_size_54 + 1 : _dma_read_packed_high_local_size_54;
+  wire [32-1:0] mask_addr_shifted_57;
+  assign mask_addr_shifted_57 = matmul_11_arg_objaddr_2 + _maxi_global_base_addr >> 2;
+  wire [32-1:0] mask_addr_masked_58;
+  assign mask_addr_masked_58 = mask_addr_shifted_57 << 2;
   reg [32-1:0] _maxi_read_req_fsm;
   localparam _maxi_read_req_fsm_init = 0;
   reg [33-1:0] _maxi_read_cur_global_size;
   reg _maxi_read_cont;
-  wire [8-1:0] pack_read_req_op_sel_56;
-  wire [32-1:0] pack_read_req_local_addr_57;
-  wire [32-1:0] pack_read_req_local_stride_58;
-  wire [33-1:0] pack_read_req_local_size_59;
-  wire [32-1:0] pack_read_req_local_blocksize_60;
-  assign pack_read_req_op_sel_56 = _maxi_read_op_sel;
-  assign pack_read_req_local_addr_57 = _maxi_read_local_addr;
-  assign pack_read_req_local_stride_58 = _maxi_read_local_stride;
-  assign pack_read_req_local_size_59 = _maxi_read_local_size;
-  assign pack_read_req_local_blocksize_60 = _maxi_read_local_blocksize;
-  wire [137-1:0] pack_read_req_packed_61;
-  assign pack_read_req_packed_61 = { pack_read_req_op_sel_56, pack_read_req_local_addr_57, pack_read_req_local_stride_58, pack_read_req_local_size_59, pack_read_req_local_blocksize_60 };
-  assign _maxi_read_req_fifo_wdata = ((_maxi_read_req_fsm == 0) && _maxi_read_start && !_maxi_read_req_fifo_almost_full)? pack_read_req_packed_61 : 'hx;
+  wire [8-1:0] pack_read_req_op_sel_59;
+  wire [32-1:0] pack_read_req_local_addr_60;
+  wire [32-1:0] pack_read_req_local_stride_61;
+  wire [33-1:0] pack_read_req_local_size_62;
+  wire [32-1:0] pack_read_req_local_blocksize_63;
+  assign pack_read_req_op_sel_59 = _maxi_read_op_sel;
+  assign pack_read_req_local_addr_60 = _maxi_read_local_addr;
+  assign pack_read_req_local_stride_61 = _maxi_read_local_stride;
+  assign pack_read_req_local_size_62 = _maxi_read_local_size;
+  assign pack_read_req_local_blocksize_63 = _maxi_read_local_blocksize;
+  wire [137-1:0] pack_read_req_packed_64;
+  assign pack_read_req_packed_64 = { pack_read_req_op_sel_59, pack_read_req_local_addr_60, pack_read_req_local_stride_61, pack_read_req_local_size_62, pack_read_req_local_blocksize_63 };
+  assign _maxi_read_req_fifo_wdata = ((_maxi_read_req_fsm == 0) && _maxi_read_start && !_maxi_read_req_fifo_almost_full)? pack_read_req_packed_64 : 'hx;
   assign _maxi_read_req_fifo_enq = ((_maxi_read_req_fsm == 0) && _maxi_read_start && !_maxi_read_req_fifo_almost_full)? (_maxi_read_req_fsm == 0) && _maxi_read_start && !_maxi_read_req_fifo_almost_full && !_maxi_read_req_fifo_almost_full : 0;
-  localparam _tmp_62 = 1;
-  wire [_tmp_62-1:0] _tmp_63;
-  assign _tmp_63 = !_maxi_read_req_fifo_almost_full;
-  reg [_tmp_62-1:0] __tmp_63_1;
-  wire [32-1:0] mask_addr_shifted_64;
-  assign mask_addr_shifted_64 = _maxi_read_global_addr >> 2;
-  wire [32-1:0] mask_addr_masked_65;
-  assign mask_addr_masked_65 = mask_addr_shifted_64 << 2;
-  wire [32-1:0] mask_addr_shifted_66;
-  assign mask_addr_shifted_66 = _maxi_read_global_addr >> 2;
-  wire [32-1:0] mask_addr_masked_67;
-  assign mask_addr_masked_67 = mask_addr_shifted_66 << 2;
-  wire [32-1:0] mask_addr_shifted_68;
-  assign mask_addr_shifted_68 = _maxi_read_global_addr >> 2;
-  wire [32-1:0] mask_addr_masked_69;
-  assign mask_addr_masked_69 = mask_addr_shifted_68 << 2;
-  wire [32-1:0] mask_addr_shifted_70;
-  assign mask_addr_shifted_70 = _maxi_read_global_addr >> 2;
-  wire [32-1:0] mask_addr_masked_71;
-  assign mask_addr_masked_71 = mask_addr_shifted_70 << 2;
-  wire [32-1:0] mask_addr_shifted_72;
-  assign mask_addr_shifted_72 = _maxi_read_global_addr >> 2;
-  wire [32-1:0] mask_addr_masked_73;
-  assign mask_addr_masked_73 = mask_addr_shifted_72 << 2;
-  wire [32-1:0] mask_addr_shifted_74;
-  assign mask_addr_shifted_74 = _maxi_read_global_addr >> 2;
-  wire [32-1:0] mask_addr_masked_75;
-  assign mask_addr_masked_75 = mask_addr_shifted_74 << 2;
+  localparam _tmp_65 = 1;
+  wire [_tmp_65-1:0] _tmp_66;
+  assign _tmp_66 = !_maxi_read_req_fifo_almost_full;
+  reg [_tmp_65-1:0] __tmp_66_1;
+  wire [32-1:0] mask_addr_shifted_67;
+  assign mask_addr_shifted_67 = _maxi_read_global_addr >> 2;
+  wire [32-1:0] mask_addr_masked_68;
+  assign mask_addr_masked_68 = mask_addr_shifted_67 << 2;
+  wire [32-1:0] mask_addr_shifted_69;
+  assign mask_addr_shifted_69 = _maxi_read_global_addr >> 2;
+  wire [32-1:0] mask_addr_masked_70;
+  assign mask_addr_masked_70 = mask_addr_shifted_69 << 2;
+  wire [32-1:0] mask_addr_shifted_71;
+  assign mask_addr_shifted_71 = _maxi_read_global_addr >> 2;
+  wire [32-1:0] mask_addr_masked_72;
+  assign mask_addr_masked_72 = mask_addr_shifted_71 << 2;
+  wire [32-1:0] mask_addr_shifted_73;
+  assign mask_addr_shifted_73 = _maxi_read_global_addr >> 2;
+  wire [32-1:0] mask_addr_masked_74;
+  assign mask_addr_masked_74 = mask_addr_shifted_73 << 2;
+  wire [32-1:0] mask_addr_shifted_75;
+  assign mask_addr_shifted_75 = _maxi_read_global_addr >> 2;
+  wire [32-1:0] mask_addr_masked_76;
+  assign mask_addr_masked_76 = mask_addr_shifted_75 << 2;
+  wire [32-1:0] mask_addr_shifted_77;
+  assign mask_addr_shifted_77 = _maxi_read_global_addr >> 2;
+  wire [32-1:0] mask_addr_masked_78;
+  assign mask_addr_masked_78 = mask_addr_shifted_77 << 2;
   reg _maxi_raddr_cond_0_1;
   reg [32-1:0] _maxi_read_data_fsm;
   localparam _maxi_read_data_fsm_init = 0;
-  reg [32-1:0] write_burst_fsm_0;
-  localparam write_burst_fsm_0_init = 0;
-  reg [7-1:0] write_burst_addr_76;
-  reg [7-1:0] write_burst_stride_77;
-  reg [33-1:0] write_burst_length_78;
-  reg write_burst_done_79;
-  assign ram_w32_l128_id1_1_addr = ((write_burst_fsm_0 == 1) && _maxi_rvalid_sb_0)? write_burst_addr_76 : 'hx;
-  assign ram_w32_l128_id1_1_wdata = ((write_burst_fsm_0 == 1) && _maxi_rvalid_sb_0)? _maxi_rdata_sb_0 : 'hx;
-  assign ram_w32_l128_id1_1_wenable = ((write_burst_fsm_0 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
-  assign ram_w32_l128_id1_1_enable = ((write_burst_fsm_0 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
-  wire [32-1:0] mask_addr_shifted_80;
-  assign mask_addr_shifted_80 = matmul_11_arg_objaddr_3 + _maxi_global_base_addr >> 2;
-  wire [32-1:0] mask_addr_masked_81;
-  assign mask_addr_masked_81 = mask_addr_shifted_80 << 2;
+  reg [32-1:0] write_burst_packed_fsm_0;
+  localparam write_burst_packed_fsm_0_init = 0;
+  reg [9-1:0] write_burst_packed_addr_79;
+  reg [9-1:0] write_burst_packed_stride_80;
+  reg [33-1:0] write_burst_packed_length_81;
+  reg write_burst_packed_done_82;
+  wire [8-1:0] write_burst_packed_ram_addr_83;
+  assign write_burst_packed_ram_addr_83 = write_burst_packed_addr_79 >> 1;
+  wire [16-1:0] write_burst_packed_ram_wdata_84;
+  assign write_burst_packed_ram_wdata_84 = _maxi_rdata_sb_0 >> 0;
+  assign ram_w16_l512_id2_0_1_addr = ((write_burst_packed_fsm_0 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_addr_83 : 'hx;
+  assign ram_w16_l512_id2_0_1_wdata = ((write_burst_packed_fsm_0 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_wdata_84 : 'hx;
+  assign ram_w16_l512_id2_0_1_wenable = ((write_burst_packed_fsm_0 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
+  assign ram_w16_l512_id2_0_1_enable = ((write_burst_packed_fsm_0 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
+  wire [8-1:0] write_burst_packed_ram_addr_85;
+  assign write_burst_packed_ram_addr_85 = write_burst_packed_addr_79 >> 1;
+  wire [16-1:0] write_burst_packed_ram_wdata_86;
+  assign write_burst_packed_ram_wdata_86 = _maxi_rdata_sb_0 >> 16;
+  assign ram_w16_l512_id2_1_1_addr = ((write_burst_packed_fsm_0 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_addr_85 : 'hx;
+  assign ram_w16_l512_id2_1_1_wdata = ((write_burst_packed_fsm_0 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_wdata_86 : 'hx;
+  assign ram_w16_l512_id2_1_1_wenable = ((write_burst_packed_fsm_0 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
+  assign ram_w16_l512_id2_1_1_enable = ((write_burst_packed_fsm_0 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
+  wire [32-1:0] mask_addr_shifted_87;
+  assign mask_addr_shifted_87 = matmul_11_arg_objaddr_3 + _maxi_global_base_addr >> 2;
+  wire [32-1:0] mask_addr_masked_88;
+  assign mask_addr_masked_88 = mask_addr_shifted_87 << 2;
   reg [32-1:0] write_burst_fsm_1;
   localparam write_burst_fsm_1_init = 0;
-  reg [7-1:0] write_burst_addr_82;
-  reg [7-1:0] write_burst_stride_83;
-  reg [33-1:0] write_burst_length_84;
-  reg write_burst_done_85;
-  assign ram_w32_l128_id0_1_addr = ((write_burst_fsm_1 == 1) && _maxi_rvalid_sb_0)? write_burst_addr_82 : 'hx;
+  reg [7-1:0] write_burst_addr_89;
+  reg [7-1:0] write_burst_stride_90;
+  reg [33-1:0] write_burst_length_91;
+  reg write_burst_done_92;
+  assign ram_w32_l128_id0_1_addr = ((write_burst_fsm_1 == 1) && _maxi_rvalid_sb_0)? write_burst_addr_89 : 'hx;
   assign ram_w32_l128_id0_1_wdata = ((write_burst_fsm_1 == 1) && _maxi_rvalid_sb_0)? _maxi_rdata_sb_0 : 'hx;
   assign ram_w32_l128_id0_1_wenable = ((write_burst_fsm_1 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
   assign ram_w32_l128_id0_1_enable = ((write_burst_fsm_1 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
-  wire [9-1:0] _dma_read_packed_high_local_size_86;
-  assign _dma_read_packed_high_local_size_86 = cparam_matmul_11_filter_read_size >> 1;
-  wire [1-1:0] _dma_read_packed_low_local_size_87;
-  assign _dma_read_packed_low_local_size_87 = cparam_matmul_11_filter_read_size & { 1{ 1'd1 } };
-  wire [9-1:0] _dma_read_packed_local_packed_size_88;
-  assign _dma_read_packed_local_packed_size_88 = (_dma_read_packed_low_local_size_87 > 0)? _dma_read_packed_high_local_size_86 + 1 : _dma_read_packed_high_local_size_86;
-  wire [32-1:0] mask_addr_shifted_89;
-  assign mask_addr_shifted_89 = matmul_11_arg_objaddr_1 + matmul_11_filter_base_offset + _maxi_global_base_addr >> 2;
-  wire [32-1:0] mask_addr_masked_90;
-  assign mask_addr_masked_90 = mask_addr_shifted_89 << 2;
+  wire [9-1:0] _dma_read_packed_high_local_size_93;
+  assign _dma_read_packed_high_local_size_93 = cparam_matmul_11_filter_read_size >> 1;
+  wire [1-1:0] _dma_read_packed_low_local_size_94;
+  assign _dma_read_packed_low_local_size_94 = cparam_matmul_11_filter_read_size & { 1{ 1'd1 } };
+  wire [9-1:0] _dma_read_packed_local_packed_size_95;
+  assign _dma_read_packed_local_packed_size_95 = (_dma_read_packed_low_local_size_94 > 0)? _dma_read_packed_high_local_size_93 + 1 : _dma_read_packed_high_local_size_93;
+  wire [32-1:0] mask_addr_shifted_96;
+  assign mask_addr_shifted_96 = matmul_11_arg_objaddr_1 + matmul_11_filter_base_offset + _maxi_global_base_addr >> 2;
+  wire [32-1:0] mask_addr_masked_97;
+  assign mask_addr_masked_97 = mask_addr_shifted_96 << 2;
   reg [32-1:0] write_burst_packed_fsm_2;
   localparam write_burst_packed_fsm_2_init = 0;
-  reg [9-1:0] write_burst_packed_addr_91;
-  reg [9-1:0] write_burst_packed_stride_92;
-  reg [33-1:0] write_burst_packed_length_93;
-  reg write_burst_packed_done_94;
-  wire [8-1:0] write_burst_packed_ram_addr_95;
-  assign write_burst_packed_ram_addr_95 = write_burst_packed_addr_91 >> 1;
-  wire [16-1:0] write_burst_packed_ram_wdata_96;
-  assign write_burst_packed_ram_wdata_96 = _maxi_rdata_sb_0 >> 0;
-  assign ram_w16_l512_id2_0_1_addr = ((write_burst_packed_fsm_2 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_addr_95 : 'hx;
-  assign ram_w16_l512_id2_0_1_wdata = ((write_burst_packed_fsm_2 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_wdata_96 : 'hx;
-  assign ram_w16_l512_id2_0_1_wenable = ((write_burst_packed_fsm_2 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
-  assign ram_w16_l512_id2_0_1_enable = ((write_burst_packed_fsm_2 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
-  wire [8-1:0] write_burst_packed_ram_addr_97;
-  assign write_burst_packed_ram_addr_97 = write_burst_packed_addr_91 >> 1;
-  wire [16-1:0] write_burst_packed_ram_wdata_98;
-  assign write_burst_packed_ram_wdata_98 = _maxi_rdata_sb_0 >> 16;
-  assign ram_w16_l512_id2_1_1_addr = ((write_burst_packed_fsm_2 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_addr_97 : 'hx;
-  assign ram_w16_l512_id2_1_1_wdata = ((write_burst_packed_fsm_2 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_wdata_98 : 'hx;
-  assign ram_w16_l512_id2_1_1_wenable = ((write_burst_packed_fsm_2 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
-  assign ram_w16_l512_id2_1_1_enable = ((write_burst_packed_fsm_2 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
+  reg [9-1:0] write_burst_packed_addr_98;
+  reg [9-1:0] write_burst_packed_stride_99;
+  reg [33-1:0] write_burst_packed_length_100;
+  reg write_burst_packed_done_101;
+  wire [8-1:0] write_burst_packed_ram_addr_102;
+  assign write_burst_packed_ram_addr_102 = write_burst_packed_addr_98 >> 1;
+  wire [16-1:0] write_burst_packed_ram_wdata_103;
+  assign write_burst_packed_ram_wdata_103 = _maxi_rdata_sb_0 >> 0;
+  assign ram_w16_l512_id3_0_1_addr = ((write_burst_packed_fsm_2 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_addr_102 : 'hx;
+  assign ram_w16_l512_id3_0_1_wdata = ((write_burst_packed_fsm_2 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_wdata_103 : 'hx;
+  assign ram_w16_l512_id3_0_1_wenable = ((write_burst_packed_fsm_2 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
+  assign ram_w16_l512_id3_0_1_enable = ((write_burst_packed_fsm_2 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
+  wire [8-1:0] write_burst_packed_ram_addr_104;
+  assign write_burst_packed_ram_addr_104 = write_burst_packed_addr_98 >> 1;
+  wire [16-1:0] write_burst_packed_ram_wdata_105;
+  assign write_burst_packed_ram_wdata_105 = _maxi_rdata_sb_0 >> 16;
+  assign ram_w16_l512_id3_1_1_addr = ((write_burst_packed_fsm_2 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_addr_104 : 'hx;
+  assign ram_w16_l512_id3_1_1_wdata = ((write_burst_packed_fsm_2 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_wdata_105 : 'hx;
+  assign ram_w16_l512_id3_1_1_wenable = ((write_burst_packed_fsm_2 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
+  assign ram_w16_l512_id3_1_1_enable = ((write_burst_packed_fsm_2 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
   wire [32-1:0] matmul_11_mux_act_gaddr_0;
   assign matmul_11_mux_act_gaddr_0 = (matmul_11_row_select == 0)? matmul_11_arg_objaddr_0 + (matmul_11_act_base_offset + cparam_matmul_11_act_offset_values_0) : 1'd0;
   wire matmul_11_dma_pad_mask_0;
@@ -1836,40 +1883,40 @@ module taketwo
   assign matmul_11_mux_dma_pad_mask_0 = (matmul_11_row_select == 0)? matmul_11_dma_pad_mask_0 : 1'd0;
   wire matmul_11_mux_dma_flag_0;
   assign matmul_11_mux_dma_flag_0 = (matmul_11_prev_row_select == 0)? matmul_11_dma_flag_0 : 1'd0;
-  wire [7-1:0] _dma_read_packed_high_local_size_99;
-  assign _dma_read_packed_high_local_size_99 = cparam_matmul_11_act_read_size >> 1;
-  wire [1-1:0] _dma_read_packed_low_local_size_100;
-  assign _dma_read_packed_low_local_size_100 = cparam_matmul_11_act_read_size & { 1{ 1'd1 } };
-  wire [7-1:0] _dma_read_packed_local_packed_size_101;
-  assign _dma_read_packed_local_packed_size_101 = (_dma_read_packed_low_local_size_100 > 0)? _dma_read_packed_high_local_size_99 + 1 : _dma_read_packed_high_local_size_99;
-  wire [32-1:0] mask_addr_shifted_102;
-  assign mask_addr_shifted_102 = matmul_11_mux_act_gaddr_0 + _maxi_global_base_addr >> 2;
-  wire [32-1:0] mask_addr_masked_103;
-  assign mask_addr_masked_103 = mask_addr_shifted_102 << 2;
+  wire [7-1:0] _dma_read_packed_high_local_size_106;
+  assign _dma_read_packed_high_local_size_106 = cparam_matmul_11_act_read_size >> 1;
+  wire [1-1:0] _dma_read_packed_low_local_size_107;
+  assign _dma_read_packed_low_local_size_107 = cparam_matmul_11_act_read_size & { 1{ 1'd1 } };
+  wire [7-1:0] _dma_read_packed_local_packed_size_108;
+  assign _dma_read_packed_local_packed_size_108 = (_dma_read_packed_low_local_size_107 > 0)? _dma_read_packed_high_local_size_106 + 1 : _dma_read_packed_high_local_size_106;
+  wire [32-1:0] mask_addr_shifted_109;
+  assign mask_addr_shifted_109 = matmul_11_mux_act_gaddr_0 + _maxi_global_base_addr >> 2;
+  wire [32-1:0] mask_addr_masked_110;
+  assign mask_addr_masked_110 = mask_addr_shifted_109 << 2;
   assign _maxi_read_req_fifo_deq = ((_maxi_read_data_fsm == 0) && (!_maxi_read_data_busy && !_maxi_read_req_fifo_empty && (_maxi_read_op_sel_fifo == 4)) && !_maxi_read_req_fifo_empty)? 1 : 
                                    ((_maxi_read_data_fsm == 0) && (!_maxi_read_data_busy && !_maxi_read_req_fifo_empty && (_maxi_read_op_sel_fifo == 3)) && !_maxi_read_req_fifo_empty)? 1 : 
                                    ((_maxi_read_data_fsm == 0) && (!_maxi_read_data_busy && !_maxi_read_req_fifo_empty && (_maxi_read_op_sel_fifo == 2)) && !_maxi_read_req_fifo_empty)? 1 : 
                                    ((_maxi_read_data_fsm == 0) && (!_maxi_read_data_busy && !_maxi_read_req_fifo_empty && (_maxi_read_op_sel_fifo == 1)) && !_maxi_read_req_fifo_empty)? 1 : 0;
   reg [32-1:0] write_burst_packed_fsm_3;
   localparam write_burst_packed_fsm_3_init = 0;
-  reg [9-1:0] write_burst_packed_addr_104;
-  reg [9-1:0] write_burst_packed_stride_105;
-  reg [33-1:0] write_burst_packed_length_106;
-  reg write_burst_packed_done_107;
-  wire [8-1:0] write_burst_packed_ram_addr_108;
-  assign write_burst_packed_ram_addr_108 = write_burst_packed_addr_104 >> 1;
-  wire [16-1:0] write_burst_packed_ram_wdata_109;
-  assign write_burst_packed_ram_wdata_109 = _maxi_rdata_sb_0 >> 0;
-  assign ram_w16_l512_id1_0_1_addr = ((write_burst_packed_fsm_3 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_addr_108 : 'hx;
-  assign ram_w16_l512_id1_0_1_wdata = ((write_burst_packed_fsm_3 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_wdata_109 : 'hx;
+  reg [9-1:0] write_burst_packed_addr_111;
+  reg [9-1:0] write_burst_packed_stride_112;
+  reg [33-1:0] write_burst_packed_length_113;
+  reg write_burst_packed_done_114;
+  wire [8-1:0] write_burst_packed_ram_addr_115;
+  assign write_burst_packed_ram_addr_115 = write_burst_packed_addr_111 >> 1;
+  wire [16-1:0] write_burst_packed_ram_wdata_116;
+  assign write_burst_packed_ram_wdata_116 = _maxi_rdata_sb_0 >> 0;
+  assign ram_w16_l512_id1_0_1_addr = ((write_burst_packed_fsm_3 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_addr_115 : 'hx;
+  assign ram_w16_l512_id1_0_1_wdata = ((write_burst_packed_fsm_3 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_wdata_116 : 'hx;
   assign ram_w16_l512_id1_0_1_wenable = ((write_burst_packed_fsm_3 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
   assign ram_w16_l512_id1_0_1_enable = ((write_burst_packed_fsm_3 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
-  wire [8-1:0] write_burst_packed_ram_addr_110;
-  assign write_burst_packed_ram_addr_110 = write_burst_packed_addr_104 >> 1;
-  wire [16-1:0] write_burst_packed_ram_wdata_111;
-  assign write_burst_packed_ram_wdata_111 = _maxi_rdata_sb_0 >> 16;
-  assign ram_w16_l512_id1_1_1_addr = ((write_burst_packed_fsm_3 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_addr_110 : 'hx;
-  assign ram_w16_l512_id1_1_1_wdata = ((write_burst_packed_fsm_3 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_wdata_111 : 'hx;
+  wire [8-1:0] write_burst_packed_ram_addr_117;
+  assign write_burst_packed_ram_addr_117 = write_burst_packed_addr_111 >> 1;
+  wire [16-1:0] write_burst_packed_ram_wdata_118;
+  assign write_burst_packed_ram_wdata_118 = _maxi_rdata_sb_0 >> 16;
+  assign ram_w16_l512_id1_1_1_addr = ((write_burst_packed_fsm_3 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_addr_117 : 'hx;
+  assign ram_w16_l512_id1_1_1_wdata = ((write_burst_packed_fsm_3 == 1) && _maxi_rvalid_sb_0)? write_burst_packed_ram_wdata_118 : 'hx;
   assign ram_w16_l512_id1_1_1_wenable = ((write_burst_packed_fsm_3 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
   assign ram_w16_l512_id1_1_1_enable = ((write_burst_packed_fsm_3 == 1) && _maxi_rvalid_sb_0)? 1'd1 : 0;
   assign _maxi_rready_sb_0 = (_maxi_read_data_fsm == 2) || (_maxi_read_data_fsm == 2) || (_maxi_read_data_fsm == 2) || (_maxi_read_data_fsm == 2);
@@ -1891,7 +1938,7 @@ module taketwo
   wire [1-1:0] stream_matmul_11_parameter_4_data;
   wire [1-1:0] stream_matmul_11__reduce_reset_data;
   wire [1-1:0] stream_matmul_11_parameter_6_data;
-  wire [32-1:0] stream_matmul_11_source_7_data;
+  wire [16-1:0] stream_matmul_11_source_7_data;
   wire [1-1:0] stream_matmul_11_parameter_8_data;
   wire [32-1:0] stream_matmul_11_source_9_data;
   wire [1-1:0] stream_matmul_11_parameter_10_data;
@@ -1935,13 +1982,13 @@ module taketwo
   reg __stream_matmul_11_stream_ivalid_27;
   reg __stream_matmul_11_stream_ivalid_28;
   reg __stream_matmul_11_stream_ivalid_29;
-  wire [32-1:0] _slice_data_98;
-  assign _slice_data_98 = stream_matmul_11_source_7_data[6'd31:1'd0];
-  wire [32-1:0] _reinterpretcast_src_99;
+  wire [16-1:0] _slice_data_98;
+  assign _slice_data_98 = stream_matmul_11_source_7_data[5'd15:1'd0];
+  wire [16-1:0] _reinterpretcast_src_99;
   assign _reinterpretcast_src_99 = _slice_data_98;
-  wire signed [32-1:0] _reinterpretcast_data_99;
+  wire signed [16-1:0] _reinterpretcast_data_99;
   assign _reinterpretcast_data_99 = _reinterpretcast_src_99;
-  wire signed [32-1:0] _cond_data_100;
+  wire signed [16-1:0] _cond_data_100;
   assign _cond_data_100 = (stream_matmul_11_parameter_6_data)? _reinterpretcast_data_99 : _reinterpretcast_data_99;
   wire [32-1:0] _slice_data_105;
   assign _slice_data_105 = stream_matmul_11_source_9_data[6'd31:1'd0];
@@ -1993,7 +2040,7 @@ module taketwo
   reg signed [16-1:0] __delay_data_224_reinterpretcast_152;
   reg [1-1:0] __delay_data_225__variable_84;
   reg [7-1:0] __delay_data_246__variable_79;
-  reg signed [32-1:0] __delay_data_257_cond_100;
+  reg signed [16-1:0] __delay_data_257_cond_100;
   reg signed [32-1:0] __delay_data_274_cond_107;
   wire signed [16-1:0] _cond_data_136;
   assign _cond_data_136 = (_eq_data_134)? __delay_data_222__variable_133 : 1'sd0;
@@ -2016,7 +2063,7 @@ module taketwo
   reg [1-1:0] __delay_data_226__delay_225__variable_84;
   reg [16-1:0] __delay_data_236_plus_190;
   reg [7-1:0] __delay_data_247__delay_246__variable_79;
-  reg signed [32-1:0] __delay_data_258__delay_257_cond_100;
+  reg signed [16-1:0] __delay_data_258__delay_257_cond_100;
   reg signed [32-1:0] __delay_data_275__delay_274_cond_107;
   reg [16-1:0] __delay_data_292_plus_209;
   reg [1-1:0] __delay_data_310_eq_215;
@@ -2024,7 +2071,7 @@ module taketwo
   reg [1-1:0] __delay_data_227__delay_226__delay_225__variable_84;
   reg [16-1:0] __delay_data_237__delay_236_plus_190;
   reg [7-1:0] __delay_data_248__delay_247__delay_246__variable_79;
-  reg signed [32-1:0] __delay_data_259__delay_258__delay_257_cond_100;
+  reg signed [16-1:0] __delay_data_259__delay_258__delay_257_cond_100;
   reg signed [32-1:0] __delay_data_276__delay_275__delay_274_cond_107;
   reg [16-1:0] __delay_data_293__delay_292_plus_209;
   reg [1-1:0] __delay_data_311__delay_310_eq_215;
@@ -2032,7 +2079,7 @@ module taketwo
   reg [1-1:0] __delay_data_228__delay_227__delay_226__delay_225__variable_84;
   reg [16-1:0] __delay_data_238__delay_237__delay_236_plus_190;
   reg [7-1:0] __delay_data_249__delay_248__delay_247__delay_246__variable_79;
-  reg signed [32-1:0] __delay_data_260__delay_259__delay_258__delay_257_cond_100;
+  reg signed [16-1:0] __delay_data_260__delay_259__delay_258__delay_257_cond_100;
   reg signed [32-1:0] __delay_data_277__delay_276__delay_275__delay_274_cond_107;
   reg [16-1:0] __delay_data_294__delay_293__delay_292_plus_209;
   reg [1-1:0] __delay_data_312__delay_311__delay_310_eq_215;
@@ -2040,7 +2087,7 @@ module taketwo
   reg [1-1:0] __delay_data_229__delay_228__delay_227__delay_226____variable_84;
   reg [16-1:0] __delay_data_239__delay_238__delay_237__delay_236_plus_190;
   reg [7-1:0] __delay_data_250__delay_249__delay_248__delay_247____variable_79;
-  reg signed [32-1:0] __delay_data_261__delay_260__delay_259__delay_258___cond_100;
+  reg signed [16-1:0] __delay_data_261__delay_260__delay_259__delay_258___cond_100;
   reg signed [32-1:0] __delay_data_278__delay_277__delay_276__delay_275___cond_107;
   reg [16-1:0] __delay_data_295__delay_294__delay_293__delay_292_plus_209;
   reg [1-1:0] __delay_data_313__delay_312__delay_311__delay_310_eq_215;
@@ -2048,7 +2095,7 @@ module taketwo
   reg [1-1:0] __delay_data_230__delay_229__delay_228__delay_227____variable_84;
   reg [16-1:0] __delay_data_240__delay_239__delay_238__delay_237___plus_190;
   reg [7-1:0] __delay_data_251__delay_250__delay_249__delay_248____variable_79;
-  reg signed [32-1:0] __delay_data_262__delay_261__delay_260__delay_259___cond_100;
+  reg signed [16-1:0] __delay_data_262__delay_261__delay_260__delay_259___cond_100;
   reg signed [32-1:0] __delay_data_279__delay_278__delay_277__delay_276___cond_107;
   reg [16-1:0] __delay_data_296__delay_295__delay_294__delay_293___plus_209;
   reg [1-1:0] __delay_data_314__delay_313__delay_312__delay_311___eq_215;
@@ -2056,7 +2103,7 @@ module taketwo
   reg [1-1:0] __delay_data_231__delay_230__delay_229__delay_228____variable_84;
   reg [16-1:0] __delay_data_241__delay_240__delay_239__delay_238___plus_190;
   reg [7-1:0] __delay_data_252__delay_251__delay_250__delay_249____variable_79;
-  reg signed [32-1:0] __delay_data_263__delay_262__delay_261__delay_260___cond_100;
+  reg signed [16-1:0] __delay_data_263__delay_262__delay_261__delay_260___cond_100;
   reg signed [32-1:0] __delay_data_280__delay_279__delay_278__delay_277___cond_107;
   reg [16-1:0] __delay_data_297__delay_296__delay_295__delay_294___plus_209;
   reg [1-1:0] __delay_data_315__delay_314__delay_313__delay_312___eq_215;
@@ -2064,7 +2111,7 @@ module taketwo
   reg [1-1:0] __delay_data_232__delay_231__delay_230__delay_229____variable_84;
   reg [16-1:0] __delay_data_242__delay_241__delay_240__delay_239___plus_190;
   reg [7-1:0] __delay_data_253__delay_252__delay_251__delay_250____variable_79;
-  reg signed [32-1:0] __delay_data_264__delay_263__delay_262__delay_261___cond_100;
+  reg signed [16-1:0] __delay_data_264__delay_263__delay_262__delay_261___cond_100;
   reg signed [32-1:0] __delay_data_281__delay_280__delay_279__delay_278___cond_107;
   reg [16-1:0] __delay_data_298__delay_297__delay_296__delay_295___plus_209;
   reg [1-1:0] __delay_data_316__delay_315__delay_314__delay_313___eq_215;
@@ -2072,7 +2119,7 @@ module taketwo
   reg [1-1:0] __delay_data_233__delay_232__delay_231__delay_230____variable_84;
   reg [16-1:0] __delay_data_243__delay_242__delay_241__delay_240___plus_190;
   reg [7-1:0] __delay_data_254__delay_253__delay_252__delay_251____variable_79;
-  reg signed [32-1:0] __delay_data_265__delay_264__delay_263__delay_262___cond_100;
+  reg signed [16-1:0] __delay_data_265__delay_264__delay_263__delay_262___cond_100;
   reg signed [32-1:0] __delay_data_282__delay_281__delay_280__delay_279___cond_107;
   reg [16-1:0] __delay_data_299__delay_298__delay_297__delay_296___plus_209;
   reg [1-1:0] __delay_data_317__delay_316__delay_315__delay_314___eq_215;
@@ -2080,7 +2127,7 @@ module taketwo
   reg [1-1:0] __delay_data_234__delay_233__delay_232__delay_231____variable_84;
   reg [16-1:0] __delay_data_244__delay_243__delay_242__delay_241___plus_190;
   reg [7-1:0] __delay_data_255__delay_254__delay_253__delay_252____variable_79;
-  reg signed [32-1:0] __delay_data_266__delay_265__delay_264__delay_263___cond_100;
+  reg signed [16-1:0] __delay_data_266__delay_265__delay_264__delay_263___cond_100;
   reg signed [32-1:0] __delay_data_283__delay_282__delay_281__delay_280___cond_107;
   reg [16-1:0] __delay_data_300__delay_299__delay_298__delay_297___plus_209;
   reg [1-1:0] __delay_data_318__delay_317__delay_316__delay_315___eq_215;
@@ -2094,7 +2141,7 @@ module taketwo
   reg [1-1:0] __delay_data_235__delay_234__delay_233__delay_232____variable_84;
   reg [16-1:0] __delay_data_245__delay_244__delay_243__delay_242___plus_190;
   reg [7-1:0] __delay_data_256__delay_255__delay_254__delay_253____variable_79;
-  reg signed [32-1:0] __delay_data_267__delay_266__delay_265__delay_264___cond_100;
+  reg signed [16-1:0] __delay_data_267__delay_266__delay_265__delay_264___cond_100;
   reg signed [32-1:0] __delay_data_284__delay_283__delay_282__delay_281___cond_107;
   reg [16-1:0] __delay_data_301__delay_300__delay_299__delay_298___plus_209;
   reg [1-1:0] __delay_data_319__delay_318__delay_317__delay_316___eq_215;
@@ -2111,32 +2158,32 @@ module taketwo
   assign acc_0_size_data = __variable_wdata_2;
   assign _acc_0_is_root = ((_stream_matmul_11_busy)? 0 : 1) && 1;
   assign _acc_0_stream_oready = ((_stream_matmul_11_busy)? _stream_matmul_11_stream_oready : 1) && _acc_0_stream_internal_oready;
-  reg signed [32-1:0] __delay_data_268__delay_267__delay_266__delay_265___cond_100;
+  reg signed [16-1:0] __delay_data_268__delay_267__delay_266__delay_265___cond_100;
   reg signed [32-1:0] __delay_data_285__delay_284__delay_283__delay_282___cond_107;
   reg [16-1:0] __delay_data_302__delay_301__delay_300__delay_299___plus_209;
   reg [1-1:0] __delay_data_320__delay_319__delay_318__delay_317___eq_215;
   reg [1-1:0] __delay_data_349__delay_348__delay_347__delay_346___eq_218;
-  reg signed [32-1:0] __delay_data_269__delay_268__delay_267__delay_266___cond_100;
+  reg signed [16-1:0] __delay_data_269__delay_268__delay_267__delay_266___cond_100;
   reg signed [32-1:0] __delay_data_286__delay_285__delay_284__delay_283___cond_107;
   reg [16-1:0] __delay_data_303__delay_302__delay_301__delay_300___plus_209;
   reg [1-1:0] __delay_data_321__delay_320__delay_319__delay_318___eq_215;
   reg [1-1:0] __delay_data_350__delay_349__delay_348__delay_347___eq_218;
-  reg signed [32-1:0] __delay_data_270__delay_269__delay_268__delay_267___cond_100;
+  reg signed [16-1:0] __delay_data_270__delay_269__delay_268__delay_267___cond_100;
   reg signed [32-1:0] __delay_data_287__delay_286__delay_285__delay_284___cond_107;
   reg [16-1:0] __delay_data_304__delay_303__delay_302__delay_301___plus_209;
   reg [1-1:0] __delay_data_322__delay_321__delay_320__delay_319___eq_215;
   reg [1-1:0] __delay_data_351__delay_350__delay_349__delay_348___eq_218;
-  reg signed [32-1:0] __delay_data_271__delay_270__delay_269__delay_268___cond_100;
+  reg signed [16-1:0] __delay_data_271__delay_270__delay_269__delay_268___cond_100;
   reg signed [32-1:0] __delay_data_288__delay_287__delay_286__delay_285___cond_107;
   reg [16-1:0] __delay_data_305__delay_304__delay_303__delay_302___plus_209;
   reg [1-1:0] __delay_data_323__delay_322__delay_321__delay_320___eq_215;
   reg [1-1:0] __delay_data_352__delay_351__delay_350__delay_349___eq_218;
-  reg signed [32-1:0] __delay_data_272__delay_271__delay_270__delay_269___cond_100;
+  reg signed [16-1:0] __delay_data_272__delay_271__delay_270__delay_269___cond_100;
   reg signed [32-1:0] __delay_data_289__delay_288__delay_287__delay_286___cond_107;
   reg [16-1:0] __delay_data_306__delay_305__delay_304__delay_303___plus_209;
   reg [1-1:0] __delay_data_324__delay_323__delay_322__delay_321___eq_215;
   reg [1-1:0] __delay_data_353__delay_352__delay_351__delay_350___eq_218;
-  reg signed [32-1:0] __delay_data_273__delay_272__delay_271__delay_270___cond_100;
+  reg signed [16-1:0] __delay_data_273__delay_272__delay_271__delay_270___cond_100;
   reg signed [32-1:0] __delay_data_290__delay_289__delay_288__delay_287___cond_107;
   reg [16-1:0] __delay_data_307__delay_306__delay_305__delay_304___plus_209;
   reg [1-1:0] __delay_data_325__delay_324__delay_323__delay_322___eq_215;
@@ -2211,28 +2258,28 @@ module taketwo
   assign stream_matmul_11_sink_26_data = _reinterpretcast_data_221;
   wire [1-1:0] stream_matmul_11_sink_27_data;
   assign stream_matmul_11_sink_27_data = __delay_data_378__delay_377__delay_376____substreamoutput_192;
-  wire _set_flag_112;
-  assign _set_flag_112 = matmul_11_comp_fsm == 3;
+  wire _set_flag_119;
+  assign _set_flag_119 = matmul_11_comp_fsm == 3;
   reg [7-1:0] __variable_wdata_79;
   assign stream_matmul_11_parameter_0_data = __variable_wdata_79;
-  wire _set_flag_113;
-  assign _set_flag_113 = matmul_11_comp_fsm == 3;
+  wire _set_flag_120;
+  assign _set_flag_120 = matmul_11_comp_fsm == 3;
   reg [1-1:0] __variable_wdata_80;
   assign stream_matmul_11_parameter_1_data = __variable_wdata_80;
-  wire _set_flag_114;
-  assign _set_flag_114 = matmul_11_comp_fsm == 3;
+  wire _set_flag_121;
+  assign _set_flag_121 = matmul_11_comp_fsm == 3;
   reg [1-1:0] __variable_wdata_81;
   assign stream_matmul_11_parameter_2_data = __variable_wdata_81;
-  wire _set_flag_115;
-  assign _set_flag_115 = matmul_11_comp_fsm == 3;
+  wire _set_flag_122;
+  assign _set_flag_122 = matmul_11_comp_fsm == 3;
   reg [1-1:0] __variable_wdata_82;
   assign stream_matmul_11_parameter_3_data = __variable_wdata_82;
-  wire _set_flag_116;
-  assign _set_flag_116 = matmul_11_comp_fsm == 3;
+  wire _set_flag_123;
+  assign _set_flag_123 = matmul_11_comp_fsm == 3;
   reg [1-1:0] __variable_wdata_83;
   assign stream_matmul_11_parameter_4_data = __variable_wdata_83;
-  wire _set_flag_117;
-  assign _set_flag_117 = matmul_11_comp_fsm == 3;
+  wire _set_flag_124;
+  assign _set_flag_124 = matmul_11_comp_fsm == 3;
   reg [1-1:0] __variable_wdata_94;
   assign stream_matmul_11_parameter_6_data = __variable_wdata_94;
   reg [32-1:0] _source_stream_matmul_11_source_7_pat_cur_offset_0;
@@ -2259,23 +2306,37 @@ module taketwo
   reg [32-1:0] _source_stream_matmul_11_source_7_pat_stride_buf_1;
   reg [32-1:0] _source_stream_matmul_11_source_7_pat_stride_buf_2;
   reg [32-1:0] _source_stream_matmul_11_source_7_pat_stride_buf_3;
-  wire _set_flag_118;
-  assign _set_flag_118 = matmul_11_comp_fsm == 3;
-  assign ram_w32_l128_id1_0_addr = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_7_source_ram_renable && (_stream_matmul_11_source_7_source_sel == 1))? _stream_matmul_11_source_7_source_ram_raddr : 'hx;
-  assign ram_w32_l128_id1_0_enable = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_7_source_ram_renable && (_stream_matmul_11_source_7_source_sel == 1))? 1'd1 : 0;
-  localparam _tmp_119 = 1;
-  wire [_tmp_119-1:0] _tmp_120;
-  assign _tmp_120 = _stream_matmul_11_stream_oready && _stream_matmul_11_source_7_source_ram_renable && (_stream_matmul_11_source_7_source_sel == 1);
-  reg [_tmp_119-1:0] __tmp_120_1;
-  assign _stream_matmul_11_source_7_source_ram_rdata = (_stream_matmul_11_source_7_source_sel == 1)? ram_w32_l128_id1_0_rdata : 'hx;
-  reg [32-1:0] __variable_wdata_95;
+  wire _set_flag_125;
+  assign _set_flag_125 = matmul_11_comp_fsm == 3;
+  wire [1-1:0] read_rtl_bank_126;
+  assign read_rtl_bank_126 = _stream_matmul_11_source_7_source_ram_raddr;
+  reg [1-1:0] _tmp_127;
+  assign ram_w16_l512_id2_0_0_addr = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_7_source_ram_renable && (_stream_matmul_11_source_7_source_sel == 1))? _stream_matmul_11_source_7_source_ram_raddr >> 1 : 'hx;
+  assign ram_w16_l512_id2_0_0_enable = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_7_source_ram_renable && (_stream_matmul_11_source_7_source_sel == 1))? 1'd1 : 0;
+  localparam _tmp_128 = 1;
+  wire [_tmp_128-1:0] _tmp_129;
+  assign _tmp_129 = _stream_matmul_11_stream_oready && _stream_matmul_11_source_7_source_ram_renable && (_stream_matmul_11_source_7_source_sel == 1);
+  reg [_tmp_128-1:0] __tmp_129_1;
+  assign ram_w16_l512_id2_1_0_addr = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_7_source_ram_renable && (_stream_matmul_11_source_7_source_sel == 1))? _stream_matmul_11_source_7_source_ram_raddr >> 1 : 'hx;
+  assign ram_w16_l512_id2_1_0_enable = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_7_source_ram_renable && (_stream_matmul_11_source_7_source_sel == 1))? 1'd1 : 0;
+  localparam _tmp_130 = 1;
+  wire [_tmp_130-1:0] _tmp_131;
+  assign _tmp_131 = _stream_matmul_11_stream_oready && _stream_matmul_11_source_7_source_ram_renable && (_stream_matmul_11_source_7_source_sel == 1);
+  reg [_tmp_130-1:0] __tmp_131_1;
+  wire signed [16-1:0] read_rtl_rdata_132;
+  wire read_rtl_rvalid_133;
+  assign read_rtl_rdata_132 = (_tmp_127 == 0)? ram_w16_l512_id2_0_0_rdata : 
+                              (_tmp_127 == 1)? ram_w16_l512_id2_1_0_rdata : 0;
+  assign read_rtl_rvalid_133 = __tmp_129_1;
+  assign _stream_matmul_11_source_7_source_ram_rdata = (_stream_matmul_11_source_7_source_sel == 1)? read_rtl_rdata_132 : 'hx;
+  reg [16-1:0] __variable_wdata_95;
   assign stream_matmul_11_source_7_data = __variable_wdata_95;
   reg [32-1:0] _stream_matmul_11_source_7_source_pat_fsm_0;
   localparam _stream_matmul_11_source_7_source_pat_fsm_0_init = 0;
   wire [32-1:0] _stream_matmul_11_source_7_source_pat_all_offset;
   assign _stream_matmul_11_source_7_source_pat_all_offset = _stream_matmul_11_source_7_source_offset_buf + _source_stream_matmul_11_source_7_pat_cur_offset_0 + _source_stream_matmul_11_source_7_pat_cur_offset_1 + _source_stream_matmul_11_source_7_pat_cur_offset_2 + _source_stream_matmul_11_source_7_pat_cur_offset_3;
-  wire _set_flag_121;
-  assign _set_flag_121 = matmul_11_comp_fsm == 3;
+  wire _set_flag_134;
+  assign _set_flag_134 = matmul_11_comp_fsm == 3;
   reg [1-1:0] __variable_wdata_101;
   assign stream_matmul_11_parameter_8_data = __variable_wdata_101;
   reg [32-1:0] _source_stream_matmul_11_source_9_pat_cur_offset_0;
@@ -2302,14 +2363,14 @@ module taketwo
   reg [32-1:0] _source_stream_matmul_11_source_9_pat_stride_buf_1;
   reg [32-1:0] _source_stream_matmul_11_source_9_pat_stride_buf_2;
   reg [32-1:0] _source_stream_matmul_11_source_9_pat_stride_buf_3;
-  wire _set_flag_122;
-  assign _set_flag_122 = matmul_11_comp_fsm == 3;
+  wire _set_flag_135;
+  assign _set_flag_135 = matmul_11_comp_fsm == 3;
   assign ram_w32_l128_id0_0_addr = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_9_source_ram_renable && (_stream_matmul_11_source_9_source_sel == 2))? _stream_matmul_11_source_9_source_ram_raddr : 'hx;
   assign ram_w32_l128_id0_0_enable = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_9_source_ram_renable && (_stream_matmul_11_source_9_source_sel == 2))? 1'd1 : 0;
-  localparam _tmp_123 = 1;
-  wire [_tmp_123-1:0] _tmp_124;
-  assign _tmp_124 = _stream_matmul_11_stream_oready && _stream_matmul_11_source_9_source_ram_renable && (_stream_matmul_11_source_9_source_sel == 2);
-  reg [_tmp_123-1:0] __tmp_124_1;
+  localparam _tmp_136 = 1;
+  wire [_tmp_136-1:0] _tmp_137;
+  assign _tmp_137 = _stream_matmul_11_stream_oready && _stream_matmul_11_source_9_source_ram_renable && (_stream_matmul_11_source_9_source_sel == 2);
+  reg [_tmp_136-1:0] __tmp_137_1;
   assign _stream_matmul_11_source_9_source_ram_rdata = (_stream_matmul_11_source_9_source_sel == 2)? ram_w32_l128_id0_0_rdata : 'hx;
   reg [32-1:0] __variable_wdata_102;
   assign stream_matmul_11_source_9_data = __variable_wdata_102;
@@ -2317,44 +2378,44 @@ module taketwo
   localparam _stream_matmul_11_source_9_source_pat_fsm_1_init = 0;
   wire [32-1:0] _stream_matmul_11_source_9_source_pat_all_offset;
   assign _stream_matmul_11_source_9_source_pat_all_offset = _stream_matmul_11_source_9_source_offset_buf + _source_stream_matmul_11_source_9_pat_cur_offset_0 + _source_stream_matmul_11_source_9_pat_cur_offset_1 + _source_stream_matmul_11_source_9_pat_cur_offset_2 + _source_stream_matmul_11_source_9_pat_cur_offset_3;
-  wire _set_flag_125;
-  assign _set_flag_125 = matmul_11_comp_fsm == 3;
+  wire _set_flag_138;
+  assign _set_flag_138 = matmul_11_comp_fsm == 3;
   reg [1-1:0] __variable_wdata_108;
   assign stream_matmul_11_parameter_10_data = __variable_wdata_108;
-  wire _set_flag_126;
-  assign _set_flag_126 = matmul_11_comp_fsm == 3;
+  wire _set_flag_139;
+  assign _set_flag_139 = matmul_11_comp_fsm == 3;
   reg [16-1:0] __variable_wdata_109;
   assign stream_matmul_11_source_11_data = __variable_wdata_109;
-  wire _set_flag_127;
-  assign _set_flag_127 = matmul_11_comp_fsm == 3;
+  wire _set_flag_140;
+  assign _set_flag_140 = matmul_11_comp_fsm == 3;
   reg [1-1:0] __variable_wdata_115;
   assign stream_matmul_11_parameter_12_data = __variable_wdata_115;
-  wire _set_flag_128;
-  assign _set_flag_128 = matmul_11_comp_fsm == 3;
+  wire _set_flag_141;
+  assign _set_flag_141 = matmul_11_comp_fsm == 3;
   reg [16-1:0] __variable_wdata_116;
   assign stream_matmul_11_source_13_data = __variable_wdata_116;
-  wire _set_flag_129;
-  assign _set_flag_129 = matmul_11_comp_fsm == 3;
+  wire _set_flag_142;
+  assign _set_flag_142 = matmul_11_comp_fsm == 3;
   reg [1-1:0] __variable_wdata_122;
   assign stream_matmul_11_parameter_14_data = __variable_wdata_122;
-  wire _set_flag_130;
-  assign _set_flag_130 = matmul_11_comp_fsm == 3;
+  wire _set_flag_143;
+  assign _set_flag_143 = matmul_11_comp_fsm == 3;
   reg [16-1:0] __variable_wdata_123;
   assign stream_matmul_11_source_15_data = __variable_wdata_123;
-  wire _set_flag_131;
-  assign _set_flag_131 = matmul_11_comp_fsm == 3;
+  wire _set_flag_144;
+  assign _set_flag_144 = matmul_11_comp_fsm == 3;
   reg [1-1:0] __variable_wdata_129;
   assign stream_matmul_11_parameter_16_data = __variable_wdata_129;
-  wire _set_flag_132;
-  assign _set_flag_132 = matmul_11_comp_fsm == 3;
+  wire _set_flag_145;
+  assign _set_flag_145 = matmul_11_comp_fsm == 3;
   reg [1-1:0] __variable_wdata_130;
   assign stream_matmul_11_parameter_17_data = __variable_wdata_130;
-  wire _set_flag_133;
-  assign _set_flag_133 = matmul_11_comp_fsm == 3;
+  wire _set_flag_146;
+  assign _set_flag_146 = matmul_11_comp_fsm == 3;
   reg [5-1:0] __variable_wdata_131;
   assign stream_matmul_11_parameter_18_data = __variable_wdata_131;
-  wire _set_flag_134;
-  assign _set_flag_134 = matmul_11_comp_fsm == 3;
+  wire _set_flag_147;
+  assign _set_flag_147 = matmul_11_comp_fsm == 3;
   reg [2-1:0] __variable_wdata_132;
   assign stream_matmul_11_parameter_19_data = __variable_wdata_132;
   reg [32-1:0] _source_stream_matmul_11_source_20_pat_cur_offset_0;
@@ -2381,29 +2442,29 @@ module taketwo
   reg [32-1:0] _source_stream_matmul_11_source_20_pat_stride_buf_1;
   reg [32-1:0] _source_stream_matmul_11_source_20_pat_stride_buf_2;
   reg [32-1:0] _source_stream_matmul_11_source_20_pat_stride_buf_3;
-  wire _set_flag_135;
-  assign _set_flag_135 = matmul_11_comp_fsm == 3;
-  wire [1-1:0] read_rtl_bank_136;
-  assign read_rtl_bank_136 = _stream_matmul_11_source_20_source_ram_raddr;
-  reg [1-1:0] _tmp_137;
+  wire _set_flag_148;
+  assign _set_flag_148 = matmul_11_comp_fsm == 3;
+  wire [1-1:0] read_rtl_bank_149;
+  assign read_rtl_bank_149 = _stream_matmul_11_source_20_source_ram_raddr;
+  reg [1-1:0] _tmp_150;
   assign ram_w16_l512_id1_0_0_addr = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_20_source_ram_renable && (_stream_matmul_11_source_20_source_sel == 3))? _stream_matmul_11_source_20_source_ram_raddr >> 1 : 'hx;
   assign ram_w16_l512_id1_0_0_enable = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_20_source_ram_renable && (_stream_matmul_11_source_20_source_sel == 3))? 1'd1 : 0;
-  localparam _tmp_138 = 1;
-  wire [_tmp_138-1:0] _tmp_139;
-  assign _tmp_139 = _stream_matmul_11_stream_oready && _stream_matmul_11_source_20_source_ram_renable && (_stream_matmul_11_source_20_source_sel == 3);
-  reg [_tmp_138-1:0] __tmp_139_1;
+  localparam _tmp_151 = 1;
+  wire [_tmp_151-1:0] _tmp_152;
+  assign _tmp_152 = _stream_matmul_11_stream_oready && _stream_matmul_11_source_20_source_ram_renable && (_stream_matmul_11_source_20_source_sel == 3);
+  reg [_tmp_151-1:0] __tmp_152_1;
   assign ram_w16_l512_id1_1_0_addr = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_20_source_ram_renable && (_stream_matmul_11_source_20_source_sel == 3))? _stream_matmul_11_source_20_source_ram_raddr >> 1 : 'hx;
   assign ram_w16_l512_id1_1_0_enable = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_20_source_ram_renable && (_stream_matmul_11_source_20_source_sel == 3))? 1'd1 : 0;
-  localparam _tmp_140 = 1;
-  wire [_tmp_140-1:0] _tmp_141;
-  assign _tmp_141 = _stream_matmul_11_stream_oready && _stream_matmul_11_source_20_source_ram_renable && (_stream_matmul_11_source_20_source_sel == 3);
-  reg [_tmp_140-1:0] __tmp_141_1;
-  wire signed [16-1:0] read_rtl_rdata_142;
-  wire read_rtl_rvalid_143;
-  assign read_rtl_rdata_142 = (_tmp_137 == 0)? ram_w16_l512_id1_0_0_rdata : 
-                              (_tmp_137 == 1)? ram_w16_l512_id1_1_0_rdata : 0;
-  assign read_rtl_rvalid_143 = __tmp_139_1;
-  assign _stream_matmul_11_source_20_source_ram_rdata = (_stream_matmul_11_source_20_source_sel == 3)? read_rtl_rdata_142 : 'hx;
+  localparam _tmp_153 = 1;
+  wire [_tmp_153-1:0] _tmp_154;
+  assign _tmp_154 = _stream_matmul_11_stream_oready && _stream_matmul_11_source_20_source_ram_renable && (_stream_matmul_11_source_20_source_sel == 3);
+  reg [_tmp_153-1:0] __tmp_154_1;
+  wire signed [16-1:0] read_rtl_rdata_155;
+  wire read_rtl_rvalid_156;
+  assign read_rtl_rdata_155 = (_tmp_150 == 0)? ram_w16_l512_id1_0_0_rdata : 
+                              (_tmp_150 == 1)? ram_w16_l512_id1_1_0_rdata : 0;
+  assign read_rtl_rvalid_156 = __tmp_152_1;
+  assign _stream_matmul_11_source_20_source_ram_rdata = (_stream_matmul_11_source_20_source_sel == 3)? read_rtl_rdata_155 : 'hx;
   reg [16-1:0] __variable_wdata_133;
   assign stream_matmul_11_source_20_data = __variable_wdata_133;
   reg [32-1:0] _stream_matmul_11_source_20_source_pat_fsm_2;
@@ -2434,50 +2495,37 @@ module taketwo
   reg [32-1:0] _source_stream_matmul_11_source_21_pat_stride_buf_1;
   reg [32-1:0] _source_stream_matmul_11_source_21_pat_stride_buf_2;
   reg [32-1:0] _source_stream_matmul_11_source_21_pat_stride_buf_3;
-  wire _set_flag_144;
-  assign _set_flag_144 = matmul_11_comp_fsm == 3;
-  wire [1-1:0] read_rtl_bank_145;
-  assign read_rtl_bank_145 = _stream_matmul_11_source_21_source_ram_raddr;
-  reg [1-1:0] _tmp_146;
-  assign ram_w16_l512_id2_0_0_addr = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_21_source_ram_renable && (_stream_matmul_11_source_21_source_sel == 4))? _stream_matmul_11_source_21_source_ram_raddr >> 1 : 'hx;
-  assign ram_w16_l512_id2_0_0_enable = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_21_source_ram_renable && (_stream_matmul_11_source_21_source_sel == 4))? 1'd1 : 0;
-  localparam _tmp_147 = 1;
-  wire [_tmp_147-1:0] _tmp_148;
-  assign _tmp_148 = _stream_matmul_11_stream_oready && _stream_matmul_11_source_21_source_ram_renable && (_stream_matmul_11_source_21_source_sel == 4);
-  reg [_tmp_147-1:0] __tmp_148_1;
-  assign ram_w16_l512_id2_1_0_addr = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_21_source_ram_renable && (_stream_matmul_11_source_21_source_sel == 4))? _stream_matmul_11_source_21_source_ram_raddr >> 1 : 'hx;
-  assign ram_w16_l512_id2_1_0_enable = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_21_source_ram_renable && (_stream_matmul_11_source_21_source_sel == 4))? 1'd1 : 0;
-  localparam _tmp_149 = 1;
-  wire [_tmp_149-1:0] _tmp_150;
-  assign _tmp_150 = _stream_matmul_11_stream_oready && _stream_matmul_11_source_21_source_ram_renable && (_stream_matmul_11_source_21_source_sel == 4);
-  reg [_tmp_149-1:0] __tmp_150_1;
-  wire signed [16-1:0] read_rtl_rdata_151;
-  wire read_rtl_rvalid_152;
-  assign read_rtl_rdata_151 = (_tmp_146 == 0)? ram_w16_l512_id2_0_0_rdata : 
-                              (_tmp_146 == 1)? ram_w16_l512_id2_1_0_rdata : 0;
-  assign read_rtl_rvalid_152 = __tmp_148_1;
-  assign _stream_matmul_11_source_21_source_ram_rdata = (_stream_matmul_11_source_21_source_sel == 4)? read_rtl_rdata_151 : 'hx;
+  wire _set_flag_157;
+  assign _set_flag_157 = matmul_11_comp_fsm == 3;
+  wire [1-1:0] read_rtl_bank_158;
+  assign read_rtl_bank_158 = _stream_matmul_11_source_21_source_ram_raddr;
+  reg [1-1:0] _tmp_159;
+  assign ram_w16_l512_id3_0_0_addr = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_21_source_ram_renable && (_stream_matmul_11_source_21_source_sel == 4))? _stream_matmul_11_source_21_source_ram_raddr >> 1 : 'hx;
+  assign ram_w16_l512_id3_0_0_enable = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_21_source_ram_renable && (_stream_matmul_11_source_21_source_sel == 4))? 1'd1 : 0;
+  localparam _tmp_160 = 1;
+  wire [_tmp_160-1:0] _tmp_161;
+  assign _tmp_161 = _stream_matmul_11_stream_oready && _stream_matmul_11_source_21_source_ram_renable && (_stream_matmul_11_source_21_source_sel == 4);
+  reg [_tmp_160-1:0] __tmp_161_1;
+  assign ram_w16_l512_id3_1_0_addr = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_21_source_ram_renable && (_stream_matmul_11_source_21_source_sel == 4))? _stream_matmul_11_source_21_source_ram_raddr >> 1 : 'hx;
+  assign ram_w16_l512_id3_1_0_enable = (_stream_matmul_11_stream_oready && _stream_matmul_11_source_21_source_ram_renable && (_stream_matmul_11_source_21_source_sel == 4))? 1'd1 : 0;
+  localparam _tmp_162 = 1;
+  wire [_tmp_162-1:0] _tmp_163;
+  assign _tmp_163 = _stream_matmul_11_stream_oready && _stream_matmul_11_source_21_source_ram_renable && (_stream_matmul_11_source_21_source_sel == 4);
+  reg [_tmp_162-1:0] __tmp_163_1;
+  wire signed [16-1:0] read_rtl_rdata_164;
+  wire read_rtl_rvalid_165;
+  assign read_rtl_rdata_164 = (_tmp_159 == 0)? ram_w16_l512_id3_0_0_rdata : 
+                              (_tmp_159 == 1)? ram_w16_l512_id3_1_0_rdata : 0;
+  assign read_rtl_rvalid_165 = __tmp_161_1;
+  assign _stream_matmul_11_source_21_source_ram_rdata = (_stream_matmul_11_source_21_source_sel == 4)? read_rtl_rdata_164 : 'hx;
   reg [16-1:0] __variable_wdata_147;
   assign stream_matmul_11_source_21_data = __variable_wdata_147;
   reg [32-1:0] _stream_matmul_11_source_21_source_pat_fsm_3;
   localparam _stream_matmul_11_source_21_source_pat_fsm_3_init = 0;
   wire [32-1:0] _stream_matmul_11_source_21_source_pat_all_offset;
   assign _stream_matmul_11_source_21_source_pat_all_offset = _stream_matmul_11_source_21_source_offset_buf + _source_stream_matmul_11_source_21_pat_cur_offset_0 + _source_stream_matmul_11_source_21_pat_cur_offset_1 + _source_stream_matmul_11_source_21_pat_cur_offset_2 + _source_stream_matmul_11_source_21_pat_cur_offset_3;
-  wire _set_flag_153;
-  assign _set_flag_153 = matmul_11_comp_fsm == 3;
-  reg _tmp_154;
-  reg _tmp_155;
-  reg _tmp_156;
-  reg _tmp_157;
-  reg _tmp_158;
-  reg _tmp_159;
-  reg _tmp_160;
-  reg _tmp_161;
-  reg _tmp_162;
-  reg _tmp_163;
-  reg _tmp_164;
-  reg _tmp_165;
-  reg _tmp_166;
+  wire _set_flag_166;
+  assign _set_flag_166 = matmul_11_comp_fsm == 3;
   reg _tmp_167;
   reg _tmp_168;
   reg _tmp_169;
@@ -2496,53 +2544,53 @@ module taketwo
   reg _tmp_182;
   reg _tmp_183;
   reg _tmp_184;
-  localparam _tmp_185 = 33;
-  wire [_tmp_185-1:0] _tmp_186;
-  assign _tmp_186 = matmul_11_stream_out_local + matmul_11_out_page_comp_offset_buf;
-  reg [_tmp_185-1:0] _tmp_187;
-  reg [_tmp_185-1:0] _tmp_188;
-  reg [_tmp_185-1:0] _tmp_189;
-  reg [_tmp_185-1:0] _tmp_190;
-  reg [_tmp_185-1:0] _tmp_191;
-  reg [_tmp_185-1:0] _tmp_192;
-  reg [_tmp_185-1:0] _tmp_193;
-  reg [_tmp_185-1:0] _tmp_194;
-  reg [_tmp_185-1:0] _tmp_195;
-  reg [_tmp_185-1:0] _tmp_196;
-  reg [_tmp_185-1:0] _tmp_197;
-  reg [_tmp_185-1:0] _tmp_198;
-  reg [_tmp_185-1:0] _tmp_199;
-  reg [_tmp_185-1:0] _tmp_200;
-  reg [_tmp_185-1:0] _tmp_201;
-  reg [_tmp_185-1:0] _tmp_202;
-  reg [_tmp_185-1:0] _tmp_203;
-  reg [_tmp_185-1:0] _tmp_204;
-  reg [_tmp_185-1:0] _tmp_205;
-  reg [_tmp_185-1:0] _tmp_206;
-  reg [_tmp_185-1:0] _tmp_207;
-  reg [_tmp_185-1:0] _tmp_208;
-  reg [_tmp_185-1:0] _tmp_209;
-  reg [_tmp_185-1:0] _tmp_210;
-  reg [_tmp_185-1:0] _tmp_211;
-  reg [_tmp_185-1:0] _tmp_212;
-  reg [_tmp_185-1:0] _tmp_213;
-  reg [_tmp_185-1:0] _tmp_214;
-  reg [_tmp_185-1:0] _tmp_215;
-  reg [_tmp_185-1:0] _tmp_216;
-  reg [_tmp_185-1:0] _tmp_217;
-  reg [32-1:0] _tmp_218;
-  reg [32-1:0] _tmp_219;
-  reg [32-1:0] _tmp_220;
-  reg [32-1:0] _tmp_221;
-  reg [32-1:0] _tmp_222;
-  reg [32-1:0] _tmp_223;
-  reg [32-1:0] _tmp_224;
-  reg [32-1:0] _tmp_225;
-  reg [32-1:0] _tmp_226;
-  reg [32-1:0] _tmp_227;
-  reg [32-1:0] _tmp_228;
-  reg [32-1:0] _tmp_229;
-  reg [32-1:0] _tmp_230;
+  reg _tmp_185;
+  reg _tmp_186;
+  reg _tmp_187;
+  reg _tmp_188;
+  reg _tmp_189;
+  reg _tmp_190;
+  reg _tmp_191;
+  reg _tmp_192;
+  reg _tmp_193;
+  reg _tmp_194;
+  reg _tmp_195;
+  reg _tmp_196;
+  reg _tmp_197;
+  localparam _tmp_198 = 33;
+  wire [_tmp_198-1:0] _tmp_199;
+  assign _tmp_199 = matmul_11_stream_out_local + matmul_11_out_page_comp_offset_buf;
+  reg [_tmp_198-1:0] _tmp_200;
+  reg [_tmp_198-1:0] _tmp_201;
+  reg [_tmp_198-1:0] _tmp_202;
+  reg [_tmp_198-1:0] _tmp_203;
+  reg [_tmp_198-1:0] _tmp_204;
+  reg [_tmp_198-1:0] _tmp_205;
+  reg [_tmp_198-1:0] _tmp_206;
+  reg [_tmp_198-1:0] _tmp_207;
+  reg [_tmp_198-1:0] _tmp_208;
+  reg [_tmp_198-1:0] _tmp_209;
+  reg [_tmp_198-1:0] _tmp_210;
+  reg [_tmp_198-1:0] _tmp_211;
+  reg [_tmp_198-1:0] _tmp_212;
+  reg [_tmp_198-1:0] _tmp_213;
+  reg [_tmp_198-1:0] _tmp_214;
+  reg [_tmp_198-1:0] _tmp_215;
+  reg [_tmp_198-1:0] _tmp_216;
+  reg [_tmp_198-1:0] _tmp_217;
+  reg [_tmp_198-1:0] _tmp_218;
+  reg [_tmp_198-1:0] _tmp_219;
+  reg [_tmp_198-1:0] _tmp_220;
+  reg [_tmp_198-1:0] _tmp_221;
+  reg [_tmp_198-1:0] _tmp_222;
+  reg [_tmp_198-1:0] _tmp_223;
+  reg [_tmp_198-1:0] _tmp_224;
+  reg [_tmp_198-1:0] _tmp_225;
+  reg [_tmp_198-1:0] _tmp_226;
+  reg [_tmp_198-1:0] _tmp_227;
+  reg [_tmp_198-1:0] _tmp_228;
+  reg [_tmp_198-1:0] _tmp_229;
+  reg [_tmp_198-1:0] _tmp_230;
   reg [32-1:0] _tmp_231;
   reg [32-1:0] _tmp_232;
   reg [32-1:0] _tmp_233;
@@ -2561,39 +2609,38 @@ module taketwo
   reg [32-1:0] _tmp_246;
   reg [32-1:0] _tmp_247;
   reg [32-1:0] _tmp_248;
-  wire [1-1:0] write_rtl_bank_249;
-  assign write_rtl_bank_249 = _stream_matmul_11_sink_26_sink_waddr;
-  assign ram_w16_l512_id0_0_0_addr = (_stream_matmul_11_stream_oready && _stream_matmul_11_sink_26_sink_wenable && (_stream_matmul_11_sink_26_sink_sel == 5) && (write_rtl_bank_249 == 0))? _stream_matmul_11_sink_26_sink_waddr >> 1 : 'hx;
-  assign ram_w16_l512_id0_0_0_wdata = (_stream_matmul_11_stream_oready && _stream_matmul_11_sink_26_sink_wenable && (_stream_matmul_11_sink_26_sink_sel == 5) && (write_rtl_bank_249 == 0))? _stream_matmul_11_sink_26_sink_wdata : 'hx;
-  assign ram_w16_l512_id0_0_0_wenable = (_stream_matmul_11_stream_oready && _stream_matmul_11_sink_26_sink_wenable && (_stream_matmul_11_sink_26_sink_sel == 5) && (write_rtl_bank_249 == 0))? 1'd1 : 0;
-  assign ram_w16_l512_id0_0_0_enable = (_stream_matmul_11_stream_oready && _stream_matmul_11_sink_26_sink_wenable && (_stream_matmul_11_sink_26_sink_sel == 5) && (write_rtl_bank_249 == 0))? 1'd1 : 0;
-  assign ram_w16_l512_id0_1_0_addr = (_stream_matmul_11_stream_oready && _stream_matmul_11_sink_26_sink_wenable && (_stream_matmul_11_sink_26_sink_sel == 5) && (write_rtl_bank_249 == 1))? _stream_matmul_11_sink_26_sink_waddr >> 1 : 'hx;
-  assign ram_w16_l512_id0_1_0_wdata = (_stream_matmul_11_stream_oready && _stream_matmul_11_sink_26_sink_wenable && (_stream_matmul_11_sink_26_sink_sel == 5) && (write_rtl_bank_249 == 1))? _stream_matmul_11_sink_26_sink_wdata : 'hx;
-  assign ram_w16_l512_id0_1_0_wenable = (_stream_matmul_11_stream_oready && _stream_matmul_11_sink_26_sink_wenable && (_stream_matmul_11_sink_26_sink_sel == 5) && (write_rtl_bank_249 == 1))? 1'd1 : 0;
-  assign ram_w16_l512_id0_1_0_enable = (_stream_matmul_11_stream_oready && _stream_matmul_11_sink_26_sink_wenable && (_stream_matmul_11_sink_26_sink_sel == 5) && (write_rtl_bank_249 == 1))? 1'd1 : 0;
+  reg [32-1:0] _tmp_249;
+  reg [32-1:0] _tmp_250;
+  reg [32-1:0] _tmp_251;
+  reg [32-1:0] _tmp_252;
+  reg [32-1:0] _tmp_253;
+  reg [32-1:0] _tmp_254;
+  reg [32-1:0] _tmp_255;
+  reg [32-1:0] _tmp_256;
+  reg [32-1:0] _tmp_257;
+  reg [32-1:0] _tmp_258;
+  reg [32-1:0] _tmp_259;
+  reg [32-1:0] _tmp_260;
+  reg [32-1:0] _tmp_261;
+  wire [1-1:0] write_rtl_bank_262;
+  assign write_rtl_bank_262 = _stream_matmul_11_sink_26_sink_waddr;
+  assign ram_w16_l512_id0_0_0_addr = (_stream_matmul_11_stream_oready && _stream_matmul_11_sink_26_sink_wenable && (_stream_matmul_11_sink_26_sink_sel == 5) && (write_rtl_bank_262 == 0))? _stream_matmul_11_sink_26_sink_waddr >> 1 : 'hx;
+  assign ram_w16_l512_id0_0_0_wdata = (_stream_matmul_11_stream_oready && _stream_matmul_11_sink_26_sink_wenable && (_stream_matmul_11_sink_26_sink_sel == 5) && (write_rtl_bank_262 == 0))? _stream_matmul_11_sink_26_sink_wdata : 'hx;
+  assign ram_w16_l512_id0_0_0_wenable = (_stream_matmul_11_stream_oready && _stream_matmul_11_sink_26_sink_wenable && (_stream_matmul_11_sink_26_sink_sel == 5) && (write_rtl_bank_262 == 0))? 1'd1 : 0;
+  assign ram_w16_l512_id0_0_0_enable = (_stream_matmul_11_stream_oready && _stream_matmul_11_sink_26_sink_wenable && (_stream_matmul_11_sink_26_sink_sel == 5) && (write_rtl_bank_262 == 0))? 1'd1 : 0;
+  assign ram_w16_l512_id0_1_0_addr = (_stream_matmul_11_stream_oready && _stream_matmul_11_sink_26_sink_wenable && (_stream_matmul_11_sink_26_sink_sel == 5) && (write_rtl_bank_262 == 1))? _stream_matmul_11_sink_26_sink_waddr >> 1 : 'hx;
+  assign ram_w16_l512_id0_1_0_wdata = (_stream_matmul_11_stream_oready && _stream_matmul_11_sink_26_sink_wenable && (_stream_matmul_11_sink_26_sink_sel == 5) && (write_rtl_bank_262 == 1))? _stream_matmul_11_sink_26_sink_wdata : 'hx;
+  assign ram_w16_l512_id0_1_0_wenable = (_stream_matmul_11_stream_oready && _stream_matmul_11_sink_26_sink_wenable && (_stream_matmul_11_sink_26_sink_sel == 5) && (write_rtl_bank_262 == 1))? 1'd1 : 0;
+  assign ram_w16_l512_id0_1_0_enable = (_stream_matmul_11_stream_oready && _stream_matmul_11_sink_26_sink_wenable && (_stream_matmul_11_sink_26_sink_sel == 5) && (write_rtl_bank_262 == 1))? 1'd1 : 0;
   reg [32-1:0] _stream_matmul_11_sink_26_sink_fsm_4;
   localparam _stream_matmul_11_sink_26_sink_fsm_4_init = 0;
-  wire _set_flag_250;
-  assign _set_flag_250 = matmul_11_comp_fsm == 4;
-  assign _stream_matmul_11_run_flag = (_set_flag_250)? 1 : 0;
-  reg _tmp_251;
-  reg _tmp_252;
-  reg _tmp_253;
-  assign _mul_3_source_stop = _mul_3_stream_oready && 1'd0;
-  reg _tmp_254;
-  reg _tmp_255;
-  reg _tmp_256;
-  reg _tmp_257;
-  reg _tmp_258;
-  reg _tmp_259;
-  reg _tmp_260;
-  reg _tmp_261;
-  reg _tmp_262;
-  reg _tmp_263;
-  assign _mul_3_sink_start = _tmp_263;
+  wire _set_flag_263;
+  assign _set_flag_263 = matmul_11_comp_fsm == 4;
+  assign _stream_matmul_11_run_flag = (_set_flag_263)? 1 : 0;
   reg _tmp_264;
   reg _tmp_265;
   reg _tmp_266;
+  assign _mul_3_source_stop = _mul_3_stream_oready && 1'd0;
   reg _tmp_267;
   reg _tmp_268;
   reg _tmp_269;
@@ -2601,10 +2648,10 @@ module taketwo
   reg _tmp_271;
   reg _tmp_272;
   reg _tmp_273;
-  assign _mul_3_sink_stop = _tmp_273;
   reg _tmp_274;
   reg _tmp_275;
   reg _tmp_276;
+  assign _mul_3_sink_start = _tmp_276;
   reg _tmp_277;
   reg _tmp_278;
   reg _tmp_279;
@@ -2612,67 +2659,65 @@ module taketwo
   reg _tmp_281;
   reg _tmp_282;
   reg _tmp_283;
-  assign _mul_3_sink_busy = _tmp_283;
   reg _tmp_284;
-  assign _mul_3_busy = _mul_3_source_busy || _mul_3_sink_busy || _mul_3_busy_reg;
   reg _tmp_285;
   reg _tmp_286;
+  assign _mul_3_sink_stop = _tmp_286;
   reg _tmp_287;
-  assign _add_tree_1_source_stop = _add_tree_1_stream_oready && 1'd0;
   reg _tmp_288;
   reg _tmp_289;
-  assign _add_tree_1_sink_start = _tmp_289;
   reg _tmp_290;
   reg _tmp_291;
-  assign _add_tree_1_sink_stop = _tmp_291;
   reg _tmp_292;
   reg _tmp_293;
-  assign _add_tree_1_sink_busy = _tmp_293;
   reg _tmp_294;
-  assign _add_tree_1_busy = _add_tree_1_source_busy || _add_tree_1_sink_busy || _add_tree_1_busy_reg;
   reg _tmp_295;
   reg _tmp_296;
+  assign _mul_3_sink_busy = _tmp_296;
   reg _tmp_297;
+  assign _mul_3_busy = _mul_3_source_busy || _mul_3_sink_busy || _mul_3_busy_reg;
   reg _tmp_298;
   reg _tmp_299;
   reg _tmp_300;
+  assign _add_tree_1_source_stop = _add_tree_1_stream_oready && 1'd0;
   reg _tmp_301;
   reg _tmp_302;
+  assign _add_tree_1_sink_start = _tmp_302;
   reg _tmp_303;
   reg _tmp_304;
-  assign _acc_0_source_stop = _acc_0_stream_oready && 1'd0;
+  assign _add_tree_1_sink_stop = _tmp_304;
   reg _tmp_305;
   reg _tmp_306;
+  assign _add_tree_1_sink_busy = _tmp_306;
   reg _tmp_307;
+  assign _add_tree_1_busy = _add_tree_1_source_busy || _add_tree_1_sink_busy || _add_tree_1_busy_reg;
   reg _tmp_308;
   reg _tmp_309;
   reg _tmp_310;
   reg _tmp_311;
-  assign _acc_0_sink_start = _tmp_311;
   reg _tmp_312;
   reg _tmp_313;
   reg _tmp_314;
   reg _tmp_315;
   reg _tmp_316;
   reg _tmp_317;
+  assign _acc_0_source_stop = _acc_0_stream_oready && 1'd0;
   reg _tmp_318;
-  assign _acc_0_sink_stop = _tmp_318;
   reg _tmp_319;
   reg _tmp_320;
   reg _tmp_321;
   reg _tmp_322;
   reg _tmp_323;
   reg _tmp_324;
+  assign _acc_0_sink_start = _tmp_324;
   reg _tmp_325;
-  assign _acc_0_sink_busy = _tmp_325;
   reg _tmp_326;
-  assign _acc_0_busy = _acc_0_source_busy || _acc_0_sink_busy || _acc_0_busy_reg;
   reg _tmp_327;
   reg _tmp_328;
   reg _tmp_329;
-  assign _mul_rshift_round_clip_2_source_stop = _mul_rshift_round_clip_2_stream_oready && 1'd0;
   reg _tmp_330;
   reg _tmp_331;
+  assign _acc_0_sink_stop = _tmp_331;
   reg _tmp_332;
   reg _tmp_333;
   reg _tmp_334;
@@ -2680,11 +2725,13 @@ module taketwo
   reg _tmp_336;
   reg _tmp_337;
   reg _tmp_338;
+  assign _acc_0_sink_busy = _tmp_338;
   reg _tmp_339;
-  assign _mul_rshift_round_clip_2_sink_start = _tmp_339;
+  assign _acc_0_busy = _acc_0_source_busy || _acc_0_sink_busy || _acc_0_busy_reg;
   reg _tmp_340;
   reg _tmp_341;
   reg _tmp_342;
+  assign _mul_rshift_round_clip_2_source_stop = _mul_rshift_round_clip_2_stream_oready && 1'd0;
   reg _tmp_343;
   reg _tmp_344;
   reg _tmp_345;
@@ -2692,10 +2739,10 @@ module taketwo
   reg _tmp_347;
   reg _tmp_348;
   reg _tmp_349;
-  assign _mul_rshift_round_clip_2_sink_stop = _tmp_349;
   reg _tmp_350;
   reg _tmp_351;
   reg _tmp_352;
+  assign _mul_rshift_round_clip_2_sink_start = _tmp_352;
   reg _tmp_353;
   reg _tmp_354;
   reg _tmp_355;
@@ -2703,43 +2750,44 @@ module taketwo
   reg _tmp_357;
   reg _tmp_358;
   reg _tmp_359;
-  assign _mul_rshift_round_clip_2_sink_busy = _tmp_359;
   reg _tmp_360;
-  assign _mul_rshift_round_clip_2_busy = _mul_rshift_round_clip_2_source_busy || _mul_rshift_round_clip_2_sink_busy || _mul_rshift_round_clip_2_busy_reg;
   reg _tmp_361;
   reg _tmp_362;
+  assign _mul_rshift_round_clip_2_sink_stop = _tmp_362;
   reg _tmp_363;
   reg _tmp_364;
   reg _tmp_365;
   reg _tmp_366;
-  reg [1-1:0] __variable_wdata_84;
-  assign stream_matmul_11__reduce_reset_data = __variable_wdata_84;
   reg _tmp_367;
   reg _tmp_368;
   reg _tmp_369;
   reg _tmp_370;
-  assign _stream_matmul_11_source_stop = _stream_matmul_11_stream_oready && (_stream_matmul_11_source_11_idle && _stream_matmul_11_source_13_idle && _stream_matmul_11_source_15_idle && _stream_matmul_11_source_20_idle && _stream_matmul_11_source_21_idle && _stream_matmul_11_source_7_idle && _stream_matmul_11_source_9_idle && (_stream_matmul_11_fsm == 3));
-  localparam _tmp_371 = 1;
-  wire [_tmp_371-1:0] _tmp_372;
-  assign _tmp_372 = _stream_matmul_11_source_11_idle && _stream_matmul_11_source_13_idle && _stream_matmul_11_source_15_idle && _stream_matmul_11_source_20_idle && _stream_matmul_11_source_21_idle && _stream_matmul_11_source_7_idle && _stream_matmul_11_source_9_idle && (_stream_matmul_11_fsm == 3);
-  reg [_tmp_371-1:0] _tmp_373;
-  localparam _tmp_374 = 1;
-  wire [_tmp_374-1:0] _tmp_375;
-  assign _tmp_375 = _stream_matmul_11_source_11_idle && _stream_matmul_11_source_13_idle && _stream_matmul_11_source_15_idle && _stream_matmul_11_source_20_idle && _stream_matmul_11_source_21_idle && _stream_matmul_11_source_7_idle && _stream_matmul_11_source_9_idle && (_stream_matmul_11_fsm == 3);
-  reg [_tmp_374-1:0] _tmp_376;
+  reg _tmp_371;
+  reg _tmp_372;
+  assign _mul_rshift_round_clip_2_sink_busy = _tmp_372;
+  reg _tmp_373;
+  assign _mul_rshift_round_clip_2_busy = _mul_rshift_round_clip_2_source_busy || _mul_rshift_round_clip_2_sink_busy || _mul_rshift_round_clip_2_busy_reg;
+  reg _tmp_374;
+  reg _tmp_375;
+  reg _tmp_376;
   reg _tmp_377;
   reg _tmp_378;
   reg _tmp_379;
+  reg [1-1:0] __variable_wdata_84;
+  assign stream_matmul_11__reduce_reset_data = __variable_wdata_84;
   reg _tmp_380;
   reg _tmp_381;
   reg _tmp_382;
   reg _tmp_383;
-  reg _tmp_384;
-  reg _tmp_385;
-  reg _tmp_386;
-  reg _tmp_387;
-  reg _tmp_388;
-  reg _tmp_389;
+  assign _stream_matmul_11_source_stop = _stream_matmul_11_stream_oready && (_stream_matmul_11_source_11_idle && _stream_matmul_11_source_13_idle && _stream_matmul_11_source_15_idle && _stream_matmul_11_source_20_idle && _stream_matmul_11_source_21_idle && _stream_matmul_11_source_7_idle && _stream_matmul_11_source_9_idle && (_stream_matmul_11_fsm == 3));
+  localparam _tmp_384 = 1;
+  wire [_tmp_384-1:0] _tmp_385;
+  assign _tmp_385 = _stream_matmul_11_source_11_idle && _stream_matmul_11_source_13_idle && _stream_matmul_11_source_15_idle && _stream_matmul_11_source_20_idle && _stream_matmul_11_source_21_idle && _stream_matmul_11_source_7_idle && _stream_matmul_11_source_9_idle && (_stream_matmul_11_fsm == 3);
+  reg [_tmp_384-1:0] _tmp_386;
+  localparam _tmp_387 = 1;
+  wire [_tmp_387-1:0] _tmp_388;
+  assign _tmp_388 = _stream_matmul_11_source_11_idle && _stream_matmul_11_source_13_idle && _stream_matmul_11_source_15_idle && _stream_matmul_11_source_20_idle && _stream_matmul_11_source_21_idle && _stream_matmul_11_source_7_idle && _stream_matmul_11_source_9_idle && (_stream_matmul_11_fsm == 3);
+  reg [_tmp_387-1:0] _tmp_389;
   reg _tmp_390;
   reg _tmp_391;
   reg _tmp_392;
@@ -2758,7 +2806,6 @@ module taketwo
   reg _tmp_405;
   reg _tmp_406;
   reg _tmp_407;
-  assign _stream_matmul_11_sink_start = _tmp_407;
   reg _tmp_408;
   reg _tmp_409;
   reg _tmp_410;
@@ -2772,6 +2819,7 @@ module taketwo
   reg _tmp_418;
   reg _tmp_419;
   reg _tmp_420;
+  assign _stream_matmul_11_sink_start = _tmp_420;
   reg _tmp_421;
   reg _tmp_422;
   reg _tmp_423;
@@ -2790,7 +2838,6 @@ module taketwo
   reg _tmp_436;
   reg _tmp_437;
   reg _tmp_438;
-  assign _stream_matmul_11_sink_stop = _tmp_438;
   reg _tmp_439;
   reg _tmp_440;
   reg _tmp_441;
@@ -2804,6 +2851,7 @@ module taketwo
   reg _tmp_449;
   reg _tmp_450;
   reg _tmp_451;
+  assign _stream_matmul_11_sink_stop = _tmp_451;
   reg _tmp_452;
   reg _tmp_453;
   reg _tmp_454;
@@ -2822,117 +2870,130 @@ module taketwo
   reg _tmp_467;
   reg _tmp_468;
   reg _tmp_469;
-  assign _stream_matmul_11_sink_busy = _tmp_469;
   reg _tmp_470;
+  reg _tmp_471;
+  reg _tmp_472;
+  reg _tmp_473;
+  reg _tmp_474;
+  reg _tmp_475;
+  reg _tmp_476;
+  reg _tmp_477;
+  reg _tmp_478;
+  reg _tmp_479;
+  reg _tmp_480;
+  reg _tmp_481;
+  reg _tmp_482;
+  assign _stream_matmul_11_sink_busy = _tmp_482;
+  reg _tmp_483;
   assign _stream_matmul_11_busy = _stream_matmul_11_source_busy || _stream_matmul_11_sink_busy || _stream_matmul_11_busy_reg;
   wire matmul_11_dma_out_mask_0;
   assign matmul_11_dma_out_mask_0 = matmul_11_out_row_count + 0 >= cparam_matmul_11_out_num_row;
-  wire [32-1:0] _dma_write_packed_high_local_size_471;
-  assign _dma_write_packed_high_local_size_471 = matmul_11_next_out_write_size >> 1;
-  wire [1-1:0] _dma_write_packed_low_local_size_472;
-  assign _dma_write_packed_low_local_size_472 = matmul_11_next_out_write_size & { 1{ 1'd1 } };
-  wire [32-1:0] _dma_write_packed_local_packed_size_473;
-  assign _dma_write_packed_local_packed_size_473 = (_dma_write_packed_low_local_size_472 > 0)? _dma_write_packed_high_local_size_471 + 1 : _dma_write_packed_high_local_size_471;
-  wire [32-1:0] mask_addr_shifted_474;
-  assign mask_addr_shifted_474 = matmul_11_objaddr + (matmul_11_out_base_offset + cparam_matmul_11_out_offset_values_0) + _maxi_global_base_addr >> 2;
-  wire [32-1:0] mask_addr_masked_475;
-  assign mask_addr_masked_475 = mask_addr_shifted_474 << 2;
+  wire [32-1:0] _dma_write_packed_high_local_size_484;
+  assign _dma_write_packed_high_local_size_484 = matmul_11_next_out_write_size >> 1;
+  wire [1-1:0] _dma_write_packed_low_local_size_485;
+  assign _dma_write_packed_low_local_size_485 = matmul_11_next_out_write_size & { 1{ 1'd1 } };
+  wire [32-1:0] _dma_write_packed_local_packed_size_486;
+  assign _dma_write_packed_local_packed_size_486 = (_dma_write_packed_low_local_size_485 > 0)? _dma_write_packed_high_local_size_484 + 1 : _dma_write_packed_high_local_size_484;
+  wire [32-1:0] mask_addr_shifted_487;
+  assign mask_addr_shifted_487 = matmul_11_objaddr + (matmul_11_out_base_offset + cparam_matmul_11_out_offset_values_0) + _maxi_global_base_addr >> 2;
+  wire [32-1:0] mask_addr_masked_488;
+  assign mask_addr_masked_488 = mask_addr_shifted_487 << 2;
   reg [32-1:0] _maxi_write_req_fsm;
   localparam _maxi_write_req_fsm_init = 0;
   reg [33-1:0] _maxi_write_cur_global_size;
   reg _maxi_write_cont;
-  wire [8-1:0] pack_write_req_op_sel_476;
-  wire [32-1:0] pack_write_req_local_addr_477;
-  wire [32-1:0] pack_write_req_local_stride_478;
-  wire [33-1:0] pack_write_req_size_479;
-  wire [32-1:0] pack_write_req_local_blocksize_480;
-  assign pack_write_req_op_sel_476 = _maxi_write_op_sel;
-  assign pack_write_req_local_addr_477 = _maxi_write_local_addr;
-  assign pack_write_req_local_stride_478 = _maxi_write_local_stride;
-  assign pack_write_req_size_479 = _maxi_write_local_size;
-  assign pack_write_req_local_blocksize_480 = _maxi_write_local_blocksize;
-  wire [137-1:0] pack_write_req_packed_481;
-  assign pack_write_req_packed_481 = { pack_write_req_op_sel_476, pack_write_req_local_addr_477, pack_write_req_local_stride_478, pack_write_req_size_479, pack_write_req_local_blocksize_480 };
-  localparam _tmp_482 = 1;
-  wire [_tmp_482-1:0] _tmp_483;
-  assign _tmp_483 = !_maxi_write_req_fifo_almost_full;
-  reg [_tmp_482-1:0] __tmp_483_1;
-  wire [32-1:0] mask_addr_shifted_484;
-  assign mask_addr_shifted_484 = _maxi_write_global_addr >> 2;
-  wire [32-1:0] mask_addr_masked_485;
-  assign mask_addr_masked_485 = mask_addr_shifted_484 << 2;
-  wire [32-1:0] mask_addr_shifted_486;
-  assign mask_addr_shifted_486 = _maxi_write_global_addr >> 2;
-  wire [32-1:0] mask_addr_masked_487;
-  assign mask_addr_masked_487 = mask_addr_shifted_486 << 2;
-  wire [32-1:0] mask_addr_shifted_488;
-  assign mask_addr_shifted_488 = _maxi_write_global_addr >> 2;
-  wire [32-1:0] mask_addr_masked_489;
-  assign mask_addr_masked_489 = mask_addr_shifted_488 << 2;
-  wire [32-1:0] mask_addr_shifted_490;
-  assign mask_addr_shifted_490 = _maxi_write_global_addr >> 2;
-  wire [32-1:0] mask_addr_masked_491;
-  assign mask_addr_masked_491 = mask_addr_shifted_490 << 2;
-  wire [32-1:0] mask_addr_shifted_492;
-  assign mask_addr_shifted_492 = _maxi_write_global_addr >> 2;
-  wire [32-1:0] mask_addr_masked_493;
-  assign mask_addr_masked_493 = mask_addr_shifted_492 << 2;
-  wire [32-1:0] mask_addr_shifted_494;
-  assign mask_addr_shifted_494 = _maxi_write_global_addr >> 2;
-  wire [32-1:0] mask_addr_masked_495;
-  assign mask_addr_masked_495 = mask_addr_shifted_494 << 2;
-  wire [8-1:0] pack_write_req_op_sel_496;
-  wire [32-1:0] pack_write_req_local_addr_497;
-  wire [32-1:0] pack_write_req_local_stride_498;
-  wire [33-1:0] pack_write_req_size_499;
-  wire [32-1:0] pack_write_req_local_blocksize_500;
-  assign pack_write_req_op_sel_496 = _maxi_write_op_sel;
-  assign pack_write_req_local_addr_497 = _maxi_write_local_addr;
-  assign pack_write_req_local_stride_498 = _maxi_write_local_stride;
-  assign pack_write_req_size_499 = _maxi_write_cur_global_size;
-  assign pack_write_req_local_blocksize_500 = _maxi_write_local_blocksize;
-  wire [137-1:0] pack_write_req_packed_501;
-  assign pack_write_req_packed_501 = { pack_write_req_op_sel_496, pack_write_req_local_addr_497, pack_write_req_local_stride_498, pack_write_req_size_499, pack_write_req_local_blocksize_500 };
-  assign _maxi_write_req_fifo_wdata = ((_maxi_write_req_fsm == 1) && !_maxi_write_req_fifo_almost_full && (maxi_awready || !maxi_awvalid) && (_maxi_outstanding_wcount < 6))? pack_write_req_packed_501 : 
-                                      ((_maxi_write_req_fsm == 0) && _maxi_write_start && !_maxi_write_req_fifo_almost_full)? pack_write_req_packed_481 : 'hx;
+  wire [8-1:0] pack_write_req_op_sel_489;
+  wire [32-1:0] pack_write_req_local_addr_490;
+  wire [32-1:0] pack_write_req_local_stride_491;
+  wire [33-1:0] pack_write_req_size_492;
+  wire [32-1:0] pack_write_req_local_blocksize_493;
+  assign pack_write_req_op_sel_489 = _maxi_write_op_sel;
+  assign pack_write_req_local_addr_490 = _maxi_write_local_addr;
+  assign pack_write_req_local_stride_491 = _maxi_write_local_stride;
+  assign pack_write_req_size_492 = _maxi_write_local_size;
+  assign pack_write_req_local_blocksize_493 = _maxi_write_local_blocksize;
+  wire [137-1:0] pack_write_req_packed_494;
+  assign pack_write_req_packed_494 = { pack_write_req_op_sel_489, pack_write_req_local_addr_490, pack_write_req_local_stride_491, pack_write_req_size_492, pack_write_req_local_blocksize_493 };
+  localparam _tmp_495 = 1;
+  wire [_tmp_495-1:0] _tmp_496;
+  assign _tmp_496 = !_maxi_write_req_fifo_almost_full;
+  reg [_tmp_495-1:0] __tmp_496_1;
+  wire [32-1:0] mask_addr_shifted_497;
+  assign mask_addr_shifted_497 = _maxi_write_global_addr >> 2;
+  wire [32-1:0] mask_addr_masked_498;
+  assign mask_addr_masked_498 = mask_addr_shifted_497 << 2;
+  wire [32-1:0] mask_addr_shifted_499;
+  assign mask_addr_shifted_499 = _maxi_write_global_addr >> 2;
+  wire [32-1:0] mask_addr_masked_500;
+  assign mask_addr_masked_500 = mask_addr_shifted_499 << 2;
+  wire [32-1:0] mask_addr_shifted_501;
+  assign mask_addr_shifted_501 = _maxi_write_global_addr >> 2;
+  wire [32-1:0] mask_addr_masked_502;
+  assign mask_addr_masked_502 = mask_addr_shifted_501 << 2;
+  wire [32-1:0] mask_addr_shifted_503;
+  assign mask_addr_shifted_503 = _maxi_write_global_addr >> 2;
+  wire [32-1:0] mask_addr_masked_504;
+  assign mask_addr_masked_504 = mask_addr_shifted_503 << 2;
+  wire [32-1:0] mask_addr_shifted_505;
+  assign mask_addr_shifted_505 = _maxi_write_global_addr >> 2;
+  wire [32-1:0] mask_addr_masked_506;
+  assign mask_addr_masked_506 = mask_addr_shifted_505 << 2;
+  wire [32-1:0] mask_addr_shifted_507;
+  assign mask_addr_shifted_507 = _maxi_write_global_addr >> 2;
+  wire [32-1:0] mask_addr_masked_508;
+  assign mask_addr_masked_508 = mask_addr_shifted_507 << 2;
+  wire [8-1:0] pack_write_req_op_sel_509;
+  wire [32-1:0] pack_write_req_local_addr_510;
+  wire [32-1:0] pack_write_req_local_stride_511;
+  wire [33-1:0] pack_write_req_size_512;
+  wire [32-1:0] pack_write_req_local_blocksize_513;
+  assign pack_write_req_op_sel_509 = _maxi_write_op_sel;
+  assign pack_write_req_local_addr_510 = _maxi_write_local_addr;
+  assign pack_write_req_local_stride_511 = _maxi_write_local_stride;
+  assign pack_write_req_size_512 = _maxi_write_cur_global_size;
+  assign pack_write_req_local_blocksize_513 = _maxi_write_local_blocksize;
+  wire [137-1:0] pack_write_req_packed_514;
+  assign pack_write_req_packed_514 = { pack_write_req_op_sel_509, pack_write_req_local_addr_510, pack_write_req_local_stride_511, pack_write_req_size_512, pack_write_req_local_blocksize_513 };
+  assign _maxi_write_req_fifo_wdata = ((_maxi_write_req_fsm == 1) && !_maxi_write_req_fifo_almost_full && (maxi_awready || !maxi_awvalid) && (_maxi_outstanding_wcount < 6))? pack_write_req_packed_514 : 
+                                      ((_maxi_write_req_fsm == 0) && _maxi_write_start && !_maxi_write_req_fifo_almost_full)? pack_write_req_packed_494 : 'hx;
   assign _maxi_write_req_fifo_enq = ((_maxi_write_req_fsm == 1) && !_maxi_write_req_fifo_almost_full && (maxi_awready || !maxi_awvalid) && (_maxi_outstanding_wcount < 6))? (_maxi_write_req_fsm == 1) && !_maxi_write_req_fifo_almost_full && (maxi_awready || !maxi_awvalid) && (_maxi_outstanding_wcount < 6) && !_maxi_write_req_fifo_almost_full : 
                                     ((_maxi_write_req_fsm == 0) && _maxi_write_start && !_maxi_write_req_fifo_almost_full)? (_maxi_write_req_fsm == 0) && _maxi_write_start && !_maxi_write_req_fifo_almost_full && !_maxi_write_req_fifo_almost_full : 0;
-  localparam _tmp_502 = 1;
-  wire [_tmp_502-1:0] _tmp_503;
-  assign _tmp_503 = !_maxi_write_req_fifo_almost_full;
-  reg [_tmp_502-1:0] __tmp_503_1;
+  localparam _tmp_515 = 1;
+  wire [_tmp_515-1:0] _tmp_516;
+  assign _tmp_516 = !_maxi_write_req_fifo_almost_full;
+  reg [_tmp_515-1:0] __tmp_516_1;
   reg _maxi_waddr_cond_0_1;
   reg [32-1:0] _maxi_write_data_fsm;
   localparam _maxi_write_data_fsm_init = 0;
   reg [32-1:0] read_burst_packed_fsm_4;
   localparam read_burst_packed_fsm_4_init = 0;
-  reg [9-1:0] read_burst_packed_addr_504;
-  reg [9-1:0] read_burst_packed_stride_505;
-  reg [33-1:0] read_burst_packed_length_506;
-  reg read_burst_packed_rvalid_507;
-  reg read_burst_packed_rlast_508;
-  wire [8-1:0] read_burst_packed_ram_addr_509;
-  assign read_burst_packed_ram_addr_509 = read_burst_packed_addr_504 >> 1;
-  assign ram_w16_l512_id0_0_1_addr = ((read_burst_packed_fsm_4 == 1) && (!read_burst_packed_rvalid_507 || (_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0)))? read_burst_packed_ram_addr_509 : 'hx;
-  assign ram_w16_l512_id0_0_1_enable = ((read_burst_packed_fsm_4 == 1) && (!read_burst_packed_rvalid_507 || (_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0)))? 1'd1 : 0;
-  localparam _tmp_510 = 1;
-  wire [_tmp_510-1:0] _tmp_511;
-  assign _tmp_511 = (read_burst_packed_fsm_4 == 1) && (!read_burst_packed_rvalid_507 || (_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0));
-  reg [_tmp_510-1:0] __tmp_511_1;
-  wire [16-1:0] read_burst_packed_ram_rdata_512;
-  assign read_burst_packed_ram_rdata_512 = ram_w16_l512_id0_0_1_rdata;
-  wire [8-1:0] read_burst_packed_ram_addr_513;
-  assign read_burst_packed_ram_addr_513 = read_burst_packed_addr_504 >> 1;
-  assign ram_w16_l512_id0_1_1_addr = ((read_burst_packed_fsm_4 == 1) && (!read_burst_packed_rvalid_507 || (_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0)))? read_burst_packed_ram_addr_513 : 'hx;
-  assign ram_w16_l512_id0_1_1_enable = ((read_burst_packed_fsm_4 == 1) && (!read_burst_packed_rvalid_507 || (_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0)))? 1'd1 : 0;
-  localparam _tmp_514 = 1;
-  wire [_tmp_514-1:0] _tmp_515;
-  assign _tmp_515 = (read_burst_packed_fsm_4 == 1) && (!read_burst_packed_rvalid_507 || (_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0));
-  reg [_tmp_514-1:0] __tmp_515_1;
-  wire [16-1:0] read_burst_packed_ram_rdata_516;
-  assign read_burst_packed_ram_rdata_516 = ram_w16_l512_id0_1_1_rdata;
-  wire [32-1:0] read_burst_packed_rdata_517;
-  assign read_burst_packed_rdata_517 = { read_burst_packed_ram_rdata_516, read_burst_packed_ram_rdata_512 };
+  reg [9-1:0] read_burst_packed_addr_517;
+  reg [9-1:0] read_burst_packed_stride_518;
+  reg [33-1:0] read_burst_packed_length_519;
+  reg read_burst_packed_rvalid_520;
+  reg read_burst_packed_rlast_521;
+  wire [8-1:0] read_burst_packed_ram_addr_522;
+  assign read_burst_packed_ram_addr_522 = read_burst_packed_addr_517 >> 1;
+  assign ram_w16_l512_id0_0_1_addr = ((read_burst_packed_fsm_4 == 1) && (!read_burst_packed_rvalid_520 || (_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0)))? read_burst_packed_ram_addr_522 : 'hx;
+  assign ram_w16_l512_id0_0_1_enable = ((read_burst_packed_fsm_4 == 1) && (!read_burst_packed_rvalid_520 || (_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0)))? 1'd1 : 0;
+  localparam _tmp_523 = 1;
+  wire [_tmp_523-1:0] _tmp_524;
+  assign _tmp_524 = (read_burst_packed_fsm_4 == 1) && (!read_burst_packed_rvalid_520 || (_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0));
+  reg [_tmp_523-1:0] __tmp_524_1;
+  wire [16-1:0] read_burst_packed_ram_rdata_525;
+  assign read_burst_packed_ram_rdata_525 = ram_w16_l512_id0_0_1_rdata;
+  wire [8-1:0] read_burst_packed_ram_addr_526;
+  assign read_burst_packed_ram_addr_526 = read_burst_packed_addr_517 >> 1;
+  assign ram_w16_l512_id0_1_1_addr = ((read_burst_packed_fsm_4 == 1) && (!read_burst_packed_rvalid_520 || (_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0)))? read_burst_packed_ram_addr_526 : 'hx;
+  assign ram_w16_l512_id0_1_1_enable = ((read_burst_packed_fsm_4 == 1) && (!read_burst_packed_rvalid_520 || (_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0)))? 1'd1 : 0;
+  localparam _tmp_527 = 1;
+  wire [_tmp_527-1:0] _tmp_528;
+  assign _tmp_528 = (read_burst_packed_fsm_4 == 1) && (!read_burst_packed_rvalid_520 || (_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0));
+  reg [_tmp_527-1:0] __tmp_528_1;
+  wire [16-1:0] read_burst_packed_ram_rdata_529;
+  assign read_burst_packed_ram_rdata_529 = ram_w16_l512_id0_1_1_rdata;
+  wire [32-1:0] read_burst_packed_rdata_530;
+  assign read_burst_packed_rdata_530 = { read_burst_packed_ram_rdata_529, read_burst_packed_ram_rdata_525 };
   assign _maxi_write_req_fifo_deq = ((_maxi_write_data_fsm == 2) && (!_maxi_write_req_fifo_empty && (_maxi_write_size_buf == 0)) && !_maxi_write_req_fifo_empty)? 1 : 
                                     ((_maxi_write_data_fsm == 0) && (!_maxi_write_data_busy && !_maxi_write_req_fifo_empty && (_maxi_write_op_sel_fifo == 1)) && !_maxi_write_req_fifo_empty)? 1 : 0;
   reg _maxi_wdata_cond_0_1;
@@ -2987,10 +3048,10 @@ module taketwo
         _maxi_wvalid_sb_0 <= 0;
         _maxi_wlast_sb_0 <= 0;
       end 
-      if((_maxi_write_op_sel_buf == 1) && read_burst_packed_rvalid_507 && ((_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0)) && (_maxi_wready_sb_0 || !_maxi_wvalid_sb_0)) begin
-        _maxi_wdata_sb_0 <= read_burst_packed_rdata_517;
+      if((_maxi_write_op_sel_buf == 1) && read_burst_packed_rvalid_520 && ((_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0)) && (_maxi_wready_sb_0 || !_maxi_wvalid_sb_0)) begin
+        _maxi_wdata_sb_0 <= read_burst_packed_rdata_530;
         _maxi_wvalid_sb_0 <= 1;
-        _maxi_wlast_sb_0 <= read_burst_packed_rlast_508 || (_maxi_write_size_buf == 1);
+        _maxi_wlast_sb_0 <= read_burst_packed_rlast_521 || (_maxi_write_size_buf == 1);
         _maxi_wstrb_sb_0 <= { 4{ 1'd1 } };
       end 
       _maxi_wdata_cond_0_1 <= 1;
@@ -3118,11 +3179,11 @@ module taketwo
       if((control_matmul_11 == 2) && _maxi_read_req_idle) begin
         _maxi_read_start <= 1;
         _maxi_read_op_sel <= 1;
-        _maxi_read_global_addr <= mask_addr_masked_55;
-        _maxi_read_global_size <= cparam_matmul_11_bias_num;
+        _maxi_read_global_addr <= mask_addr_masked_58;
+        _maxi_read_global_size <= _dma_read_packed_local_packed_size_56;
         _maxi_read_local_addr <= 0;
-        _maxi_read_local_stride <= 1;
-        _maxi_read_local_size <= cparam_matmul_11_bias_num;
+        _maxi_read_local_stride <= 2;
+        _maxi_read_local_size <= _dma_read_packed_local_packed_size_56;
         _maxi_read_local_blocksize <= 1;
       end 
       if((_maxi_read_req_fsm == 0) && _maxi_read_start) begin
@@ -3131,15 +3192,15 @@ module taketwo
       if(_maxi_read_start && _maxi_read_req_fifo_almost_full) begin
         _maxi_read_start <= 1;
       end 
-      if((_maxi_read_req_fsm == 0) && (_maxi_read_start || _maxi_read_cont) && !_maxi_read_req_fifo_almost_full && (_maxi_read_global_size <= 256) && ((mask_addr_masked_65 & 4095) + (_maxi_read_global_size << 2) >= 4096)) begin
-        _maxi_read_cur_global_size <= 4096 - (mask_addr_masked_67 & 4095) >> 2;
-        _maxi_read_global_size <= _maxi_read_global_size - (4096 - (mask_addr_masked_69 & 4095) >> 2);
+      if((_maxi_read_req_fsm == 0) && (_maxi_read_start || _maxi_read_cont) && !_maxi_read_req_fifo_almost_full && (_maxi_read_global_size <= 256) && ((mask_addr_masked_68 & 4095) + (_maxi_read_global_size << 2) >= 4096)) begin
+        _maxi_read_cur_global_size <= 4096 - (mask_addr_masked_70 & 4095) >> 2;
+        _maxi_read_global_size <= _maxi_read_global_size - (4096 - (mask_addr_masked_72 & 4095) >> 2);
       end else if((_maxi_read_req_fsm == 0) && (_maxi_read_start || _maxi_read_cont) && !_maxi_read_req_fifo_almost_full && (_maxi_read_global_size <= 256)) begin
         _maxi_read_cur_global_size <= _maxi_read_global_size;
         _maxi_read_global_size <= 0;
-      end else if((_maxi_read_req_fsm == 0) && (_maxi_read_start || _maxi_read_cont) && !_maxi_read_req_fifo_almost_full && ((mask_addr_masked_71 & 4095) + 1024 >= 4096)) begin
-        _maxi_read_cur_global_size <= 4096 - (mask_addr_masked_73 & 4095) >> 2;
-        _maxi_read_global_size <= _maxi_read_global_size - (4096 - (mask_addr_masked_75 & 4095) >> 2);
+      end else if((_maxi_read_req_fsm == 0) && (_maxi_read_start || _maxi_read_cont) && !_maxi_read_req_fifo_almost_full && ((mask_addr_masked_74 & 4095) + 1024 >= 4096)) begin
+        _maxi_read_cur_global_size <= 4096 - (mask_addr_masked_76 & 4095) >> 2;
+        _maxi_read_global_size <= _maxi_read_global_size - (4096 - (mask_addr_masked_78 & 4095) >> 2);
       end else if((_maxi_read_req_fsm == 0) && (_maxi_read_start || _maxi_read_cont) && !_maxi_read_req_fifo_almost_full) begin
         _maxi_read_cur_global_size <= 256;
         _maxi_read_global_size <= _maxi_read_global_size - 256;
@@ -3167,7 +3228,7 @@ module taketwo
       if((control_matmul_11 == 4) && _maxi_read_req_idle) begin
         _maxi_read_start <= 1;
         _maxi_read_op_sel <= 2;
-        _maxi_read_global_addr <= mask_addr_masked_81;
+        _maxi_read_global_addr <= mask_addr_masked_88;
         _maxi_read_global_size <= cparam_matmul_11_scale_num;
         _maxi_read_local_addr <= 0;
         _maxi_read_local_stride <= 1;
@@ -3191,11 +3252,11 @@ module taketwo
       if((control_matmul_11 == 8) && _maxi_read_req_idle) begin
         _maxi_read_start <= 1;
         _maxi_read_op_sel <= 3;
-        _maxi_read_global_addr <= mask_addr_masked_90;
-        _maxi_read_global_size <= _dma_read_packed_local_packed_size_88;
+        _maxi_read_global_addr <= mask_addr_masked_97;
+        _maxi_read_global_size <= _dma_read_packed_local_packed_size_95;
         _maxi_read_local_addr <= matmul_11_filter_page_dma_offset;
         _maxi_read_local_stride <= 2;
-        _maxi_read_local_size <= _dma_read_packed_local_packed_size_88;
+        _maxi_read_local_size <= _dma_read_packed_local_packed_size_95;
         _maxi_read_local_blocksize <= 1;
       end 
       if((_maxi_read_data_fsm == 0) && (!_maxi_read_data_busy && !_maxi_read_req_fifo_empty && (_maxi_read_op_sel_fifo == 3))) begin
@@ -3215,11 +3276,11 @@ module taketwo
       if((control_matmul_11 == 14) && _maxi_read_req_idle) begin
         _maxi_read_start <= 1;
         _maxi_read_op_sel <= 4;
-        _maxi_read_global_addr <= mask_addr_masked_103;
-        _maxi_read_global_size <= _dma_read_packed_local_packed_size_101;
+        _maxi_read_global_addr <= mask_addr_masked_110;
+        _maxi_read_global_size <= _dma_read_packed_local_packed_size_108;
         _maxi_read_local_addr <= matmul_11_act_page_dma_offset_0;
         _maxi_read_local_stride <= 2;
-        _maxi_read_local_size <= _dma_read_packed_local_packed_size_101;
+        _maxi_read_local_size <= _dma_read_packed_local_packed_size_108;
         _maxi_read_local_blocksize <= 1;
       end 
       if((_maxi_read_data_fsm == 0) && (!_maxi_read_data_busy && !_maxi_read_req_fifo_empty && (_maxi_read_op_sel_fifo == 4))) begin
@@ -3239,11 +3300,11 @@ module taketwo
       if((control_matmul_11 == 23) && _maxi_write_req_idle) begin
         _maxi_write_start <= 1;
         _maxi_write_op_sel <= 1;
-        _maxi_write_global_addr <= mask_addr_masked_475;
-        _maxi_write_global_size <= _dma_write_packed_local_packed_size_473;
+        _maxi_write_global_addr <= mask_addr_masked_488;
+        _maxi_write_global_size <= _dma_write_packed_local_packed_size_486;
         _maxi_write_local_addr <= matmul_11_out_laddr_offset + matmul_11_out_page_dma_offset;
         _maxi_write_local_stride <= 2;
-        _maxi_write_local_size <= _dma_write_packed_local_packed_size_473;
+        _maxi_write_local_size <= _dma_write_packed_local_packed_size_486;
         _maxi_write_local_blocksize <= 1;
       end 
       if((_maxi_write_req_fsm == 0) && _maxi_write_start) begin
@@ -3252,15 +3313,15 @@ module taketwo
       if(_maxi_write_start && _maxi_write_req_fifo_almost_full) begin
         _maxi_write_start <= 1;
       end 
-      if((_maxi_write_req_fsm == 0) && (_maxi_write_start || _maxi_write_cont) && !_maxi_write_req_fifo_almost_full && (_maxi_write_global_size <= 256) && ((mask_addr_masked_485 & 4095) + (_maxi_write_global_size << 2) >= 4096)) begin
-        _maxi_write_cur_global_size <= 4096 - (mask_addr_masked_487 & 4095) >> 2;
-        _maxi_write_global_size <= _maxi_write_global_size - (4096 - (mask_addr_masked_489 & 4095) >> 2);
+      if((_maxi_write_req_fsm == 0) && (_maxi_write_start || _maxi_write_cont) && !_maxi_write_req_fifo_almost_full && (_maxi_write_global_size <= 256) && ((mask_addr_masked_498 & 4095) + (_maxi_write_global_size << 2) >= 4096)) begin
+        _maxi_write_cur_global_size <= 4096 - (mask_addr_masked_500 & 4095) >> 2;
+        _maxi_write_global_size <= _maxi_write_global_size - (4096 - (mask_addr_masked_502 & 4095) >> 2);
       end else if((_maxi_write_req_fsm == 0) && (_maxi_write_start || _maxi_write_cont) && !_maxi_write_req_fifo_almost_full && (_maxi_write_global_size <= 256)) begin
         _maxi_write_cur_global_size <= _maxi_write_global_size;
         _maxi_write_global_size <= 0;
-      end else if((_maxi_write_req_fsm == 0) && (_maxi_write_start || _maxi_write_cont) && !_maxi_write_req_fifo_almost_full && ((mask_addr_masked_491 & 4095) + 1024 >= 4096)) begin
-        _maxi_write_cur_global_size <= 4096 - (mask_addr_masked_493 & 4095) >> 2;
-        _maxi_write_global_size <= _maxi_write_global_size - (4096 - (mask_addr_masked_495 & 4095) >> 2);
+      end else if((_maxi_write_req_fsm == 0) && (_maxi_write_start || _maxi_write_cont) && !_maxi_write_req_fifo_almost_full && ((mask_addr_masked_504 & 4095) + 1024 >= 4096)) begin
+        _maxi_write_cur_global_size <= 4096 - (mask_addr_masked_506 & 4095) >> 2;
+        _maxi_write_global_size <= _maxi_write_global_size - (4096 - (mask_addr_masked_508 & 4095) >> 2);
       end else if((_maxi_write_req_fsm == 0) && (_maxi_write_start || _maxi_write_cont) && !_maxi_write_req_fifo_almost_full) begin
         _maxi_write_cur_global_size <= 256;
         _maxi_write_global_size <= _maxi_write_global_size - 256;
@@ -3285,10 +3346,10 @@ module taketwo
       if((_maxi_write_data_fsm == 2) && (!_maxi_write_req_fifo_empty && (_maxi_write_size_buf == 0))) begin
         _maxi_write_size_buf <= _maxi_write_size_fifo;
       end 
-      if((_maxi_write_data_fsm == 2) && read_burst_packed_rvalid_507 && ((_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0))) begin
+      if((_maxi_write_data_fsm == 2) && read_burst_packed_rvalid_520 && ((_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0))) begin
         _maxi_write_size_buf <= _maxi_write_size_buf - 1;
       end 
-      if((_maxi_write_data_fsm == 2) && ((_maxi_write_op_sel_buf == 1) && read_burst_packed_rvalid_507 && ((_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0))) && read_burst_packed_rlast_508) begin
+      if((_maxi_write_data_fsm == 2) && ((_maxi_write_op_sel_buf == 1) && read_burst_packed_rvalid_520 && ((_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0))) && read_burst_packed_rlast_521) begin
         _maxi_write_data_busy <= 0;
       end 
     end
@@ -3298,7 +3359,7 @@ module taketwo
   always @(posedge CLK) begin
     if(RESETN_inv_buf) begin
       count__maxi_read_req_fifo <= 0;
-      __tmp_63_1 <= 0;
+      __tmp_66_1 <= 0;
     end else begin
       if(_maxi_read_req_fifo_enq && !_maxi_read_req_fifo_full && (_maxi_read_req_fifo_deq && !_maxi_read_req_fifo_empty)) begin
         count__maxi_read_req_fifo <= count__maxi_read_req_fifo;
@@ -3307,7 +3368,7 @@ module taketwo
       end else if(_maxi_read_req_fifo_deq && !_maxi_read_req_fifo_empty) begin
         count__maxi_read_req_fifo <= count__maxi_read_req_fifo - 1;
       end 
-      __tmp_63_1 <= _tmp_63;
+      __tmp_66_1 <= _tmp_66;
     end
   end
 
@@ -3315,8 +3376,8 @@ module taketwo
   always @(posedge CLK) begin
     if(RESETN_inv_buf) begin
       count__maxi_write_req_fifo <= 0;
-      __tmp_483_1 <= 0;
-      __tmp_503_1 <= 0;
+      __tmp_496_1 <= 0;
+      __tmp_516_1 <= 0;
     end else begin
       if(_maxi_write_req_fifo_enq && !_maxi_write_req_fifo_full && (_maxi_write_req_fifo_deq && !_maxi_write_req_fifo_empty)) begin
         count__maxi_write_req_fifo <= count__maxi_write_req_fifo;
@@ -3325,8 +3386,8 @@ module taketwo
       end else if(_maxi_write_req_fifo_deq && !_maxi_write_req_fifo_empty) begin
         count__maxi_write_req_fifo <= count__maxi_write_req_fifo - 1;
       end 
-      __tmp_483_1 <= _tmp_483;
-      __tmp_503_1 <= _tmp_503;
+      __tmp_496_1 <= _tmp_496;
+      __tmp_516_1 <= _tmp_516;
     end
   end
 
@@ -3422,11 +3483,11 @@ module taketwo
       _saxi_flag_29 <= 0;
       _saxi_register_30 <= 0;
       _saxi_flag_30 <= 0;
-      _saxi_register_31 <= 5696;
+      _saxi_register_31 <= 5504;
       _saxi_flag_31 <= 0;
       _saxi_register_32 <= 0;
       _saxi_flag_32 <= 0;
-      _saxi_register_33 <= 5504;
+      _saxi_register_33 <= 5312;
       _saxi_flag_33 <= 0;
       _saxi_register_34 <= 0;
       _saxi_flag_34 <= 0;
@@ -4456,72 +4517,81 @@ module taketwo
 
   always @(posedge CLK) begin
     if(RST) begin
-      __tmp_511_1 <= 0;
+      __tmp_524_1 <= 0;
     end else begin
-      __tmp_511_1 <= _tmp_511;
+      __tmp_524_1 <= _tmp_524;
     end
   end
 
 
   always @(posedge CLK) begin
     if(RST) begin
-      __tmp_515_1 <= 0;
+      __tmp_528_1 <= 0;
     end else begin
-      __tmp_515_1 <= _tmp_515;
+      __tmp_528_1 <= _tmp_528;
     end
   end
 
 
   always @(posedge CLK) begin
     if(RST) begin
-      __tmp_139_1 <= 0;
+      __tmp_152_1 <= 0;
     end else begin
-      __tmp_139_1 <= _tmp_139;
+      __tmp_152_1 <= _tmp_152;
     end
   end
 
 
   always @(posedge CLK) begin
     if(RST) begin
-      __tmp_141_1 <= 0;
+      __tmp_154_1 <= 0;
     end else begin
-      __tmp_141_1 <= _tmp_141;
+      __tmp_154_1 <= _tmp_154;
     end
   end
 
 
   always @(posedge CLK) begin
     if(RST) begin
-      __tmp_148_1 <= 0;
+      __tmp_129_1 <= 0;
     end else begin
-      __tmp_148_1 <= _tmp_148;
+      __tmp_129_1 <= _tmp_129;
     end
   end
 
 
   always @(posedge CLK) begin
     if(RST) begin
-      __tmp_150_1 <= 0;
+      __tmp_131_1 <= 0;
     end else begin
-      __tmp_150_1 <= _tmp_150;
+      __tmp_131_1 <= _tmp_131;
     end
   end
 
 
   always @(posedge CLK) begin
     if(RST) begin
-      __tmp_124_1 <= 0;
+      __tmp_161_1 <= 0;
     end else begin
-      __tmp_124_1 <= _tmp_124;
+      __tmp_161_1 <= _tmp_161;
     end
   end
 
 
   always @(posedge CLK) begin
     if(RST) begin
-      __tmp_120_1 <= 0;
+      __tmp_163_1 <= 0;
     end else begin
-      __tmp_120_1 <= _tmp_120;
+      __tmp_163_1 <= _tmp_163;
+    end
+  end
+
+
+  always @(posedge CLK) begin
+    if(RST) begin
+      __tmp_137_1 <= 0;
+    end else begin
+      __tmp_137_1 <= _tmp_137;
     end
   end
 
@@ -4570,19 +4640,6 @@ module taketwo
       __variable_wdata_0 <= 0;
       __variable_wdata_1 <= 0;
       __variable_wdata_2 <= 0;
-      _tmp_295 <= 0;
-      _tmp_296 <= 0;
-      _tmp_297 <= 0;
-      _tmp_298 <= 0;
-      _tmp_299 <= 0;
-      _tmp_300 <= 0;
-      _tmp_301 <= 0;
-      _tmp_302 <= 0;
-      _tmp_303 <= 0;
-      _tmp_304 <= 0;
-      _tmp_305 <= 0;
-      _tmp_306 <= 0;
-      _tmp_307 <= 0;
       _tmp_308 <= 0;
       _tmp_309 <= 0;
       _tmp_310 <= 0;
@@ -4602,6 +4659,19 @@ module taketwo
       _tmp_324 <= 0;
       _tmp_325 <= 0;
       _tmp_326 <= 0;
+      _tmp_327 <= 0;
+      _tmp_328 <= 0;
+      _tmp_329 <= 0;
+      _tmp_330 <= 0;
+      _tmp_331 <= 0;
+      _tmp_332 <= 0;
+      _tmp_333 <= 0;
+      _tmp_334 <= 0;
+      _tmp_335 <= 0;
+      _tmp_336 <= 0;
+      _tmp_337 <= 0;
+      _tmp_338 <= 0;
+      _tmp_339 <= 0;
       _acc_0_busy_reg <= 0;
     end else begin
       if(_acc_0_stream_oready) begin
@@ -4725,55 +4795,7 @@ module taketwo
         __variable_wdata_2 <= __delay_data_256__delay_255__delay_254__delay_253____variable_79;
       end 
       if(_acc_0_stream_oready) begin
-        _tmp_295 <= _acc_0_source_start;
-      end 
-      if(_acc_0_stream_oready) begin
-        _tmp_296 <= _tmp_295;
-      end 
-      if(_acc_0_stream_oready) begin
-        _tmp_297 <= _tmp_296;
-      end 
-      if(_acc_0_stream_oready) begin
-        _tmp_298 <= _acc_0_source_start;
-      end 
-      if(_acc_0_stream_oready) begin
-        _tmp_299 <= _tmp_298;
-      end 
-      if(_acc_0_stream_oready) begin
-        _tmp_300 <= _tmp_299;
-      end 
-      if(_acc_0_stream_oready && _tmp_300) begin
-        __variable_wdata_15 <= 1;
-      end 
-      if(_acc_0_stream_oready) begin
-        _tmp_301 <= _acc_0_source_start;
-      end 
-      if(_acc_0_stream_oready) begin
-        _tmp_302 <= _tmp_301;
-      end 
-      if(_acc_0_stream_oready) begin
-        _tmp_303 <= _tmp_302;
-      end 
-      if(_acc_0_stream_oready) begin
-        _tmp_304 <= _tmp_303;
-      end 
-      if(_acc_0_stream_oready && _tmp_304) begin
-        __variable_wdata_15 <= 0;
-      end 
-      if(_acc_0_stream_oready && 1'd0) begin
-        __variable_wdata_15 <= 1;
-      end 
-      if(_acc_0_stream_oready) begin
-        _tmp_305 <= _acc_0_source_start;
-      end 
-      if(_acc_0_stream_oready) begin
-        _tmp_306 <= _tmp_305;
-      end 
-      if(_acc_0_stream_oready) begin
-        _tmp_307 <= _tmp_306;
-      end 
-      if(_acc_0_stream_oready) begin
-        _tmp_308 <= _tmp_307;
+        _tmp_308 <= _acc_0_source_start;
       end 
       if(_acc_0_stream_oready) begin
         _tmp_309 <= _tmp_308;
@@ -4782,16 +4804,19 @@ module taketwo
         _tmp_310 <= _tmp_309;
       end 
       if(_acc_0_stream_oready) begin
-        _tmp_311 <= _tmp_310;
+        _tmp_311 <= _acc_0_source_start;
       end 
       if(_acc_0_stream_oready) begin
-        _tmp_312 <= _acc_0_source_stop;
+        _tmp_312 <= _tmp_311;
       end 
       if(_acc_0_stream_oready) begin
         _tmp_313 <= _tmp_312;
       end 
+      if(_acc_0_stream_oready && _tmp_313) begin
+        __variable_wdata_15 <= 1;
+      end 
       if(_acc_0_stream_oready) begin
-        _tmp_314 <= _tmp_313;
+        _tmp_314 <= _acc_0_source_start;
       end 
       if(_acc_0_stream_oready) begin
         _tmp_315 <= _tmp_314;
@@ -4802,11 +4827,17 @@ module taketwo
       if(_acc_0_stream_oready) begin
         _tmp_317 <= _tmp_316;
       end 
-      if(_acc_0_stream_oready) begin
-        _tmp_318 <= _tmp_317;
+      if(_acc_0_stream_oready && _tmp_317) begin
+        __variable_wdata_15 <= 0;
+      end 
+      if(_acc_0_stream_oready && 1'd0) begin
+        __variable_wdata_15 <= 1;
       end 
       if(_acc_0_stream_oready) begin
-        _tmp_319 <= _acc_0_source_busy;
+        _tmp_318 <= _acc_0_source_start;
+      end 
+      if(_acc_0_stream_oready) begin
+        _tmp_319 <= _tmp_318;
       end 
       if(_acc_0_stream_oready) begin
         _tmp_320 <= _tmp_319;
@@ -4824,12 +4855,51 @@ module taketwo
         _tmp_324 <= _tmp_323;
       end 
       if(_acc_0_stream_oready) begin
-        _tmp_325 <= _tmp_324;
+        _tmp_325 <= _acc_0_source_stop;
       end 
       if(_acc_0_stream_oready) begin
-        _tmp_326 <= _acc_0_sink_busy;
+        _tmp_326 <= _tmp_325;
       end 
-      if(!_acc_0_sink_busy && _tmp_326) begin
+      if(_acc_0_stream_oready) begin
+        _tmp_327 <= _tmp_326;
+      end 
+      if(_acc_0_stream_oready) begin
+        _tmp_328 <= _tmp_327;
+      end 
+      if(_acc_0_stream_oready) begin
+        _tmp_329 <= _tmp_328;
+      end 
+      if(_acc_0_stream_oready) begin
+        _tmp_330 <= _tmp_329;
+      end 
+      if(_acc_0_stream_oready) begin
+        _tmp_331 <= _tmp_330;
+      end 
+      if(_acc_0_stream_oready) begin
+        _tmp_332 <= _acc_0_source_busy;
+      end 
+      if(_acc_0_stream_oready) begin
+        _tmp_333 <= _tmp_332;
+      end 
+      if(_acc_0_stream_oready) begin
+        _tmp_334 <= _tmp_333;
+      end 
+      if(_acc_0_stream_oready) begin
+        _tmp_335 <= _tmp_334;
+      end 
+      if(_acc_0_stream_oready) begin
+        _tmp_336 <= _tmp_335;
+      end 
+      if(_acc_0_stream_oready) begin
+        _tmp_337 <= _tmp_336;
+      end 
+      if(_acc_0_stream_oready) begin
+        _tmp_338 <= _tmp_337;
+      end 
+      if(_acc_0_stream_oready) begin
+        _tmp_339 <= _acc_0_sink_busy;
+      end 
+      if(!_acc_0_sink_busy && _tmp_339) begin
         _acc_0_busy_reg <= 0;
       end 
       if(_acc_0_source_busy) begin
@@ -4855,7 +4925,7 @@ module taketwo
       if(_stream_matmul_11_stream_oready && _stream_matmul_11_busy) begin
         _acc_0_source_busy <= _stream_matmul_11_source_busy;
       end 
-      if(_acc_0_stream_oready && _tmp_297) begin
+      if(_acc_0_stream_oready && _tmp_310) begin
         _acc_0_stream_ivalid <= 1;
       end 
       if(_acc_0_stream_oready && 1'd0) begin
@@ -4911,16 +4981,16 @@ module taketwo
       _add_tree_1_sum_sink_wenable <= 0;
       _add_tree_1_sum_sink_fifo_enq <= 0;
       __variable_wdata_22 <= 0;
-      _tmp_285 <= 0;
-      _tmp_286 <= 0;
-      _tmp_287 <= 0;
-      _tmp_288 <= 0;
-      _tmp_289 <= 0;
-      _tmp_290 <= 0;
-      _tmp_291 <= 0;
-      _tmp_292 <= 0;
-      _tmp_293 <= 0;
-      _tmp_294 <= 0;
+      _tmp_298 <= 0;
+      _tmp_299 <= 0;
+      _tmp_300 <= 0;
+      _tmp_301 <= 0;
+      _tmp_302 <= 0;
+      _tmp_303 <= 0;
+      _tmp_304 <= 0;
+      _tmp_305 <= 0;
+      _tmp_306 <= 0;
+      _tmp_307 <= 0;
       _add_tree_1_busy_reg <= 0;
     end else begin
       if(_add_tree_1_stream_oready) begin
@@ -4936,36 +5006,36 @@ module taketwo
         __variable_wdata_22 <= __substreamoutput_data_175;
       end 
       if(_add_tree_1_stream_oready) begin
-        _tmp_285 <= _add_tree_1_source_start;
+        _tmp_298 <= _add_tree_1_source_start;
       end 
       if(_add_tree_1_stream_oready) begin
-        _tmp_286 <= _tmp_285;
+        _tmp_299 <= _tmp_298;
       end 
       if(_add_tree_1_stream_oready) begin
-        _tmp_287 <= _tmp_286;
+        _tmp_300 <= _tmp_299;
       end 
       if(_add_tree_1_stream_oready) begin
-        _tmp_288 <= _add_tree_1_source_start;
+        _tmp_301 <= _add_tree_1_source_start;
       end 
       if(_add_tree_1_stream_oready) begin
-        _tmp_289 <= _tmp_288;
+        _tmp_302 <= _tmp_301;
       end 
       if(_add_tree_1_stream_oready) begin
-        _tmp_290 <= _add_tree_1_source_stop;
+        _tmp_303 <= _add_tree_1_source_stop;
       end 
       if(_add_tree_1_stream_oready) begin
-        _tmp_291 <= _tmp_290;
+        _tmp_304 <= _tmp_303;
       end 
       if(_add_tree_1_stream_oready) begin
-        _tmp_292 <= _add_tree_1_source_busy;
+        _tmp_305 <= _add_tree_1_source_busy;
       end 
       if(_add_tree_1_stream_oready) begin
-        _tmp_293 <= _tmp_292;
+        _tmp_306 <= _tmp_305;
       end 
       if(_add_tree_1_stream_oready) begin
-        _tmp_294 <= _add_tree_1_sink_busy;
+        _tmp_307 <= _add_tree_1_sink_busy;
       end 
-      if(!_add_tree_1_sink_busy && _tmp_294) begin
+      if(!_add_tree_1_sink_busy && _tmp_307) begin
         _add_tree_1_busy_reg <= 0;
       end 
       if(_add_tree_1_source_busy) begin
@@ -4991,7 +5061,7 @@ module taketwo
       if(_stream_matmul_11_stream_oready && _stream_matmul_11_busy) begin
         _add_tree_1_source_busy <= _stream_matmul_11_source_busy;
       end 
-      if(_add_tree_1_stream_oready && _tmp_287) begin
+      if(_add_tree_1_stream_oready && _tmp_300) begin
         _add_tree_1_stream_ivalid <= 1;
       end 
       if(_add_tree_1_stream_oready && 1'd0) begin
@@ -5085,19 +5155,6 @@ module taketwo
       __variable_wdata_24 <= 0;
       __variable_wdata_25 <= 0;
       __variable_wdata_26 <= 0;
-      _tmp_327 <= 0;
-      _tmp_328 <= 0;
-      _tmp_329 <= 0;
-      _tmp_330 <= 0;
-      _tmp_331 <= 0;
-      _tmp_332 <= 0;
-      _tmp_333 <= 0;
-      _tmp_334 <= 0;
-      _tmp_335 <= 0;
-      _tmp_336 <= 0;
-      _tmp_337 <= 0;
-      _tmp_338 <= 0;
-      _tmp_339 <= 0;
       _tmp_340 <= 0;
       _tmp_341 <= 0;
       _tmp_342 <= 0;
@@ -5119,6 +5176,19 @@ module taketwo
       _tmp_358 <= 0;
       _tmp_359 <= 0;
       _tmp_360 <= 0;
+      _tmp_361 <= 0;
+      _tmp_362 <= 0;
+      _tmp_363 <= 0;
+      _tmp_364 <= 0;
+      _tmp_365 <= 0;
+      _tmp_366 <= 0;
+      _tmp_367 <= 0;
+      _tmp_368 <= 0;
+      _tmp_369 <= 0;
+      _tmp_370 <= 0;
+      _tmp_371 <= 0;
+      _tmp_372 <= 0;
+      _tmp_373 <= 0;
       _mul_rshift_round_clip_2_busy_reg <= 0;
     end else begin
       if(_mul_rshift_round_clip_2_stream_oready) begin
@@ -5240,46 +5310,7 @@ module taketwo
         __variable_wdata_26 <= __delay_data_308__delay_307__delay_306__delay_305___plus_209;
       end 
       if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_327 <= _mul_rshift_round_clip_2_source_start;
-      end 
-      if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_328 <= _tmp_327;
-      end 
-      if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_329 <= _tmp_328;
-      end 
-      if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_330 <= _mul_rshift_round_clip_2_source_start;
-      end 
-      if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_331 <= _tmp_330;
-      end 
-      if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_332 <= _tmp_331;
-      end 
-      if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_333 <= _tmp_332;
-      end 
-      if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_334 <= _tmp_333;
-      end 
-      if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_335 <= _tmp_334;
-      end 
-      if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_336 <= _tmp_335;
-      end 
-      if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_337 <= _tmp_336;
-      end 
-      if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_338 <= _tmp_337;
-      end 
-      if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_339 <= _tmp_338;
-      end 
-      if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_340 <= _mul_rshift_round_clip_2_source_stop;
+        _tmp_340 <= _mul_rshift_round_clip_2_source_start;
       end 
       if(_mul_rshift_round_clip_2_stream_oready) begin
         _tmp_341 <= _tmp_340;
@@ -5288,7 +5319,7 @@ module taketwo
         _tmp_342 <= _tmp_341;
       end 
       if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_343 <= _tmp_342;
+        _tmp_343 <= _mul_rshift_round_clip_2_source_start;
       end 
       if(_mul_rshift_round_clip_2_stream_oready) begin
         _tmp_344 <= _tmp_343;
@@ -5309,7 +5340,7 @@ module taketwo
         _tmp_349 <= _tmp_348;
       end 
       if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_350 <= _mul_rshift_round_clip_2_source_busy;
+        _tmp_350 <= _tmp_349;
       end 
       if(_mul_rshift_round_clip_2_stream_oready) begin
         _tmp_351 <= _tmp_350;
@@ -5318,7 +5349,7 @@ module taketwo
         _tmp_352 <= _tmp_351;
       end 
       if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_353 <= _tmp_352;
+        _tmp_353 <= _mul_rshift_round_clip_2_source_stop;
       end 
       if(_mul_rshift_round_clip_2_stream_oready) begin
         _tmp_354 <= _tmp_353;
@@ -5339,9 +5370,48 @@ module taketwo
         _tmp_359 <= _tmp_358;
       end 
       if(_mul_rshift_round_clip_2_stream_oready) begin
-        _tmp_360 <= _mul_rshift_round_clip_2_sink_busy;
+        _tmp_360 <= _tmp_359;
       end 
-      if(!_mul_rshift_round_clip_2_sink_busy && _tmp_360) begin
+      if(_mul_rshift_round_clip_2_stream_oready) begin
+        _tmp_361 <= _tmp_360;
+      end 
+      if(_mul_rshift_round_clip_2_stream_oready) begin
+        _tmp_362 <= _tmp_361;
+      end 
+      if(_mul_rshift_round_clip_2_stream_oready) begin
+        _tmp_363 <= _mul_rshift_round_clip_2_source_busy;
+      end 
+      if(_mul_rshift_round_clip_2_stream_oready) begin
+        _tmp_364 <= _tmp_363;
+      end 
+      if(_mul_rshift_round_clip_2_stream_oready) begin
+        _tmp_365 <= _tmp_364;
+      end 
+      if(_mul_rshift_round_clip_2_stream_oready) begin
+        _tmp_366 <= _tmp_365;
+      end 
+      if(_mul_rshift_round_clip_2_stream_oready) begin
+        _tmp_367 <= _tmp_366;
+      end 
+      if(_mul_rshift_round_clip_2_stream_oready) begin
+        _tmp_368 <= _tmp_367;
+      end 
+      if(_mul_rshift_round_clip_2_stream_oready) begin
+        _tmp_369 <= _tmp_368;
+      end 
+      if(_mul_rshift_round_clip_2_stream_oready) begin
+        _tmp_370 <= _tmp_369;
+      end 
+      if(_mul_rshift_round_clip_2_stream_oready) begin
+        _tmp_371 <= _tmp_370;
+      end 
+      if(_mul_rshift_round_clip_2_stream_oready) begin
+        _tmp_372 <= _tmp_371;
+      end 
+      if(_mul_rshift_round_clip_2_stream_oready) begin
+        _tmp_373 <= _mul_rshift_round_clip_2_sink_busy;
+      end 
+      if(!_mul_rshift_round_clip_2_sink_busy && _tmp_373) begin
         _mul_rshift_round_clip_2_busy_reg <= 0;
       end 
       if(_mul_rshift_round_clip_2_source_busy) begin
@@ -5367,7 +5437,7 @@ module taketwo
       if(_stream_matmul_11_stream_oready && _stream_matmul_11_busy) begin
         _mul_rshift_round_clip_2_source_busy <= _stream_matmul_11_source_busy;
       end 
-      if(_mul_rshift_round_clip_2_stream_oready && _tmp_329) begin
+      if(_mul_rshift_round_clip_2_stream_oready && _tmp_342) begin
         _mul_rshift_round_clip_2_stream_ivalid <= 1;
       end 
       if(_mul_rshift_round_clip_2_stream_oready && 1'd0) begin
@@ -5462,19 +5532,6 @@ module taketwo
       __variable_wdata_58 <= 0;
       __variable_wdata_59 <= 0;
       __variable_wdata_60 <= 0;
-      _tmp_251 <= 0;
-      _tmp_252 <= 0;
-      _tmp_253 <= 0;
-      _tmp_254 <= 0;
-      _tmp_255 <= 0;
-      _tmp_256 <= 0;
-      _tmp_257 <= 0;
-      _tmp_258 <= 0;
-      _tmp_259 <= 0;
-      _tmp_260 <= 0;
-      _tmp_261 <= 0;
-      _tmp_262 <= 0;
-      _tmp_263 <= 0;
       _tmp_264 <= 0;
       _tmp_265 <= 0;
       _tmp_266 <= 0;
@@ -5496,6 +5553,19 @@ module taketwo
       _tmp_282 <= 0;
       _tmp_283 <= 0;
       _tmp_284 <= 0;
+      _tmp_285 <= 0;
+      _tmp_286 <= 0;
+      _tmp_287 <= 0;
+      _tmp_288 <= 0;
+      _tmp_289 <= 0;
+      _tmp_290 <= 0;
+      _tmp_291 <= 0;
+      _tmp_292 <= 0;
+      _tmp_293 <= 0;
+      _tmp_294 <= 0;
+      _tmp_295 <= 0;
+      _tmp_296 <= 0;
+      _tmp_297 <= 0;
       _mul_3_busy_reg <= 0;
     end else begin
       if(_mul_3_stream_oready) begin
@@ -5620,46 +5690,7 @@ module taketwo
         __variable_wdata_60 <= _plus_data_174;
       end 
       if(_mul_3_stream_oready) begin
-        _tmp_251 <= _mul_3_source_start;
-      end 
-      if(_mul_3_stream_oready) begin
-        _tmp_252 <= _tmp_251;
-      end 
-      if(_mul_3_stream_oready) begin
-        _tmp_253 <= _tmp_252;
-      end 
-      if(_mul_3_stream_oready) begin
-        _tmp_254 <= _mul_3_source_start;
-      end 
-      if(_mul_3_stream_oready) begin
-        _tmp_255 <= _tmp_254;
-      end 
-      if(_mul_3_stream_oready) begin
-        _tmp_256 <= _tmp_255;
-      end 
-      if(_mul_3_stream_oready) begin
-        _tmp_257 <= _tmp_256;
-      end 
-      if(_mul_3_stream_oready) begin
-        _tmp_258 <= _tmp_257;
-      end 
-      if(_mul_3_stream_oready) begin
-        _tmp_259 <= _tmp_258;
-      end 
-      if(_mul_3_stream_oready) begin
-        _tmp_260 <= _tmp_259;
-      end 
-      if(_mul_3_stream_oready) begin
-        _tmp_261 <= _tmp_260;
-      end 
-      if(_mul_3_stream_oready) begin
-        _tmp_262 <= _tmp_261;
-      end 
-      if(_mul_3_stream_oready) begin
-        _tmp_263 <= _tmp_262;
-      end 
-      if(_mul_3_stream_oready) begin
-        _tmp_264 <= _mul_3_source_stop;
+        _tmp_264 <= _mul_3_source_start;
       end 
       if(_mul_3_stream_oready) begin
         _tmp_265 <= _tmp_264;
@@ -5668,7 +5699,7 @@ module taketwo
         _tmp_266 <= _tmp_265;
       end 
       if(_mul_3_stream_oready) begin
-        _tmp_267 <= _tmp_266;
+        _tmp_267 <= _mul_3_source_start;
       end 
       if(_mul_3_stream_oready) begin
         _tmp_268 <= _tmp_267;
@@ -5689,7 +5720,7 @@ module taketwo
         _tmp_273 <= _tmp_272;
       end 
       if(_mul_3_stream_oready) begin
-        _tmp_274 <= _mul_3_source_busy;
+        _tmp_274 <= _tmp_273;
       end 
       if(_mul_3_stream_oready) begin
         _tmp_275 <= _tmp_274;
@@ -5698,7 +5729,7 @@ module taketwo
         _tmp_276 <= _tmp_275;
       end 
       if(_mul_3_stream_oready) begin
-        _tmp_277 <= _tmp_276;
+        _tmp_277 <= _mul_3_source_stop;
       end 
       if(_mul_3_stream_oready) begin
         _tmp_278 <= _tmp_277;
@@ -5719,9 +5750,48 @@ module taketwo
         _tmp_283 <= _tmp_282;
       end 
       if(_mul_3_stream_oready) begin
-        _tmp_284 <= _mul_3_sink_busy;
+        _tmp_284 <= _tmp_283;
       end 
-      if(!_mul_3_sink_busy && _tmp_284) begin
+      if(_mul_3_stream_oready) begin
+        _tmp_285 <= _tmp_284;
+      end 
+      if(_mul_3_stream_oready) begin
+        _tmp_286 <= _tmp_285;
+      end 
+      if(_mul_3_stream_oready) begin
+        _tmp_287 <= _mul_3_source_busy;
+      end 
+      if(_mul_3_stream_oready) begin
+        _tmp_288 <= _tmp_287;
+      end 
+      if(_mul_3_stream_oready) begin
+        _tmp_289 <= _tmp_288;
+      end 
+      if(_mul_3_stream_oready) begin
+        _tmp_290 <= _tmp_289;
+      end 
+      if(_mul_3_stream_oready) begin
+        _tmp_291 <= _tmp_290;
+      end 
+      if(_mul_3_stream_oready) begin
+        _tmp_292 <= _tmp_291;
+      end 
+      if(_mul_3_stream_oready) begin
+        _tmp_293 <= _tmp_292;
+      end 
+      if(_mul_3_stream_oready) begin
+        _tmp_294 <= _tmp_293;
+      end 
+      if(_mul_3_stream_oready) begin
+        _tmp_295 <= _tmp_294;
+      end 
+      if(_mul_3_stream_oready) begin
+        _tmp_296 <= _tmp_295;
+      end 
+      if(_mul_3_stream_oready) begin
+        _tmp_297 <= _mul_3_sink_busy;
+      end 
+      if(!_mul_3_sink_busy && _tmp_297) begin
         _mul_3_busy_reg <= 0;
       end 
       if(_mul_3_source_busy) begin
@@ -5747,7 +5817,7 @@ module taketwo
       if(_stream_matmul_11_stream_oready && _stream_matmul_11_busy) begin
         _mul_3_source_busy <= _stream_matmul_11_source_busy;
       end 
-      if(_mul_3_stream_oready && _tmp_253) begin
+      if(_mul_3_stream_oready && _tmp_266) begin
         _mul_3_stream_ivalid <= 1;
       end 
       if(_mul_3_stream_oready && 1'd0) begin
@@ -6175,19 +6245,6 @@ module taketwo
       _source_stream_matmul_11_source_21_pat_stride_buf_3 <= 0;
       __variable_wdata_147 <= 0;
       _stream_matmul_11_source_21_source_ram_raddr <= 0;
-      _tmp_154 <= 0;
-      _tmp_155 <= 0;
-      _tmp_156 <= 0;
-      _tmp_157 <= 0;
-      _tmp_158 <= 0;
-      _tmp_159 <= 0;
-      _tmp_160 <= 0;
-      _tmp_161 <= 0;
-      _tmp_162 <= 0;
-      _tmp_163 <= 0;
-      _tmp_164 <= 0;
-      _tmp_165 <= 0;
-      _tmp_166 <= 0;
       _tmp_167 <= 0;
       _tmp_168 <= 0;
       _tmp_169 <= 0;
@@ -6206,6 +6263,8 @@ module taketwo
       _tmp_182 <= 0;
       _tmp_183 <= 0;
       _tmp_184 <= 0;
+      _tmp_185 <= 0;
+      _tmp_186 <= 0;
       _tmp_187 <= 0;
       _tmp_188 <= 0;
       _tmp_189 <= 0;
@@ -6217,8 +6276,6 @@ module taketwo
       _tmp_195 <= 0;
       _tmp_196 <= 0;
       _tmp_197 <= 0;
-      _tmp_198 <= 0;
-      _tmp_199 <= 0;
       _tmp_200 <= 0;
       _tmp_201 <= 0;
       _tmp_202 <= 0;
@@ -6268,6 +6325,19 @@ module taketwo
       _tmp_246 <= 0;
       _tmp_247 <= 0;
       _tmp_248 <= 0;
+      _tmp_249 <= 0;
+      _tmp_250 <= 0;
+      _tmp_251 <= 0;
+      _tmp_252 <= 0;
+      _tmp_253 <= 0;
+      _tmp_254 <= 0;
+      _tmp_255 <= 0;
+      _tmp_256 <= 0;
+      _tmp_257 <= 0;
+      _tmp_258 <= 0;
+      _tmp_259 <= 0;
+      _tmp_260 <= 0;
+      _tmp_261 <= 0;
       _stream_matmul_11_sink_26_sink_mode <= 5'b0;
       _stream_matmul_11_sink_26_sink_offset <= 0;
       _stream_matmul_11_sink_26_sink_size <= 0;
@@ -6279,31 +6349,18 @@ module taketwo
       _stream_matmul_11_sink_26_sink_waddr <= 0;
       _stream_matmul_11_sink_26_sink_count <= 0;
       _stream_matmul_11_sink_26_sink_wdata <= 0;
-      _tmp_361 <= 0;
-      _tmp_362 <= 0;
-      _tmp_363 <= 0;
-      _tmp_364 <= 0;
-      _tmp_365 <= 0;
-      _tmp_366 <= 0;
-      __variable_wdata_84 <= 0;
-      _tmp_367 <= 0;
-      _tmp_368 <= 0;
-      _tmp_369 <= 0;
-      _tmp_370 <= 0;
-      _tmp_373 <= 0;
+      _tmp_374 <= 0;
+      _tmp_375 <= 0;
       _tmp_376 <= 0;
       _tmp_377 <= 0;
       _tmp_378 <= 0;
       _tmp_379 <= 0;
+      __variable_wdata_84 <= 0;
       _tmp_380 <= 0;
       _tmp_381 <= 0;
       _tmp_382 <= 0;
       _tmp_383 <= 0;
-      _tmp_384 <= 0;
-      _tmp_385 <= 0;
       _tmp_386 <= 0;
-      _tmp_387 <= 0;
-      _tmp_388 <= 0;
       _tmp_389 <= 0;
       _tmp_390 <= 0;
       _tmp_391 <= 0;
@@ -6386,6 +6443,19 @@ module taketwo
       _tmp_468 <= 0;
       _tmp_469 <= 0;
       _tmp_470 <= 0;
+      _tmp_471 <= 0;
+      _tmp_472 <= 0;
+      _tmp_473 <= 0;
+      _tmp_474 <= 0;
+      _tmp_475 <= 0;
+      _tmp_476 <= 0;
+      _tmp_477 <= 0;
+      _tmp_478 <= 0;
+      _tmp_479 <= 0;
+      _tmp_480 <= 0;
+      _tmp_481 <= 0;
+      _tmp_482 <= 0;
+      _tmp_483 <= 0;
       _stream_matmul_11_busy_reg <= 0;
     end else begin
       if(_stream_matmul_11_stream_oready) begin
@@ -7019,63 +7089,63 @@ module taketwo
       if(_stream_matmul_11_stream_oready) begin
         __delay_data_378__delay_377__delay_376____substreamoutput_192 <= __delay_data_377__delay_376__delay_375____substreamoutput_192;
       end 
-      if(_set_flag_112) begin
+      if(_set_flag_119) begin
         _stream_matmul_11_parameter_0_next_parameter_data <= cparam_matmul_11_stream_reduce_size;
       end 
       if(_stream_matmul_11_source_start) begin
         __variable_wdata_79 <= _stream_matmul_11_parameter_0_next_parameter_data;
       end 
-      if(_set_flag_113) begin
+      if(_set_flag_120) begin
         _stream_matmul_11_parameter_1_next_parameter_data <= matmul_11_col_select;
       end 
       if(_stream_matmul_11_source_start) begin
         __variable_wdata_80 <= _stream_matmul_11_parameter_1_next_parameter_data;
       end 
-      if(_set_flag_114) begin
+      if(_set_flag_121) begin
         _stream_matmul_11_parameter_2_next_parameter_data <= matmul_11_row_select_buf;
       end 
       if(_stream_matmul_11_source_start) begin
         __variable_wdata_81 <= _stream_matmul_11_parameter_2_next_parameter_data;
       end 
-      if(_set_flag_115) begin
+      if(_set_flag_122) begin
         _stream_matmul_11_parameter_3_next_parameter_data <= matmul_11_stream_pad_masks;
       end 
       if(_stream_matmul_11_source_start) begin
         __variable_wdata_82 <= _stream_matmul_11_parameter_3_next_parameter_data;
       end 
-      if(_set_flag_116) begin
+      if(_set_flag_123) begin
         _stream_matmul_11_parameter_4_next_parameter_data <= cparam_matmul_11_stream_omit_mask;
       end 
       if(_stream_matmul_11_source_start) begin
         __variable_wdata_83 <= _stream_matmul_11_parameter_4_next_parameter_data;
       end 
-      if(_set_flag_117) begin
+      if(_set_flag_124) begin
         _stream_matmul_11_parameter_6_next_parameter_data <= cparam_matmul_11_bias_scala;
       end 
       if(_stream_matmul_11_source_start) begin
         __variable_wdata_94 <= _stream_matmul_11_parameter_6_next_parameter_data;
       end 
-      if(_set_flag_118) begin
+      if(_set_flag_125) begin
         _stream_matmul_11_source_7_source_mode <= 5'b10;
         _stream_matmul_11_source_7_source_offset <= (cparam_matmul_11_bias_num == 1)? 0 : matmul_11_och_count_buf;
       end 
-      if(_set_flag_118) begin
+      if(_set_flag_125) begin
         _source_stream_matmul_11_source_7_pat_size_0 <= cparam_matmul_11_stream_reduce_size;
         _source_stream_matmul_11_source_7_pat_stride_0 <= 0;
       end 
-      if(_set_flag_118) begin
+      if(_set_flag_125) begin
         _source_stream_matmul_11_source_7_pat_size_1 <= matmul_11_next_stream_num_ops;
         _source_stream_matmul_11_source_7_pat_stride_1 <= (cparam_matmul_11_bias_num == 1)? 0 : 1;
       end 
-      if(_set_flag_118) begin
+      if(_set_flag_125) begin
         _source_stream_matmul_11_source_7_pat_size_2 <= 1;
         _source_stream_matmul_11_source_7_pat_stride_2 <= 0;
       end 
-      if(_set_flag_118) begin
+      if(_set_flag_125) begin
         _source_stream_matmul_11_source_7_pat_size_3 <= 1;
         _source_stream_matmul_11_source_7_pat_stride_3 <= 0;
       end 
-      if(_set_flag_118) begin
+      if(_set_flag_125) begin
         _stream_matmul_11_source_7_source_sel <= 1;
       end 
       if(_stream_matmul_11_source_start && _stream_matmul_11_source_7_source_mode & 5'b10 && _stream_matmul_11_stream_oready) begin
@@ -7177,33 +7247,33 @@ module taketwo
         _stream_matmul_11_source_7_source_ram_renable <= 0;
         _stream_matmul_11_source_7_idle <= 1;
       end 
-      if(_set_flag_121) begin
+      if(_set_flag_134) begin
         _stream_matmul_11_parameter_8_next_parameter_data <= cparam_matmul_11_scale_scala;
       end 
       if(_stream_matmul_11_source_start) begin
         __variable_wdata_101 <= _stream_matmul_11_parameter_8_next_parameter_data;
       end 
-      if(_set_flag_122) begin
+      if(_set_flag_135) begin
         _stream_matmul_11_source_9_source_mode <= 5'b10;
         _stream_matmul_11_source_9_source_offset <= (cparam_matmul_11_scale_num == 1)? 0 : matmul_11_och_count_buf;
       end 
-      if(_set_flag_122) begin
+      if(_set_flag_135) begin
         _source_stream_matmul_11_source_9_pat_size_0 <= cparam_matmul_11_stream_reduce_size;
         _source_stream_matmul_11_source_9_pat_stride_0 <= 0;
       end 
-      if(_set_flag_122) begin
+      if(_set_flag_135) begin
         _source_stream_matmul_11_source_9_pat_size_1 <= matmul_11_next_stream_num_ops;
         _source_stream_matmul_11_source_9_pat_stride_1 <= (cparam_matmul_11_scale_num == 1)? 0 : 1;
       end 
-      if(_set_flag_122) begin
+      if(_set_flag_135) begin
         _source_stream_matmul_11_source_9_pat_size_2 <= 1;
         _source_stream_matmul_11_source_9_pat_stride_2 <= 0;
       end 
-      if(_set_flag_122) begin
+      if(_set_flag_135) begin
         _source_stream_matmul_11_source_9_pat_size_3 <= 1;
         _source_stream_matmul_11_source_9_pat_stride_3 <= 0;
       end 
-      if(_set_flag_122) begin
+      if(_set_flag_135) begin
         _stream_matmul_11_source_9_source_sel <= 2;
       end 
       if(_stream_matmul_11_source_start && _stream_matmul_11_source_9_source_mode & 5'b10 && _stream_matmul_11_stream_oready) begin
@@ -7305,13 +7375,13 @@ module taketwo
         _stream_matmul_11_source_9_source_ram_renable <= 0;
         _stream_matmul_11_source_9_idle <= 1;
       end 
-      if(_set_flag_125) begin
+      if(_set_flag_138) begin
         _stream_matmul_11_parameter_10_next_parameter_data <= 1;
       end 
       if(_stream_matmul_11_source_start) begin
         __variable_wdata_108 <= _stream_matmul_11_parameter_10_next_parameter_data;
       end 
-      if(_set_flag_126) begin
+      if(_set_flag_139) begin
         _stream_matmul_11_source_11_source_mode <= 5'b0;
         _stream_matmul_11_source_11_source_empty_data <= 0;
       end 
@@ -7321,13 +7391,13 @@ module taketwo
       if(_stream_matmul_11_source_start && _stream_matmul_11_stream_oready && !(|(_stream_matmul_11_source_11_source_mode & 5'b0)) && _stream_matmul_11_is_root) begin
         __variable_wdata_109 <= _stream_matmul_11_source_11_source_empty_data;
       end 
-      if(_set_flag_127) begin
+      if(_set_flag_140) begin
         _stream_matmul_11_parameter_12_next_parameter_data <= 1;
       end 
       if(_stream_matmul_11_source_start) begin
         __variable_wdata_115 <= _stream_matmul_11_parameter_12_next_parameter_data;
       end 
-      if(_set_flag_128) begin
+      if(_set_flag_141) begin
         _stream_matmul_11_source_13_source_mode <= 5'b0;
         _stream_matmul_11_source_13_source_empty_data <= 0;
       end 
@@ -7337,13 +7407,13 @@ module taketwo
       if(_stream_matmul_11_source_start && _stream_matmul_11_stream_oready && !(|(_stream_matmul_11_source_13_source_mode & 5'b0)) && _stream_matmul_11_is_root) begin
         __variable_wdata_116 <= _stream_matmul_11_source_13_source_empty_data;
       end 
-      if(_set_flag_129) begin
+      if(_set_flag_142) begin
         _stream_matmul_11_parameter_14_next_parameter_data <= 1;
       end 
       if(_stream_matmul_11_source_start) begin
         __variable_wdata_122 <= _stream_matmul_11_parameter_14_next_parameter_data;
       end 
-      if(_set_flag_130) begin
+      if(_set_flag_143) begin
         _stream_matmul_11_source_15_source_mode <= 5'b0;
         _stream_matmul_11_source_15_source_empty_data <= 0;
       end 
@@ -7353,51 +7423,51 @@ module taketwo
       if(_stream_matmul_11_source_start && _stream_matmul_11_stream_oready && !(|(_stream_matmul_11_source_15_source_mode & 5'b0)) && _stream_matmul_11_is_root) begin
         __variable_wdata_123 <= _stream_matmul_11_source_15_source_empty_data;
       end 
-      if(_set_flag_131) begin
+      if(_set_flag_144) begin
         _stream_matmul_11_parameter_16_next_parameter_data <= cparam_matmul_11_cshamt_mul_value;
       end 
       if(_stream_matmul_11_source_start) begin
         __variable_wdata_129 <= _stream_matmul_11_parameter_16_next_parameter_data;
       end 
-      if(_set_flag_132) begin
+      if(_set_flag_145) begin
         _stream_matmul_11_parameter_17_next_parameter_data <= cparam_matmul_11_cshamt_sum_value;
       end 
       if(_stream_matmul_11_source_start) begin
         __variable_wdata_130 <= _stream_matmul_11_parameter_17_next_parameter_data;
       end 
-      if(_set_flag_133) begin
+      if(_set_flag_146) begin
         _stream_matmul_11_parameter_18_next_parameter_data <= cparam_matmul_11_cshamt_out_value;
       end 
       if(_stream_matmul_11_source_start) begin
         __variable_wdata_131 <= _stream_matmul_11_parameter_18_next_parameter_data;
       end 
-      if(_set_flag_134) begin
+      if(_set_flag_147) begin
         _stream_matmul_11_parameter_19_next_parameter_data <= cparam_matmul_11_act_func_index;
       end 
       if(_stream_matmul_11_source_start) begin
         __variable_wdata_132 <= _stream_matmul_11_parameter_19_next_parameter_data;
       end 
-      if(_set_flag_135) begin
+      if(_set_flag_148) begin
         _stream_matmul_11_source_20_source_mode <= 5'b10;
         _stream_matmul_11_source_20_source_offset <= matmul_11_stream_act_local_0 + matmul_11_act_page_comp_offset_buf_0;
       end 
-      if(_set_flag_135) begin
+      if(_set_flag_148) begin
         _source_stream_matmul_11_source_20_pat_size_0 <= cparam_matmul_11_stream_reduce_size;
         _source_stream_matmul_11_source_20_pat_stride_0 <= 1;
       end 
-      if(_set_flag_135) begin
+      if(_set_flag_148) begin
         _source_stream_matmul_11_source_20_pat_size_1 <= matmul_11_next_stream_num_ops;
         _source_stream_matmul_11_source_20_pat_stride_1 <= 0;
       end 
-      if(_set_flag_135) begin
+      if(_set_flag_148) begin
         _source_stream_matmul_11_source_20_pat_size_2 <= 1;
         _source_stream_matmul_11_source_20_pat_stride_2 <= 0;
       end 
-      if(_set_flag_135) begin
+      if(_set_flag_148) begin
         _source_stream_matmul_11_source_20_pat_size_3 <= 1;
         _source_stream_matmul_11_source_20_pat_stride_3 <= 0;
       end 
-      if(_set_flag_135) begin
+      if(_set_flag_148) begin
         _stream_matmul_11_source_20_source_sel <= 3;
       end 
       if(_stream_matmul_11_source_start && _stream_matmul_11_source_20_source_mode & 5'b10 && _stream_matmul_11_stream_oready) begin
@@ -7499,27 +7569,27 @@ module taketwo
         _stream_matmul_11_source_20_source_ram_renable <= 0;
         _stream_matmul_11_source_20_idle <= 1;
       end 
-      if(_set_flag_144) begin
+      if(_set_flag_157) begin
         _stream_matmul_11_source_21_source_mode <= 5'b10;
         _stream_matmul_11_source_21_source_offset <= matmul_11_filter_page_comp_offset_buf;
       end 
-      if(_set_flag_144) begin
+      if(_set_flag_157) begin
         _source_stream_matmul_11_source_21_pat_size_0 <= cparam_matmul_11_stream_reduce_size;
         _source_stream_matmul_11_source_21_pat_stride_0 <= 1;
       end 
-      if(_set_flag_144) begin
+      if(_set_flag_157) begin
         _source_stream_matmul_11_source_21_pat_size_1 <= matmul_11_next_stream_num_ops;
         _source_stream_matmul_11_source_21_pat_stride_1 <= cparam_matmul_11_stream_aligned_reduce_size;
       end 
-      if(_set_flag_144) begin
+      if(_set_flag_157) begin
         _source_stream_matmul_11_source_21_pat_size_2 <= 1;
         _source_stream_matmul_11_source_21_pat_stride_2 <= 0;
       end 
-      if(_set_flag_144) begin
+      if(_set_flag_157) begin
         _source_stream_matmul_11_source_21_pat_size_3 <= 1;
         _source_stream_matmul_11_source_21_pat_stride_3 <= 0;
       end 
-      if(_set_flag_144) begin
+      if(_set_flag_157) begin
         _stream_matmul_11_source_21_source_sel <= 4;
       end 
       if(_stream_matmul_11_source_start && _stream_matmul_11_source_21_source_mode & 5'b10 && _stream_matmul_11_stream_oready) begin
@@ -7622,46 +7692,7 @@ module taketwo
         _stream_matmul_11_source_21_idle <= 1;
       end 
       if(_stream_matmul_11_stream_oready) begin
-        _tmp_154 <= _set_flag_153;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_155 <= _tmp_154;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_156 <= _tmp_155;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_157 <= _tmp_156;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_158 <= _tmp_157;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_159 <= _tmp_158;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_160 <= _tmp_159;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_161 <= _tmp_160;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_162 <= _tmp_161;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_163 <= _tmp_162;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_164 <= _tmp_163;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_165 <= _tmp_164;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_166 <= _tmp_165;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_167 <= _tmp_166;
+        _tmp_167 <= _set_flag_166;
       end 
       if(_stream_matmul_11_stream_oready) begin
         _tmp_168 <= _tmp_167;
@@ -7715,6 +7746,12 @@ module taketwo
         _tmp_184 <= _tmp_183;
       end 
       if(_stream_matmul_11_stream_oready) begin
+        _tmp_185 <= _tmp_184;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_186 <= _tmp_185;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
         _tmp_187 <= _tmp_186;
       end 
       if(_stream_matmul_11_stream_oready) begin
@@ -7746,12 +7783,6 @@ module taketwo
       end 
       if(_stream_matmul_11_stream_oready) begin
         _tmp_197 <= _tmp_196;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_198 <= _tmp_197;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_199 <= _tmp_198;
       end 
       if(_stream_matmul_11_stream_oready) begin
         _tmp_200 <= _tmp_199;
@@ -7808,7 +7839,7 @@ module taketwo
         _tmp_217 <= _tmp_216;
       end 
       if(_stream_matmul_11_stream_oready) begin
-        _tmp_218 <= matmul_11_next_stream_num_ops;
+        _tmp_218 <= _tmp_217;
       end 
       if(_stream_matmul_11_stream_oready) begin
         _tmp_219 <= _tmp_218;
@@ -7847,7 +7878,7 @@ module taketwo
         _tmp_230 <= _tmp_229;
       end 
       if(_stream_matmul_11_stream_oready) begin
-        _tmp_231 <= _tmp_230;
+        _tmp_231 <= matmul_11_next_stream_num_ops;
       end 
       if(_stream_matmul_11_stream_oready) begin
         _tmp_232 <= _tmp_231;
@@ -7900,13 +7931,52 @@ module taketwo
       if(_stream_matmul_11_stream_oready) begin
         _tmp_248 <= _tmp_247;
       end 
-      if(_tmp_184) begin
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_249 <= _tmp_248;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_250 <= _tmp_249;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_251 <= _tmp_250;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_252 <= _tmp_251;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_253 <= _tmp_252;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_254 <= _tmp_253;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_255 <= _tmp_254;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_256 <= _tmp_255;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_257 <= _tmp_256;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_258 <= _tmp_257;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_259 <= _tmp_258;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_260 <= _tmp_259;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_261 <= _tmp_260;
+      end 
+      if(_tmp_197) begin
         _stream_matmul_11_sink_26_sink_mode <= 5'b1;
-        _stream_matmul_11_sink_26_sink_offset <= _tmp_217;
-        _stream_matmul_11_sink_26_sink_size <= _tmp_248;
+        _stream_matmul_11_sink_26_sink_offset <= _tmp_230;
+        _stream_matmul_11_sink_26_sink_size <= _tmp_261;
         _stream_matmul_11_sink_26_sink_stride <= 1;
       end 
-      if(_tmp_184) begin
+      if(_tmp_197) begin
         _stream_matmul_11_sink_26_sink_sel <= 5;
       end 
       if(_stream_matmul_11_sink_start && _stream_matmul_11_sink_26_sink_mode & 5'b1 && _stream_matmul_11_stream_oready) begin
@@ -7925,49 +7995,13 @@ module taketwo
         _stream_matmul_11_sink_26_sink_count <= _stream_matmul_11_sink_26_sink_count - 1;
       end 
       if(_stream_matmul_11_stream_oready) begin
-        _tmp_361 <= _stream_matmul_11_source_start;
+        _tmp_374 <= _stream_matmul_11_source_start;
       end 
       if(_stream_matmul_11_stream_oready) begin
-        _tmp_362 <= _tmp_361;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_363 <= _tmp_362;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_364 <= _stream_matmul_11_source_start;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_365 <= _tmp_364;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_366 <= _tmp_365;
-      end 
-      if(_stream_matmul_11_stream_oready && _tmp_366) begin
-        __variable_wdata_84 <= 1;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_367 <= _stream_matmul_11_source_start;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_368 <= _tmp_367;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_369 <= _tmp_368;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_370 <= _tmp_369;
-      end 
-      if(_stream_matmul_11_stream_oready && _tmp_370) begin
-        __variable_wdata_84 <= 0;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_373 <= _tmp_372;
+        _tmp_375 <= _tmp_374;
       end 
       if(_stream_matmul_11_stream_oready) begin
         _tmp_376 <= _tmp_375;
-      end 
-      if(_stream_matmul_11_stream_oready && _tmp_376) begin
-        __variable_wdata_84 <= 1;
       end 
       if(_stream_matmul_11_stream_oready) begin
         _tmp_377 <= _stream_matmul_11_source_start;
@@ -7978,8 +8012,11 @@ module taketwo
       if(_stream_matmul_11_stream_oready) begin
         _tmp_379 <= _tmp_378;
       end 
+      if(_stream_matmul_11_stream_oready && _tmp_379) begin
+        __variable_wdata_84 <= 1;
+      end 
       if(_stream_matmul_11_stream_oready) begin
-        _tmp_380 <= _tmp_379;
+        _tmp_380 <= _stream_matmul_11_source_start;
       end 
       if(_stream_matmul_11_stream_oready) begin
         _tmp_381 <= _tmp_380;
@@ -7990,26 +8027,20 @@ module taketwo
       if(_stream_matmul_11_stream_oready) begin
         _tmp_383 <= _tmp_382;
       end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_384 <= _tmp_383;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_385 <= _tmp_384;
+      if(_stream_matmul_11_stream_oready && _tmp_383) begin
+        __variable_wdata_84 <= 0;
       end 
       if(_stream_matmul_11_stream_oready) begin
         _tmp_386 <= _tmp_385;
       end 
       if(_stream_matmul_11_stream_oready) begin
-        _tmp_387 <= _tmp_386;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
-        _tmp_388 <= _tmp_387;
-      end 
-      if(_stream_matmul_11_stream_oready) begin
         _tmp_389 <= _tmp_388;
       end 
+      if(_stream_matmul_11_stream_oready && _tmp_389) begin
+        __variable_wdata_84 <= 1;
+      end 
       if(_stream_matmul_11_stream_oready) begin
-        _tmp_390 <= _tmp_389;
+        _tmp_390 <= _stream_matmul_11_source_start;
       end 
       if(_stream_matmul_11_stream_oready) begin
         _tmp_391 <= _tmp_390;
@@ -8063,7 +8094,7 @@ module taketwo
         _tmp_407 <= _tmp_406;
       end 
       if(_stream_matmul_11_stream_oready) begin
-        _tmp_408 <= _stream_matmul_11_source_stop;
+        _tmp_408 <= _tmp_407;
       end 
       if(_stream_matmul_11_stream_oready) begin
         _tmp_409 <= _tmp_408;
@@ -8102,7 +8133,7 @@ module taketwo
         _tmp_420 <= _tmp_419;
       end 
       if(_stream_matmul_11_stream_oready) begin
-        _tmp_421 <= _tmp_420;
+        _tmp_421 <= _stream_matmul_11_source_stop;
       end 
       if(_stream_matmul_11_stream_oready) begin
         _tmp_422 <= _tmp_421;
@@ -8156,7 +8187,7 @@ module taketwo
         _tmp_438 <= _tmp_437;
       end 
       if(_stream_matmul_11_stream_oready) begin
-        _tmp_439 <= _stream_matmul_11_source_busy;
+        _tmp_439 <= _tmp_438;
       end 
       if(_stream_matmul_11_stream_oready) begin
         _tmp_440 <= _tmp_439;
@@ -8195,7 +8226,7 @@ module taketwo
         _tmp_451 <= _tmp_450;
       end 
       if(_stream_matmul_11_stream_oready) begin
-        _tmp_452 <= _tmp_451;
+        _tmp_452 <= _stream_matmul_11_source_busy;
       end 
       if(_stream_matmul_11_stream_oready) begin
         _tmp_453 <= _tmp_452;
@@ -8249,9 +8280,48 @@ module taketwo
         _tmp_469 <= _tmp_468;
       end 
       if(_stream_matmul_11_stream_oready) begin
-        _tmp_470 <= _stream_matmul_11_sink_busy;
+        _tmp_470 <= _tmp_469;
       end 
-      if(!_stream_matmul_11_sink_busy && _tmp_470) begin
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_471 <= _tmp_470;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_472 <= _tmp_471;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_473 <= _tmp_472;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_474 <= _tmp_473;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_475 <= _tmp_474;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_476 <= _tmp_475;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_477 <= _tmp_476;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_478 <= _tmp_477;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_479 <= _tmp_478;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_480 <= _tmp_479;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_481 <= _tmp_480;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_482 <= _tmp_481;
+      end 
+      if(_stream_matmul_11_stream_oready) begin
+        _tmp_483 <= _stream_matmul_11_sink_busy;
+      end 
+      if(!_stream_matmul_11_sink_busy && _tmp_483) begin
         _stream_matmul_11_busy_reg <= 0;
       end 
       if(_stream_matmul_11_source_busy) begin
@@ -8271,10 +8341,10 @@ module taketwo
       _stream_matmul_11_source_busy <= 0;
       _stream_matmul_11_stream_ivalid <= 0;
     end else begin
-      if(_stream_matmul_11_stream_oready && _tmp_363) begin
+      if(_stream_matmul_11_stream_oready && _tmp_376) begin
         _stream_matmul_11_stream_ivalid <= 1;
       end 
-      if(_stream_matmul_11_stream_oready && _tmp_373) begin
+      if(_stream_matmul_11_stream_oready && _tmp_386) begin
         _stream_matmul_11_stream_ivalid <= 0;
       end 
       case(_stream_matmul_11_fsm)
@@ -8419,7 +8489,7 @@ module taketwo
           main_fsm <= main_fsm_13;
         end
         main_fsm_13: begin
-          matmul_11_arg_objaddr_3 <= _saxi_register_36 + 768;
+          matmul_11_arg_objaddr_3 <= _saxi_register_36 + 640;
           main_fsm <= main_fsm_14;
         end
         main_fsm_14: begin
@@ -8449,15 +8519,15 @@ module taketwo
           main_fsm <= main_fsm_21;
         end
         main_fsm_21: begin
-          matmul_11_arg_objaddr_1 <= _saxi_register_36 + 832;
+          matmul_11_arg_objaddr_1 <= _saxi_register_36 + 704;
           main_fsm <= main_fsm_22;
         end
         main_fsm_22: begin
-          matmul_11_arg_objaddr_2 <= _saxi_register_36 + 4928;
+          matmul_11_arg_objaddr_2 <= _saxi_register_36 + 4800;
           main_fsm <= main_fsm_23;
         end
         main_fsm_23: begin
-          matmul_11_arg_objaddr_3 <= _saxi_register_36 + 5056;
+          matmul_11_arg_objaddr_3 <= _saxi_register_36 + 4864;
           main_fsm <= main_fsm_24;
         end
         main_fsm_24: begin
@@ -8487,15 +8557,15 @@ module taketwo
           main_fsm <= main_fsm_31;
         end
         main_fsm_31: begin
-          matmul_11_arg_objaddr_1 <= _saxi_register_36 + 5120;
+          matmul_11_arg_objaddr_1 <= _saxi_register_36 + 4928;
           main_fsm <= main_fsm_32;
         end
         main_fsm_32: begin
-          matmul_11_arg_objaddr_2 <= _saxi_register_36 + 5248;
+          matmul_11_arg_objaddr_2 <= _saxi_register_36 + 5056;
           main_fsm <= main_fsm_33;
         end
         main_fsm_33: begin
-          matmul_11_arg_objaddr_3 <= _saxi_register_36 + 5312;
+          matmul_11_arg_objaddr_3 <= _saxi_register_36 + 5120;
           main_fsm <= main_fsm_34;
         end
         main_fsm_34: begin
@@ -9077,46 +9147,46 @@ module taketwo
     end
   end
 
-  localparam write_burst_fsm_0_1 = 1;
+  localparam write_burst_packed_fsm_0_1 = 1;
 
   always @(posedge CLK) begin
     if(RST) begin
-      write_burst_fsm_0 <= write_burst_fsm_0_init;
-      write_burst_addr_76 <= 0;
-      write_burst_stride_77 <= 0;
-      write_burst_length_78 <= 0;
-      write_burst_done_79 <= 0;
+      write_burst_packed_fsm_0 <= write_burst_packed_fsm_0_init;
+      write_burst_packed_addr_79 <= 0;
+      write_burst_packed_stride_80 <= 0;
+      write_burst_packed_length_81 <= 0;
+      write_burst_packed_done_82 <= 0;
     end else begin
-      case(write_burst_fsm_0)
-        write_burst_fsm_0_init: begin
-          write_burst_addr_76 <= _maxi_read_local_addr_buf;
-          write_burst_stride_77 <= _maxi_read_local_stride_buf;
-          write_burst_length_78 <= _maxi_read_local_size_buf;
-          write_burst_done_79 <= 0;
+      case(write_burst_packed_fsm_0)
+        write_burst_packed_fsm_0_init: begin
+          write_burst_packed_addr_79 <= _maxi_read_local_addr_buf;
+          write_burst_packed_stride_80 <= _maxi_read_local_stride_buf;
+          write_burst_packed_length_81 <= _maxi_read_local_size_buf;
+          write_burst_packed_done_82 <= 0;
           if((_maxi_read_data_fsm == 1) && (_maxi_read_op_sel_buf == 1) && (_maxi_read_local_size_buf > 0)) begin
-            write_burst_fsm_0 <= write_burst_fsm_0_1;
+            write_burst_packed_fsm_0 <= write_burst_packed_fsm_0_1;
           end 
         end
-        write_burst_fsm_0_1: begin
+        write_burst_packed_fsm_0_1: begin
           if(_maxi_rvalid_sb_0) begin
-            write_burst_addr_76 <= write_burst_addr_76 + write_burst_stride_77;
-            write_burst_length_78 <= write_burst_length_78 - 1;
-            write_burst_done_79 <= 0;
+            write_burst_packed_addr_79 <= write_burst_packed_addr_79 + write_burst_packed_stride_80;
+            write_burst_packed_length_81 <= write_burst_packed_length_81 - 1;
+            write_burst_packed_done_82 <= 0;
           end 
-          if(_maxi_rvalid_sb_0 && (write_burst_length_78 <= 1)) begin
-            write_burst_done_79 <= 1;
-          end 
-          if(_maxi_rvalid_sb_0 && 0) begin
-            write_burst_done_79 <= 1;
-          end 
-          if(_maxi_rvalid_sb_0 && (write_burst_length_78 <= 1)) begin
-            write_burst_fsm_0 <= write_burst_fsm_0_init;
+          if(_maxi_rvalid_sb_0 && (write_burst_packed_length_81 <= 1)) begin
+            write_burst_packed_done_82 <= 1;
           end 
           if(_maxi_rvalid_sb_0 && 0) begin
-            write_burst_fsm_0 <= write_burst_fsm_0_init;
+            write_burst_packed_done_82 <= 1;
+          end 
+          if(_maxi_rvalid_sb_0 && (write_burst_packed_length_81 <= 1)) begin
+            write_burst_packed_fsm_0 <= write_burst_packed_fsm_0_init;
+          end 
+          if(_maxi_rvalid_sb_0 && 0) begin
+            write_burst_packed_fsm_0 <= write_burst_packed_fsm_0_init;
           end 
           if(0) begin
-            write_burst_fsm_0 <= write_burst_fsm_0_init;
+            write_burst_packed_fsm_0 <= write_burst_packed_fsm_0_init;
           end 
         end
       endcase
@@ -9128,34 +9198,34 @@ module taketwo
   always @(posedge CLK) begin
     if(RST) begin
       write_burst_fsm_1 <= write_burst_fsm_1_init;
-      write_burst_addr_82 <= 0;
-      write_burst_stride_83 <= 0;
-      write_burst_length_84 <= 0;
-      write_burst_done_85 <= 0;
+      write_burst_addr_89 <= 0;
+      write_burst_stride_90 <= 0;
+      write_burst_length_91 <= 0;
+      write_burst_done_92 <= 0;
     end else begin
       case(write_burst_fsm_1)
         write_burst_fsm_1_init: begin
-          write_burst_addr_82 <= _maxi_read_local_addr_buf;
-          write_burst_stride_83 <= _maxi_read_local_stride_buf;
-          write_burst_length_84 <= _maxi_read_local_size_buf;
-          write_burst_done_85 <= 0;
+          write_burst_addr_89 <= _maxi_read_local_addr_buf;
+          write_burst_stride_90 <= _maxi_read_local_stride_buf;
+          write_burst_length_91 <= _maxi_read_local_size_buf;
+          write_burst_done_92 <= 0;
           if((_maxi_read_data_fsm == 1) && (_maxi_read_op_sel_buf == 2) && (_maxi_read_local_size_buf > 0)) begin
             write_burst_fsm_1 <= write_burst_fsm_1_1;
           end 
         end
         write_burst_fsm_1_1: begin
           if(_maxi_rvalid_sb_0) begin
-            write_burst_addr_82 <= write_burst_addr_82 + write_burst_stride_83;
-            write_burst_length_84 <= write_burst_length_84 - 1;
-            write_burst_done_85 <= 0;
+            write_burst_addr_89 <= write_burst_addr_89 + write_burst_stride_90;
+            write_burst_length_91 <= write_burst_length_91 - 1;
+            write_burst_done_92 <= 0;
           end 
-          if(_maxi_rvalid_sb_0 && (write_burst_length_84 <= 1)) begin
-            write_burst_done_85 <= 1;
+          if(_maxi_rvalid_sb_0 && (write_burst_length_91 <= 1)) begin
+            write_burst_done_92 <= 1;
           end 
           if(_maxi_rvalid_sb_0 && 0) begin
-            write_burst_done_85 <= 1;
+            write_burst_done_92 <= 1;
           end 
-          if(_maxi_rvalid_sb_0 && (write_burst_length_84 <= 1)) begin
+          if(_maxi_rvalid_sb_0 && (write_burst_length_91 <= 1)) begin
             write_burst_fsm_1 <= write_burst_fsm_1_init;
           end 
           if(_maxi_rvalid_sb_0 && 0) begin
@@ -9174,34 +9244,34 @@ module taketwo
   always @(posedge CLK) begin
     if(RST) begin
       write_burst_packed_fsm_2 <= write_burst_packed_fsm_2_init;
-      write_burst_packed_addr_91 <= 0;
-      write_burst_packed_stride_92 <= 0;
-      write_burst_packed_length_93 <= 0;
-      write_burst_packed_done_94 <= 0;
+      write_burst_packed_addr_98 <= 0;
+      write_burst_packed_stride_99 <= 0;
+      write_burst_packed_length_100 <= 0;
+      write_burst_packed_done_101 <= 0;
     end else begin
       case(write_burst_packed_fsm_2)
         write_burst_packed_fsm_2_init: begin
-          write_burst_packed_addr_91 <= _maxi_read_local_addr_buf;
-          write_burst_packed_stride_92 <= _maxi_read_local_stride_buf;
-          write_burst_packed_length_93 <= _maxi_read_local_size_buf;
-          write_burst_packed_done_94 <= 0;
+          write_burst_packed_addr_98 <= _maxi_read_local_addr_buf;
+          write_burst_packed_stride_99 <= _maxi_read_local_stride_buf;
+          write_burst_packed_length_100 <= _maxi_read_local_size_buf;
+          write_burst_packed_done_101 <= 0;
           if((_maxi_read_data_fsm == 1) && (_maxi_read_op_sel_buf == 3) && (_maxi_read_local_size_buf > 0)) begin
             write_burst_packed_fsm_2 <= write_burst_packed_fsm_2_1;
           end 
         end
         write_burst_packed_fsm_2_1: begin
           if(_maxi_rvalid_sb_0) begin
-            write_burst_packed_addr_91 <= write_burst_packed_addr_91 + write_burst_packed_stride_92;
-            write_burst_packed_length_93 <= write_burst_packed_length_93 - 1;
-            write_burst_packed_done_94 <= 0;
+            write_burst_packed_addr_98 <= write_burst_packed_addr_98 + write_burst_packed_stride_99;
+            write_burst_packed_length_100 <= write_burst_packed_length_100 - 1;
+            write_burst_packed_done_101 <= 0;
           end 
-          if(_maxi_rvalid_sb_0 && (write_burst_packed_length_93 <= 1)) begin
-            write_burst_packed_done_94 <= 1;
+          if(_maxi_rvalid_sb_0 && (write_burst_packed_length_100 <= 1)) begin
+            write_burst_packed_done_101 <= 1;
           end 
           if(_maxi_rvalid_sb_0 && 0) begin
-            write_burst_packed_done_94 <= 1;
+            write_burst_packed_done_101 <= 1;
           end 
-          if(_maxi_rvalid_sb_0 && (write_burst_packed_length_93 <= 1)) begin
+          if(_maxi_rvalid_sb_0 && (write_burst_packed_length_100 <= 1)) begin
             write_burst_packed_fsm_2 <= write_burst_packed_fsm_2_init;
           end 
           if(_maxi_rvalid_sb_0 && 0) begin
@@ -9220,34 +9290,34 @@ module taketwo
   always @(posedge CLK) begin
     if(RST) begin
       write_burst_packed_fsm_3 <= write_burst_packed_fsm_3_init;
-      write_burst_packed_addr_104 <= 0;
-      write_burst_packed_stride_105 <= 0;
-      write_burst_packed_length_106 <= 0;
-      write_burst_packed_done_107 <= 0;
+      write_burst_packed_addr_111 <= 0;
+      write_burst_packed_stride_112 <= 0;
+      write_burst_packed_length_113 <= 0;
+      write_burst_packed_done_114 <= 0;
     end else begin
       case(write_burst_packed_fsm_3)
         write_burst_packed_fsm_3_init: begin
-          write_burst_packed_addr_104 <= _maxi_read_local_addr_buf;
-          write_burst_packed_stride_105 <= _maxi_read_local_stride_buf;
-          write_burst_packed_length_106 <= _maxi_read_local_size_buf;
-          write_burst_packed_done_107 <= 0;
+          write_burst_packed_addr_111 <= _maxi_read_local_addr_buf;
+          write_burst_packed_stride_112 <= _maxi_read_local_stride_buf;
+          write_burst_packed_length_113 <= _maxi_read_local_size_buf;
+          write_burst_packed_done_114 <= 0;
           if((_maxi_read_data_fsm == 1) && (_maxi_read_op_sel_buf == 4) && (_maxi_read_local_size_buf > 0)) begin
             write_burst_packed_fsm_3 <= write_burst_packed_fsm_3_1;
           end 
         end
         write_burst_packed_fsm_3_1: begin
           if(_maxi_rvalid_sb_0) begin
-            write_burst_packed_addr_104 <= write_burst_packed_addr_104 + write_burst_packed_stride_105;
-            write_burst_packed_length_106 <= write_burst_packed_length_106 - 1;
-            write_burst_packed_done_107 <= 0;
+            write_burst_packed_addr_111 <= write_burst_packed_addr_111 + write_burst_packed_stride_112;
+            write_burst_packed_length_113 <= write_burst_packed_length_113 - 1;
+            write_burst_packed_done_114 <= 0;
           end 
-          if(_maxi_rvalid_sb_0 && (write_burst_packed_length_106 <= 1)) begin
-            write_burst_packed_done_107 <= 1;
+          if(_maxi_rvalid_sb_0 && (write_burst_packed_length_113 <= 1)) begin
+            write_burst_packed_done_114 <= 1;
           end 
           if(_maxi_rvalid_sb_0 && 0) begin
-            write_burst_packed_done_107 <= 1;
+            write_burst_packed_done_114 <= 1;
           end 
-          if(_maxi_rvalid_sb_0 && (write_burst_packed_length_106 <= 1)) begin
+          if(_maxi_rvalid_sb_0 && (write_burst_packed_length_113 <= 1)) begin
             write_burst_packed_fsm_3 <= write_burst_packed_fsm_3_init;
           end 
           if(_maxi_rvalid_sb_0 && 0) begin
@@ -9411,6 +9481,17 @@ module taketwo
     end
   end
 
+
+  always @(posedge CLK) begin
+    if(RST) begin
+      _tmp_127 <= 0;
+    end else begin
+      if(_stream_matmul_11_stream_oready && _stream_matmul_11_source_7_source_ram_renable && (_stream_matmul_11_source_7_source_sel == 1)) begin
+        _tmp_127 <= read_rtl_bank_126;
+      end 
+    end
+  end
+
   localparam _stream_matmul_11_source_7_source_pat_fsm_0_1 = 1;
   localparam _stream_matmul_11_source_7_source_pat_fsm_0_2 = 2;
 
@@ -9474,10 +9555,10 @@ module taketwo
 
   always @(posedge CLK) begin
     if(RST) begin
-      _tmp_137 <= 0;
+      _tmp_150 <= 0;
     end else begin
       if(_stream_matmul_11_stream_oready && _stream_matmul_11_source_20_source_ram_renable && (_stream_matmul_11_source_20_source_sel == 3)) begin
-        _tmp_137 <= read_rtl_bank_136;
+        _tmp_150 <= read_rtl_bank_149;
       end 
     end
   end
@@ -9515,10 +9596,10 @@ module taketwo
 
   always @(posedge CLK) begin
     if(RST) begin
-      _tmp_146 <= 0;
+      _tmp_159 <= 0;
     end else begin
       if(_stream_matmul_11_stream_oready && _stream_matmul_11_source_21_source_ram_renable && (_stream_matmul_11_source_21_source_sel == 4)) begin
-        _tmp_146 <= read_rtl_bank_145;
+        _tmp_159 <= read_rtl_bank_158;
       end 
     end
   end
@@ -9628,7 +9709,7 @@ module taketwo
           _maxi_write_data_fsm <= _maxi_write_data_fsm_2;
         end
         _maxi_write_data_fsm_2: begin
-          if((_maxi_write_op_sel_buf == 1) && read_burst_packed_rvalid_507 && ((_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0)) && read_burst_packed_rlast_508) begin
+          if((_maxi_write_op_sel_buf == 1) && read_burst_packed_rvalid_520 && ((_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0)) && read_burst_packed_rlast_521) begin
             _maxi_write_data_fsm <= _maxi_write_data_fsm_init;
           end 
         end
@@ -9641,41 +9722,41 @@ module taketwo
   always @(posedge CLK) begin
     if(RST) begin
       read_burst_packed_fsm_4 <= read_burst_packed_fsm_4_init;
-      read_burst_packed_addr_504 <= 0;
-      read_burst_packed_stride_505 <= 0;
-      read_burst_packed_length_506 <= 0;
-      read_burst_packed_rvalid_507 <= 0;
-      read_burst_packed_rlast_508 <= 0;
+      read_burst_packed_addr_517 <= 0;
+      read_burst_packed_stride_518 <= 0;
+      read_burst_packed_length_519 <= 0;
+      read_burst_packed_rvalid_520 <= 0;
+      read_burst_packed_rlast_521 <= 0;
     end else begin
       case(read_burst_packed_fsm_4)
         read_burst_packed_fsm_4_init: begin
-          read_burst_packed_addr_504 <= _maxi_write_local_addr_buf;
-          read_burst_packed_stride_505 <= _maxi_write_local_stride_buf;
-          read_burst_packed_length_506 <= _maxi_write_size_buf;
-          read_burst_packed_rvalid_507 <= 0;
-          read_burst_packed_rlast_508 <= 0;
+          read_burst_packed_addr_517 <= _maxi_write_local_addr_buf;
+          read_burst_packed_stride_518 <= _maxi_write_local_stride_buf;
+          read_burst_packed_length_519 <= _maxi_write_size_buf;
+          read_burst_packed_rvalid_520 <= 0;
+          read_burst_packed_rlast_521 <= 0;
           if((_maxi_write_data_fsm == 1) && (_maxi_write_op_sel_buf == 1) && (_maxi_write_size_buf > 0)) begin
             read_burst_packed_fsm_4 <= read_burst_packed_fsm_4_1;
           end 
         end
         read_burst_packed_fsm_4_1: begin
-          if((_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0) && (read_burst_packed_length_506 > 0)) begin
-            read_burst_packed_addr_504 <= read_burst_packed_addr_504 + read_burst_packed_stride_505;
-            read_burst_packed_length_506 <= read_burst_packed_length_506 - 1;
-            read_burst_packed_rvalid_507 <= 1;
+          if((_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0) && (read_burst_packed_length_519 > 0)) begin
+            read_burst_packed_addr_517 <= read_burst_packed_addr_517 + read_burst_packed_stride_518;
+            read_burst_packed_length_519 <= read_burst_packed_length_519 - 1;
+            read_burst_packed_rvalid_520 <= 1;
           end 
-          if((_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0) && (read_burst_packed_length_506 <= 1)) begin
-            read_burst_packed_rlast_508 <= 1;
+          if((_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0) && (read_burst_packed_length_519 <= 1)) begin
+            read_burst_packed_rlast_521 <= 1;
           end 
-          if(read_burst_packed_rlast_508 && read_burst_packed_rvalid_507 && ((_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0))) begin
-            read_burst_packed_rvalid_507 <= 0;
-            read_burst_packed_rlast_508 <= 0;
+          if(read_burst_packed_rlast_521 && read_burst_packed_rvalid_520 && ((_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0))) begin
+            read_burst_packed_rvalid_520 <= 0;
+            read_burst_packed_rlast_521 <= 0;
           end 
           if(0) begin
-            read_burst_packed_rvalid_507 <= 0;
-            read_burst_packed_rlast_508 <= 0;
+            read_burst_packed_rvalid_520 <= 0;
+            read_burst_packed_rlast_521 <= 0;
           end 
-          if(read_burst_packed_rlast_508 && read_burst_packed_rvalid_507 && ((_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0))) begin
+          if(read_burst_packed_rlast_521 && read_burst_packed_rvalid_520 && ((_maxi_wready_sb_0 || !_maxi_wvalid_sb_0) && (_maxi_write_size_buf > 0))) begin
             read_burst_packed_fsm_4 <= read_burst_packed_fsm_4_init;
           end 
           if(0) begin
@@ -10091,6 +10172,104 @@ endmodule
 
 
 
+module ram_w16_l512_id3_0
+(
+  input CLK,
+  input [8-1:0] ram_w16_l512_id3_0_0_addr,
+  output [16-1:0] ram_w16_l512_id3_0_0_rdata,
+  input [16-1:0] ram_w16_l512_id3_0_0_wdata,
+  input ram_w16_l512_id3_0_0_wenable,
+  input ram_w16_l512_id3_0_0_enable,
+  input [8-1:0] ram_w16_l512_id3_0_1_addr,
+  output [16-1:0] ram_w16_l512_id3_0_1_rdata,
+  input [16-1:0] ram_w16_l512_id3_0_1_wdata,
+  input ram_w16_l512_id3_0_1_wenable,
+  input ram_w16_l512_id3_0_1_enable
+);
+
+  reg [16-1:0] ram_w16_l512_id3_0_0_rdata_out;
+  assign ram_w16_l512_id3_0_0_rdata = ram_w16_l512_id3_0_0_rdata_out;
+  reg [16-1:0] ram_w16_l512_id3_0_1_rdata_out;
+  assign ram_w16_l512_id3_0_1_rdata = ram_w16_l512_id3_0_1_rdata_out;
+  reg [16-1:0] mem [0:256-1];
+
+  always @(posedge CLK) begin
+    if(ram_w16_l512_id3_0_0_enable) begin
+      if(ram_w16_l512_id3_0_0_wenable) begin
+        mem[ram_w16_l512_id3_0_0_addr] <= ram_w16_l512_id3_0_0_wdata;
+        ram_w16_l512_id3_0_0_rdata_out <= ram_w16_l512_id3_0_0_wdata;
+      end else begin
+        ram_w16_l512_id3_0_0_rdata_out <= mem[ram_w16_l512_id3_0_0_addr];
+      end
+    end 
+  end
+
+
+  always @(posedge CLK) begin
+    if(ram_w16_l512_id3_0_1_enable) begin
+      if(ram_w16_l512_id3_0_1_wenable) begin
+        mem[ram_w16_l512_id3_0_1_addr] <= ram_w16_l512_id3_0_1_wdata;
+        ram_w16_l512_id3_0_1_rdata_out <= ram_w16_l512_id3_0_1_wdata;
+      end else begin
+        ram_w16_l512_id3_0_1_rdata_out <= mem[ram_w16_l512_id3_0_1_addr];
+      end
+    end 
+  end
+
+
+endmodule
+
+
+
+module ram_w16_l512_id3_1
+(
+  input CLK,
+  input [8-1:0] ram_w16_l512_id3_1_0_addr,
+  output [16-1:0] ram_w16_l512_id3_1_0_rdata,
+  input [16-1:0] ram_w16_l512_id3_1_0_wdata,
+  input ram_w16_l512_id3_1_0_wenable,
+  input ram_w16_l512_id3_1_0_enable,
+  input [8-1:0] ram_w16_l512_id3_1_1_addr,
+  output [16-1:0] ram_w16_l512_id3_1_1_rdata,
+  input [16-1:0] ram_w16_l512_id3_1_1_wdata,
+  input ram_w16_l512_id3_1_1_wenable,
+  input ram_w16_l512_id3_1_1_enable
+);
+
+  reg [16-1:0] ram_w16_l512_id3_1_0_rdata_out;
+  assign ram_w16_l512_id3_1_0_rdata = ram_w16_l512_id3_1_0_rdata_out;
+  reg [16-1:0] ram_w16_l512_id3_1_1_rdata_out;
+  assign ram_w16_l512_id3_1_1_rdata = ram_w16_l512_id3_1_1_rdata_out;
+  reg [16-1:0] mem [0:256-1];
+
+  always @(posedge CLK) begin
+    if(ram_w16_l512_id3_1_0_enable) begin
+      if(ram_w16_l512_id3_1_0_wenable) begin
+        mem[ram_w16_l512_id3_1_0_addr] <= ram_w16_l512_id3_1_0_wdata;
+        ram_w16_l512_id3_1_0_rdata_out <= ram_w16_l512_id3_1_0_wdata;
+      end else begin
+        ram_w16_l512_id3_1_0_rdata_out <= mem[ram_w16_l512_id3_1_0_addr];
+      end
+    end 
+  end
+
+
+  always @(posedge CLK) begin
+    if(ram_w16_l512_id3_1_1_enable) begin
+      if(ram_w16_l512_id3_1_1_wenable) begin
+        mem[ram_w16_l512_id3_1_1_addr] <= ram_w16_l512_id3_1_1_wdata;
+        ram_w16_l512_id3_1_1_rdata_out <= ram_w16_l512_id3_1_1_wdata;
+      end else begin
+        ram_w16_l512_id3_1_1_rdata_out <= mem[ram_w16_l512_id3_1_1_addr];
+      end
+    end 
+  end
+
+
+endmodule
+
+
+
 module ram_w32_l128_id0
 (
   input CLK,
@@ -10131,55 +10310,6 @@ module ram_w32_l128_id0
         ram_w32_l128_id0_1_rdata_out <= ram_w32_l128_id0_1_wdata;
       end else begin
         ram_w32_l128_id0_1_rdata_out <= mem[ram_w32_l128_id0_1_addr];
-      end
-    end 
-  end
-
-
-endmodule
-
-
-
-module ram_w32_l128_id1
-(
-  input CLK,
-  input [7-1:0] ram_w32_l128_id1_0_addr,
-  output [32-1:0] ram_w32_l128_id1_0_rdata,
-  input [32-1:0] ram_w32_l128_id1_0_wdata,
-  input ram_w32_l128_id1_0_wenable,
-  input ram_w32_l128_id1_0_enable,
-  input [7-1:0] ram_w32_l128_id1_1_addr,
-  output [32-1:0] ram_w32_l128_id1_1_rdata,
-  input [32-1:0] ram_w32_l128_id1_1_wdata,
-  input ram_w32_l128_id1_1_wenable,
-  input ram_w32_l128_id1_1_enable
-);
-
-  reg [32-1:0] ram_w32_l128_id1_0_rdata_out;
-  assign ram_w32_l128_id1_0_rdata = ram_w32_l128_id1_0_rdata_out;
-  reg [32-1:0] ram_w32_l128_id1_1_rdata_out;
-  assign ram_w32_l128_id1_1_rdata = ram_w32_l128_id1_1_rdata_out;
-  reg [32-1:0] mem [0:128-1];
-
-  always @(posedge CLK) begin
-    if(ram_w32_l128_id1_0_enable) begin
-      if(ram_w32_l128_id1_0_wenable) begin
-        mem[ram_w32_l128_id1_0_addr] <= ram_w32_l128_id1_0_wdata;
-        ram_w32_l128_id1_0_rdata_out <= ram_w32_l128_id1_0_wdata;
-      end else begin
-        ram_w32_l128_id1_0_rdata_out <= mem[ram_w32_l128_id1_0_addr];
-      end
-    end 
-  end
-
-
-  always @(posedge CLK) begin
-    if(ram_w32_l128_id1_1_enable) begin
-      if(ram_w32_l128_id1_1_wenable) begin
-        mem[ram_w32_l128_id1_1_addr] <= ram_w32_l128_id1_1_wdata;
-        ram_w32_l128_id1_1_rdata_out <= ram_w32_l128_id1_1_wdata;
-      end else begin
-        ram_w32_l128_id1_1_rdata_out <= mem[ram_w32_l128_id1_1_addr];
       end
     end 
   end

@@ -17,6 +17,7 @@ Optional:
 
 import os
 import math
+import shutil
 import numpy as np
 import nngen as ng
 
@@ -53,7 +54,7 @@ def main():
         default_constant_dtype=ng.int16,
         default_operator_dtype=ng.int16,
         default_scale_dtype=ng.int32,
-        default_bias_dtype=ng.int32,   # your biases end up int32 in the generated map
+        default_bias_dtype=ng.int16,   # keep biases packed at 16 bits with the rest of the parameters
         disable_fusion=False,
         verbose=True,
     )
@@ -145,6 +146,11 @@ def main():
     # Build a testbench module around 'targ'
     outputfile = os.path.join(OUT_DIR, f"{PROJECT}.out")
     memimg_name = 'memimg_' + os.path.basename(outputfile)
+
+    # Verilator leaves dependency files with absolute paths in the output dir.
+    # If this tree was generated on another machine/user account, rebuild it cleanly.
+    if os.path.isdir(outputfile):
+        shutil.rmtree(outputfile)
 
     m = Module('test')
 
