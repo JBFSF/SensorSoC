@@ -53,7 +53,7 @@ def main():
         default_variable_dtype=ng.int16,
         default_constant_dtype=ng.int16,
         default_operator_dtype=ng.int16,
-        default_scale_dtype=ng.int16,
+        default_scale_dtype=ng.int32,
         default_bias_dtype=ng.int16,   # keep biases packed at 16 bits with the rest of the parameters
         disable_fusion=False,
         verbose=True,
