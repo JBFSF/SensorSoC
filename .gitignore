@@ -8,4 +8,4 @@ img/
 *.lyrdb
 sim/data/
 sensor_output/
-sim/waves
+sim/waves/
