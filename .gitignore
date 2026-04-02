@@ -2,9 +2,10 @@ runs/
 __pycache__/
 gf180mcu/
 gf180_drc.lyrdb
-sim_build/
+sim/build/
 final/
 img/
 *.lyrdb
 sim/data/
 sensor_output/
+sim/waves
