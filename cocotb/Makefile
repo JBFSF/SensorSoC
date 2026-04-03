@@ -668,6 +668,43 @@ sim-top-pipeline: $(TOP_PIPELINE_VVP)
 	@mkdir -p $(WAVE_DIR)
 	@cd $(WAVE_DIR) && $(VVP) $(abspath $(TOP_PIPELINE_VVP))
 
+# ============================================================
+# Cocotb: top -> taketwo feature load check
+# ============================================================
+
+TOP_MLP_FEATURES_TOP    := sim_top_mlp_features
+TOP_MLP_FEATURES_TOP_V  := $(TB_DIR)/sim_top_mlp_features.sv
+TOP_MLP_FEATURES_VVP    := sim_top_mlp_features.vvp
+TOP_MLP_FEATURES_PYMOD  := test_top_mlp_features
+TOP_MLP_FEATURES_SRCS   := \
+  $(TOP_MLP_FEATURES_TOP_V) \
+  $(TB_DIR)/taketwo_core_only.v \
+  $(RTL_DIR)/top.sv \
+  $(RTL_DIR)/axi_interface.sv \
+  $(RTL_DIR)/i2c_master.sv \
+  $(RTL_DIR)/accel_reader.sv \
+  $(RTL_DIR)/motion_preprocess.sv \
+  $(RTL_DIR)/ppg_fifo_reader.sv \
+  $(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
+  $(RTL_DIR)/rmssd_engine.sv \
+  $(RTL_DIR)/signal_quality.sv \
+  $(RTL_DIR)/feature_engine.sv \
+  $(RTL_DIR)/cos_lut_timer.sv \
+  $(RTL_DIR)/globaltimer.sv \
+  sensors/i2c_slave_lis2dw12.sv \
+  sensors/i2c_slave_adpd144ri.sv
+
+$(TOP_MLP_FEATURES_VVP): $(TOP_MLP_FEATURES_SRCS)
+	@echo "[COCOTB] Building $@"
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_MLP_FEATURES_TOP) -o $@ $(TOP_MLP_FEATURES_SRCS)
+
+.PHONY: test-top-mlp-features
+test-top-mlp-features: $(TOP_MLP_FEATURES_VVP)
+	@echo "[COCOTB] Running $(TOP_MLP_FEATURES_PYMOD) on $(TOP_MLP_FEATURES_TOP)"
+	@export COCOTB_TOPLEVEL=$(TOP_MLP_FEATURES_TOP); \
+	export COCOTB_TEST_MODULES=$(TOP_MLP_FEATURES_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(TOP_MLP_FEATURES_VVP))
+
 
 # ============================================================
 # HOST I2C TARGET
