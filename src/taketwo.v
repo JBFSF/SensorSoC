@@ -1,5 +1,3 @@
-
-
 module taketwo
 (
   input CLK,
@@ -9978,9 +9976,15 @@ module ram_w16_l512_id0_0
 
   wire write_en_n;
   wire [8:0] addr;
-  wire activate = ram_w16_l512_id0_0_0_enable & ram_w16_l512_id0_0_1_enable;
-  assign write_en_n = ~(ram_w16_l512_id0_0_1_wenable && ram_w16_l512_id0_0_1_enable);
-  assign addr = {1'b0,(ram_w16_l512_id0_0_1_enable) ? ram_w16_l512_id0_0_1_addr : ram_w16_l512_id0_0_0_addr};
+  wire activate = ram_w16_l512_id0_0_0_enable | ram_w16_l512_id0_0_1_enable;
+  wire port0_writing = ram_w16_l512_id0_0_0_wenable && ram_w16_l512_id0_0_0_enable;
+  wire port1_writing = ram_w16_l512_id0_0_1_wenable && ram_w16_l512_id0_0_1_enable;
+  assign write_en_n = ~(port0_writing | port1_writing);
+  wire [15:0] wdata = port1_writing ? ram_w16_l512_id0_0_1_wdata : ram_w16_l512_id0_0_0_wdata;
+  wire [7:0] q_top, q_bot;
+  assign addr = {1'b0, port1_writing ? ram_w16_l512_id0_0_1_addr :
+                       port0_writing ? ram_w16_l512_id0_0_0_addr :
+                       ram_w16_l512_id0_0_1_enable   ? ram_w16_l512_id0_0_1_addr : ram_w16_l512_id0_0_0_addr};
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1
   mem_top (
@@ -9989,8 +9993,8 @@ module ram_w16_l512_id0_0
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id0_0_1_wdata[15:8]),
-    .Q(ram_w16_l512_id0_0_0_rdata[15:8]),
+    .D(wdata[15:8]),
+    .Q(q_top),
     .VDD(vdd), 
     .VSS(vss)
   );
@@ -10002,13 +10006,14 @@ module ram_w16_l512_id0_0
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id0_0_1_wdata[7:0]),
-    .Q(ram_w16_l512_id0_0_0_rdata[7:0]),
+    .D(wdata[7:0]),
+    .Q(q_bot),
     .VDD(vdd), 
     .VSS(vss)
   );
 
-  assign ram_w16_l512_id0_0_1_rdata = 16'h0000;
+  assign ram_w16_l512_id0_0_0_rdata = {q_top, q_bot};
+  assign ram_w16_l512_id0_0_1_rdata = {q_top, q_bot};
 
   // reg [16-1:0] ram_w16_l512_id0_0_0_rdata_out;
   // assign ram_w16_l512_id0_0_0_rdata = ram_w16_l512_id0_0_0_rdata_out;
@@ -10064,9 +10069,15 @@ module ram_w16_l512_id0_1
 
   wire write_en_n;
   wire [8:0] addr;
-  wire activate = ram_w16_l512_id0_1_0_enable & ram_w16_l512_id0_1_1_enable;
-  assign write_en_n = ~(ram_w16_l512_id0_1_1_wenable && ram_w16_l512_id0_1_1_enable);
-  assign addr = {1'b0,(ram_w16_l512_id0_1_1_enable) ? ram_w16_l512_id0_1_1_addr : ram_w16_l512_id0_1_0_addr};
+  wire activate = ram_w16_l512_id0_1_0_enable | ram_w16_l512_id0_1_1_enable;
+  wire port0_writing = ram_w16_l512_id0_1_0_wenable && ram_w16_l512_id0_1_0_enable;
+  wire port1_writing = ram_w16_l512_id0_1_1_wenable && ram_w16_l512_id0_1_1_enable;
+  assign write_en_n = ~(port0_writing | port1_writing);
+  wire [15:0] wdata = port1_writing ? ram_w16_l512_id0_1_1_wdata : ram_w16_l512_id0_1_0_wdata;
+  wire [7:0] q_top, q_bot;
+  assign addr = {1'b0, port1_writing ? ram_w16_l512_id0_1_1_addr :
+                       port0_writing ? ram_w16_l512_id0_1_0_addr :
+                       ram_w16_l512_id0_1_1_enable   ? ram_w16_l512_id0_1_1_addr : ram_w16_l512_id0_1_0_addr};
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1
   mem_top (
@@ -10075,8 +10086,8 @@ module ram_w16_l512_id0_1
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id0_1_1_wdata[15:8]),
-    .Q(ram_w16_l512_id0_1_0_rdata[15:8]),
+    .D(wdata[15:8]),
+    .Q(q_top),
     .VDD(vdd), 
     .VSS(vss)
   );
@@ -10088,13 +10099,14 @@ module ram_w16_l512_id0_1
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id0_1_1_wdata[7:0]),
-    .Q(ram_w16_l512_id0_1_0_rdata[7:0]),
+    .D(wdata[7:0]),
+    .Q(q_bot),
     .VDD(vdd), 
     .VSS(vss)
   );
 
-  assign ram_w16_l512_id0_1_1_rdata = 16'h0000;
+  assign ram_w16_l512_id0_1_0_rdata = {q_top, q_bot};
+  assign ram_w16_l512_id0_1_1_rdata = {q_top, q_bot};
 
   // reg [16-1:0] ram_w16_l512_id0_1_0_rdata_out;
   // assign ram_w16_l512_id0_1_0_rdata = ram_w16_l512_id0_1_0_rdata_out;
@@ -10150,9 +10162,15 @@ module ram_w16_l512_id1_0
 
   wire write_en_n;
   wire [8:0] addr;
-  wire activate = ram_w16_l512_id1_0_0_enable & ram_w16_l512_id1_0_1_enable;
-  assign write_en_n = ~(ram_w16_l512_id1_0_1_wenable && ram_w16_l512_id1_0_1_enable);
-  assign addr = {1'b0,(ram_w16_l512_id1_0_1_enable) ? ram_w16_l512_id1_0_1_addr : ram_w16_l512_id1_0_0_addr};
+  wire activate = ram_w16_l512_id1_0_0_enable | ram_w16_l512_id1_0_1_enable;
+  wire port0_writing = ram_w16_l512_id1_0_0_wenable && ram_w16_l512_id1_0_0_enable;
+  wire port1_writing = ram_w16_l512_id1_0_1_wenable && ram_w16_l512_id1_0_1_enable;
+  assign write_en_n = ~(port0_writing | port1_writing);
+  wire [15:0] wdata = port1_writing ? ram_w16_l512_id1_0_1_wdata : ram_w16_l512_id1_0_0_wdata;
+  wire [7:0] q_top, q_bot;
+  assign addr = {1'b0, port1_writing ? ram_w16_l512_id1_0_1_addr :
+                       port0_writing ? ram_w16_l512_id1_0_0_addr :
+                       ram_w16_l512_id1_0_1_enable   ? ram_w16_l512_id1_0_1_addr : ram_w16_l512_id1_0_0_addr};
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1
   mem_top (
@@ -10161,8 +10179,8 @@ module ram_w16_l512_id1_0
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id1_0_1_wdata[15:8]),
-    .Q(ram_w16_l512_id1_0_0_rdata[15:8]),
+    .D(wdata[15:8]),
+    .Q(q_top),
     .VDD(vdd), 
     .VSS(vss)
   );
@@ -10174,13 +10192,14 @@ module ram_w16_l512_id1_0
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id1_0_1_wdata[7:0]),
-    .Q(ram_w16_l512_id1_0_0_rdata[7:0]),
+    .D(wdata[7:0]),
+    .Q(q_bot),
     .VDD(vdd), 
     .VSS(vss)
   );
 
-  assign ram_w16_l512_id1_0_1_rdata = 16'h0000;
+  assign ram_w16_l512_id1_0_0_rdata = {q_top, q_bot};
+  assign ram_w16_l512_id1_0_1_rdata = {q_top, q_bot};
 
   // reg [16-1:0] ram_w16_l512_id1_0_0_rdata_out;
   // assign ram_w16_l512_id1_0_0_rdata = ram_w16_l512_id1_0_0_rdata_out;
@@ -10236,9 +10255,15 @@ module ram_w16_l512_id1_1
 
   wire write_en_n;
   wire [8:0] addr;
-  wire activate = ram_w16_l512_id1_1_0_enable & ram_w16_l512_id1_1_1_enable;
-  assign write_en_n = ~(ram_w16_l512_id1_1_1_wenable && ram_w16_l512_id1_1_1_enable);
-  assign addr = {1'b0,(ram_w16_l512_id1_1_1_enable) ? ram_w16_l512_id1_1_1_addr : ram_w16_l512_id1_1_0_addr};
+  wire activate = ram_w16_l512_id1_1_0_enable | ram_w16_l512_id1_1_1_enable;
+  wire port0_writing = ram_w16_l512_id1_1_0_wenable && ram_w16_l512_id1_1_0_enable;
+  wire port1_writing = ram_w16_l512_id1_1_1_wenable && ram_w16_l512_id1_1_1_enable;
+  assign write_en_n = ~(port0_writing | port1_writing);
+  wire [15:0] wdata = port1_writing ? ram_w16_l512_id1_1_1_wdata : ram_w16_l512_id1_1_0_wdata;
+  wire [7:0] q_top, q_bot;
+  assign addr = {1'b0, port1_writing ? ram_w16_l512_id1_1_1_addr :
+                       port0_writing ? ram_w16_l512_id1_1_0_addr :
+                       ram_w16_l512_id1_1_1_enable   ? ram_w16_l512_id1_1_1_addr : ram_w16_l512_id1_1_0_addr};
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1
   mem_top (
@@ -10247,8 +10272,8 @@ module ram_w16_l512_id1_1
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id1_1_1_wdata[15:8]),
-    .Q(ram_w16_l512_id1_1_0_rdata[15:8]),
+    .D(wdata[15:8]),
+    .Q(q_top),
     .VDD(vdd), 
     .VSS(vss)
   );
@@ -10260,13 +10285,14 @@ module ram_w16_l512_id1_1
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id1_1_1_wdata[7:0]),
-    .Q(ram_w16_l512_id1_1_0_rdata[7:0]),
+    .D(wdata[7:0]),
+    .Q(q_bot),
     .VDD(vdd), 
     .VSS(vss)
   );
 
-  assign ram_w16_l512_id1_1_1_rdata = 16'h0000;
+  assign ram_w16_l512_id1_1_0_rdata = {q_top, q_bot};
+  assign ram_w16_l512_id1_1_1_rdata = {q_top, q_bot};
 
   // reg [16-1:0] ram_w16_l512_id1_1_0_rdata_out;
   // assign ram_w16_l512_id1_1_0_rdata = ram_w16_l512_id1_1_0_rdata_out;
@@ -10322,9 +10348,15 @@ module ram_w16_l512_id2_0
 
   wire write_en_n;
   wire [8:0] addr;
-  wire activate = ram_w16_l512_id2_0_0_enable & ram_w16_l512_id2_0_1_enable;
-  assign write_en_n = ~(ram_w16_l512_id2_0_1_wenable && ram_w16_l512_id2_0_1_enable);
-  assign addr = {1'b0,(ram_w16_l512_id2_0_1_enable) ? ram_w16_l512_id2_0_1_addr : ram_w16_l512_id2_0_0_addr};
+  wire activate = ram_w16_l512_id2_0_0_enable | ram_w16_l512_id2_0_1_enable;
+  wire port0_writing = ram_w16_l512_id2_0_0_wenable && ram_w16_l512_id2_0_0_enable;
+  wire port1_writing = ram_w16_l512_id2_0_1_wenable && ram_w16_l512_id2_0_1_enable;
+  assign write_en_n = ~(port0_writing | port1_writing);
+  wire [15:0] wdata = port1_writing ? ram_w16_l512_id2_0_1_wdata : ram_w16_l512_id2_0_0_wdata;
+  wire [7:0] q_top, q_bot;
+  assign addr = {1'b0, port1_writing ? ram_w16_l512_id2_0_1_addr :
+                       port0_writing ? ram_w16_l512_id2_0_0_addr :
+                       ram_w16_l512_id2_0_1_enable   ? ram_w16_l512_id2_0_1_addr : ram_w16_l512_id2_0_0_addr};
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1
   mem_top (
@@ -10333,8 +10365,8 @@ module ram_w16_l512_id2_0
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id2_0_1_wdata[15:8]),
-    .Q(ram_w16_l512_id2_0_0_rdata[15:8]),
+    .D(wdata[15:8]),
+    .Q(q_top),
     .VDD(vdd), 
     .VSS(vss)
   );
@@ -10346,13 +10378,14 @@ module ram_w16_l512_id2_0
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id2_0_1_wdata[7:0]),
-    .Q(ram_w16_l512_id2_0_0_rdata[7:0]),
+    .D(wdata[7:0]),
+    .Q(q_bot),
     .VDD(vdd), 
     .VSS(vss)
   );
 
-  assign ram_w16_l512_id2_0_1_rdata = 16'h0000;
+  assign ram_w16_l512_id2_0_0_rdata = {q_top, q_bot};
+  assign ram_w16_l512_id2_0_1_rdata = {q_top, q_bot};
 
   // reg [16-1:0] ram_w16_l512_id2_0_0_rdata_out;
   // assign ram_w16_l512_id2_0_0_rdata = ram_w16_l512_id2_0_0_rdata_out;
@@ -10408,9 +10441,15 @@ module ram_w16_l512_id2_1
 
   wire write_en_n;
   wire [8:0] addr;
-  wire activate = ram_w16_l512_id2_1_0_enable & ram_w16_l512_id2_1_1_enable;
-  assign write_en_n = ~(ram_w16_l512_id2_1_1_wenable && ram_w16_l512_id2_1_1_enable);
-  assign addr = {1'b0,(ram_w16_l512_id2_1_1_enable) ? ram_w16_l512_id2_1_1_addr : ram_w16_l512_id2_1_0_addr};
+  wire activate = ram_w16_l512_id2_1_0_enable | ram_w16_l512_id2_1_1_enable;
+  wire port0_writing = ram_w16_l512_id2_1_0_wenable && ram_w16_l512_id2_1_0_enable;
+  wire port1_writing = ram_w16_l512_id2_1_1_wenable && ram_w16_l512_id2_1_1_enable;
+  assign write_en_n = ~(port0_writing | port1_writing);
+  wire [15:0] wdata = port1_writing ? ram_w16_l512_id2_1_1_wdata : ram_w16_l512_id2_1_0_wdata;
+  wire [7:0] q_top, q_bot;
+  assign addr = {1'b0, port1_writing ? ram_w16_l512_id2_1_1_addr :
+                       port0_writing ? ram_w16_l512_id2_1_0_addr :
+                       ram_w16_l512_id2_1_1_enable   ? ram_w16_l512_id2_1_1_addr : ram_w16_l512_id2_1_0_addr};
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1
   mem_top (
@@ -10419,8 +10458,8 @@ module ram_w16_l512_id2_1
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id2_1_1_wdata[15:8]),
-    .Q(ram_w16_l512_id2_1_0_rdata[15:8]),
+    .D(wdata[15:8]),
+    .Q(q_top),
     .VDD(vdd), 
     .VSS(vss)
   );
@@ -10432,13 +10471,14 @@ module ram_w16_l512_id2_1
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id2_1_1_wdata[7:0]),
-    .Q(ram_w16_l512_id2_1_0_rdata[7:0]),
+    .D(wdata[7:0]),
+    .Q(q_bot),
     .VDD(vdd), 
     .VSS(vss)
   );
 
-  assign ram_w16_l512_id2_1_1_rdata = 16'h0000;
+  assign ram_w16_l512_id2_1_0_rdata = {q_top, q_bot};
+  assign ram_w16_l512_id2_1_1_rdata = {q_top, q_bot};
 
   // reg [16-1:0] ram_w16_l512_id2_1_0_rdata_out;
   // assign ram_w16_l512_id2_1_0_rdata = ram_w16_l512_id2_1_0_rdata_out;
@@ -10494,9 +10534,15 @@ module ram_w16_l512_id3_0
 
   wire write_en_n;
   wire [8:0] addr;
-  wire activate = ram_w16_l512_id3_0_0_enable & ram_w16_l512_id3_0_1_enable;
-  assign write_en_n = ~(ram_w16_l512_id3_0_1_wenable && ram_w16_l512_id3_0_1_enable);
-  assign addr = {1'b0,(ram_w16_l512_id3_0_1_enable) ? ram_w16_l512_id3_0_1_addr : ram_w16_l512_id3_0_0_addr};
+  wire activate = ram_w16_l512_id3_0_0_enable | ram_w16_l512_id3_0_1_enable;
+  wire port0_writing = ram_w16_l512_id3_0_0_wenable && ram_w16_l512_id3_0_0_enable;
+  wire port1_writing = ram_w16_l512_id3_0_1_wenable && ram_w16_l512_id3_0_1_enable;
+  assign write_en_n = ~(port0_writing | port1_writing);
+  wire [15:0] wdata = port1_writing ? ram_w16_l512_id3_0_1_wdata : ram_w16_l512_id3_0_0_wdata;
+  wire [7:0] q_top, q_bot;
+  assign addr = {1'b0, port1_writing ? ram_w16_l512_id3_0_1_addr :
+                       port0_writing ? ram_w16_l512_id3_0_0_addr :
+                       ram_w16_l512_id3_0_1_enable   ? ram_w16_l512_id3_0_1_addr : ram_w16_l512_id3_0_0_addr};
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1
   mem_top (
@@ -10505,8 +10551,8 @@ module ram_w16_l512_id3_0
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id3_0_1_wdata[15:8]),
-    .Q(ram_w16_l512_id3_0_0_rdata[15:8]),
+    .D(wdata[15:8]),
+    .Q(q_top),
     .VDD(vdd), 
     .VSS(vss)
   );
@@ -10518,13 +10564,14 @@ module ram_w16_l512_id3_0
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id3_0_1_wdata[7:0]),
-    .Q(ram_w16_l512_id3_0_0_rdata[7:0]),
+    .D(wdata[7:0]),
+    .Q(q_bot),
     .VDD(vdd), 
     .VSS(vss)
   );
 
-  assign ram_w16_l512_id3_0_1_rdata = 16'h0000;
+  assign ram_w16_l512_id3_0_0_rdata = {q_top, q_bot};
+  assign ram_w16_l512_id3_0_1_rdata = {q_top, q_bot};
 
   // reg [16-1:0] ram_w16_l512_id3_0_0_rdata_out;
   // assign ram_w16_l512_id3_0_0_rdata = ram_w16_l512_id3_0_0_rdata_out;
@@ -10580,9 +10627,15 @@ module ram_w16_l512_id3_1
 
   wire write_en_n;
   wire [8:0] addr;
-  wire activate = ram_w16_l512_id3_1_0_enable & ram_w16_l512_id3_1_1_enable;
-  assign write_en_n = ~(ram_w16_l512_id3_1_1_wenable && ram_w16_l512_id3_1_1_enable);
-  assign addr = {1'b0,(ram_w16_l512_id3_1_1_enable) ? ram_w16_l512_id3_1_1_addr : ram_w16_l512_id3_1_0_addr};
+  wire activate = ram_w16_l512_id3_1_0_enable | ram_w16_l512_id3_1_1_enable;
+  wire port0_writing = ram_w16_l512_id3_1_0_wenable && ram_w16_l512_id3_1_0_enable;
+  wire port1_writing = ram_w16_l512_id3_1_1_wenable && ram_w16_l512_id3_1_1_enable;
+  assign write_en_n = ~(port0_writing | port1_writing);
+  wire [15:0] wdata = port1_writing ? ram_w16_l512_id3_1_1_wdata : ram_w16_l512_id3_1_0_wdata;
+  wire [7:0] q_top, q_bot;
+  assign addr = {1'b0, port1_writing ? ram_w16_l512_id3_1_1_addr :
+                       port0_writing ? ram_w16_l512_id3_1_0_addr :
+                       ram_w16_l512_id3_1_1_enable   ? ram_w16_l512_id3_1_1_addr : ram_w16_l512_id3_1_0_addr};
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1
   mem_top (
@@ -10591,8 +10644,8 @@ module ram_w16_l512_id3_1
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id3_1_1_wdata[15:8]),
-    .Q(ram_w16_l512_id3_1_0_rdata[15:8]),
+    .D(wdata[15:8]),
+    .Q(q_top),
     .VDD(vdd), 
     .VSS(vss)
   );
@@ -10604,13 +10657,14 @@ module ram_w16_l512_id3_1
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id3_1_1_wdata[7:0]),
-    .Q(ram_w16_l512_id3_1_0_rdata[7:0]),
+    .D(wdata[7:0]),
+    .Q(q_bot),
     .VDD(vdd), 
     .VSS(vss)
   );
 
-  assign ram_w16_l512_id3_1_1_rdata = 16'h0000;
+  assign ram_w16_l512_id3_1_0_rdata = {q_top, q_bot};
+  assign ram_w16_l512_id3_1_1_rdata = {q_top, q_bot};
 
   // reg [16-1:0] ram_w16_l512_id3_1_0_rdata_out;
   // assign ram_w16_l512_id3_1_0_rdata = ram_w16_l512_id3_1_0_rdata_out;
@@ -10666,9 +10720,15 @@ module ram_w16_l512_id4_0
 
   wire write_en_n;
   wire [8:0] addr;
-  wire activate = ram_w16_l512_id4_0_0_enable & ram_w16_l512_id4_0_1_enable;
-  assign write_en_n = ~(ram_w16_l512_id4_0_1_wenable && ram_w16_l512_id4_0_1_enable);
-  assign addr = {1'b0,(ram_w16_l512_id4_0_1_enable) ? ram_w16_l512_id4_0_1_addr : ram_w16_l512_id4_0_0_addr};
+  wire activate = ram_w16_l512_id4_0_0_enable | ram_w16_l512_id4_0_1_enable;
+  wire port0_writing = ram_w16_l512_id4_0_0_wenable && ram_w16_l512_id4_0_0_enable;
+  wire port1_writing = ram_w16_l512_id4_0_1_wenable && ram_w16_l512_id4_0_1_enable;
+  assign write_en_n = ~(port0_writing | port1_writing);
+  wire [15:0] wdata = port1_writing ? ram_w16_l512_id4_0_1_wdata : ram_w16_l512_id4_0_0_wdata;
+  wire [7:0] q_top, q_bot;
+  assign addr = {1'b0, port1_writing ? ram_w16_l512_id4_0_1_addr :
+                       port0_writing ? ram_w16_l512_id4_0_0_addr :
+                       ram_w16_l512_id4_0_1_enable   ? ram_w16_l512_id4_0_1_addr : ram_w16_l512_id4_0_0_addr};
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1
   mem_top (
@@ -10677,8 +10737,8 @@ module ram_w16_l512_id4_0
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id4_0_1_wdata[15:8]),
-    .Q(ram_w16_l512_id4_0_0_rdata[15:8]),
+    .D(wdata[15:8]),
+    .Q(q_top),
     .VDD(vdd), 
     .VSS(vss)
   );
@@ -10690,13 +10750,14 @@ module ram_w16_l512_id4_0
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id4_0_1_wdata[7:0]),
-    .Q(ram_w16_l512_id4_0_0_rdata[7:0]),
+    .D(wdata[7:0]),
+    .Q(q_bot),
     .VDD(vdd), 
     .VSS(vss)
   );
 
-  assign ram_w16_l512_id4_0_1_rdata = 16'h0000;
+  assign ram_w16_l512_id4_0_0_rdata = {q_top, q_bot};
+  assign ram_w16_l512_id4_0_1_rdata = {q_top, q_bot};
 
   // reg [16-1:0] ram_w16_l512_id4_0_0_rdata_out;
   // assign ram_w16_l512_id4_0_0_rdata = ram_w16_l512_id4_0_0_rdata_out;
@@ -10752,9 +10813,15 @@ module ram_w16_l512_id4_1
 
   wire write_en_n;
   wire [8:0] addr;
-  wire activate = ram_w16_l512_id4_1_0_enable & ram_w16_l512_id4_1_1_enable;
-  assign write_en_n = ~(ram_w16_l512_id4_1_1_wenable && ram_w16_l512_id4_1_1_enable);
-  assign addr = {1'b0,(ram_w16_l512_id4_1_1_enable) ? ram_w16_l512_id4_1_1_addr : ram_w16_l512_id4_1_0_addr};
+  wire activate = ram_w16_l512_id4_1_0_enable | ram_w16_l512_id4_1_1_enable;
+  wire port0_writing = ram_w16_l512_id4_1_0_wenable && ram_w16_l512_id4_1_0_enable;
+  wire port1_writing = ram_w16_l512_id4_1_1_wenable && ram_w16_l512_id4_1_1_enable;
+  assign write_en_n = ~(port0_writing | port1_writing);
+  wire [15:0] wdata = port1_writing ? ram_w16_l512_id4_1_1_wdata : ram_w16_l512_id4_1_0_wdata;
+  wire [7:0] q_top, q_bot;
+  assign addr = {1'b0, port1_writing ? ram_w16_l512_id4_1_1_addr :
+                       port0_writing ? ram_w16_l512_id4_1_0_addr :
+                       ram_w16_l512_id4_1_1_enable   ? ram_w16_l512_id4_1_1_addr : ram_w16_l512_id4_1_0_addr};
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1
   mem_top (
@@ -10763,8 +10830,8 @@ module ram_w16_l512_id4_1
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id4_1_1_wdata[15:8]),
-    .Q(ram_w16_l512_id4_1_0_rdata[15:8]),
+    .D(wdata[15:8]),
+    .Q(q_top),
     .VDD(vdd), 
     .VSS(vss)
   );
@@ -10776,13 +10843,14 @@ module ram_w16_l512_id4_1
     .GWEN(write_en_n),
     .WEN(8'b00000000), 
     .A(addr),
-    .D(ram_w16_l512_id4_1_1_wdata[7:0]),
-    .Q(ram_w16_l512_id4_1_0_rdata[7:0]),
+    .D(wdata[7:0]),
+    .Q(q_bot),
     .VDD(vdd), 
     .VSS(vss)
   );
 
-  assign ram_w16_l512_id4_1_1_rdata = 16'h0000;
+  assign ram_w16_l512_id4_1_0_rdata = {q_top, q_bot};
+  assign ram_w16_l512_id4_1_1_rdata = {q_top, q_bot};
 
   // reg [16-1:0] ram_w16_l512_id4_1_0_rdata_out;
   // assign ram_w16_l512_id4_1_0_rdata = ram_w16_l512_id4_1_0_rdata_out;
@@ -10934,4 +11002,3 @@ module multiplier_core_0
 
 
 endmodule
-
