@@ -1,5 +1,7 @@
 `timescale 1ns/1ps
 
+`include "taketwo_feature_bridge.sv"
+
 module top #(
     parameter int unsigned CLK_HZ = 10_000_000,
     parameter int unsigned GT_CLK_HZ = 10_000_000,
@@ -404,10 +406,7 @@ module top #(
         .ml_update_gate_i(ml_update_gate_o)     // gate emission/update when signal quality is poor
     );
 
-    // -------------------------------------------------------------------------
-    // AXI interface – writes the four feature scalars to memory each epoch.
-    // Dummy wires for AXI bus outputs (to be connected to top-level ports later).
-    // -------------------------------------------------------------------------
+    // axi wires 
     logic [31:0] axi_x_addr_w;       // destination address for feature writes (placeholder)
     logic        axi_done_w;         // one-cycle pulse when writes complete
     logic        axi_busy_w;         // high while writes are in progress
@@ -434,32 +433,149 @@ module top #(
     logic        maxi_bvalid_w;
     logic        maxi_bready_w;
 
-    // Tie AXI slave-side dummy inputs low until connected to a real bus.
-    assign axi_x_addr_w  = 32'h0000_0000;
-    assign maxi_awready_w = 1'b0;
-    assign maxi_wready_w  = 1'b0;
-    assign maxi_bresp_w   = 2'b00;
-    assign maxi_bvalid_w  = 1'b0;
+    logic        taketwo_irq_w;
+    logic [31:0] tk_maxi_awaddr_w;
+    logic [7:0]  tk_maxi_awlen_w;
+    logic [2:0]  tk_maxi_awsize_w;
+    logic [1:0]  tk_maxi_awburst_w;
+    logic        tk_maxi_awlock_w;
+    logic [3:0]  tk_maxi_awcache_w;
+    logic [2:0]  tk_maxi_awprot_w;
+    logic [3:0]  tk_maxi_awqos_w;
+    logic [1:0]  tk_maxi_awuser_w;
+    logic        tk_maxi_awvalid_w;
+    logic        tk_maxi_awready_w;
+
+    logic [31:0] tk_maxi_wdata_w;
+    logic [3:0]  tk_maxi_wstrb_w;
+    logic        tk_maxi_wlast_w;
+    logic        tk_maxi_wvalid_w;
+    logic        tk_maxi_wready_w;
+
+    logic [1:0]  tk_maxi_bresp_w;
+    logic        tk_maxi_bvalid_w;
+    logic        tk_maxi_bready_w;
+
+    logic [31:0] tk_maxi_araddr_w;
+    logic [7:0]  tk_maxi_arlen_w;
+    logic [2:0]  tk_maxi_arsize_w;
+    logic [1:0]  tk_maxi_arburst_w;
+    logic        tk_maxi_arlock_w;
+    logic [3:0]  tk_maxi_arcache_w;
+    logic [2:0]  tk_maxi_arprot_w;
+    logic [3:0]  tk_maxi_arqos_w;
+    logic [1:0]  tk_maxi_aruser_w;
+    logic        tk_maxi_arvalid_w;
+    logic        tk_maxi_arready_w;
+    logic [31:0] tk_maxi_rdata_w;
+    logic [1:0]  tk_maxi_rresp_w;
+    logic        tk_maxi_rlast_w;
+    logic        tk_maxi_rvalid_w;
+    logic        tk_maxi_rready_w;
+
+    logic [31:0] tk_saxi_awaddr_w;
+    logic [3:0]  tk_saxi_awcache_w;
+    logic [2:0]  tk_saxi_awprot_w;
+    logic        tk_saxi_awvalid_w;
+    wire         tk_saxi_awready_w;
+    logic [31:0] tk_saxi_wdata_w;
+    logic [3:0]  tk_saxi_wstrb_w;
+    logic        tk_saxi_wvalid_w;
+    wire         tk_saxi_wready_w;
+    wire [1:0]   tk_saxi_bresp_w;
+    wire         tk_saxi_bvalid_w;
+    logic        tk_saxi_bready_w;
+    logic [31:0] tk_saxi_araddr_w;
+    logic [3:0]  tk_saxi_arcache_w;
+    logic [2:0]  tk_saxi_arprot_w;
+    logic        tk_saxi_arvalid_w;
+    wire         tk_saxi_arready_w;
+    wire [31:0]  tk_saxi_rdata_w;
+    wire [1:0]   tk_saxi_rresp_w;
+    wire         tk_saxi_rvalid_w;
+    logic        tk_saxi_rready_w;
+
+    logic [31:0] tk_shared_mem [16:17];
+    taketwo_feature_bridge u_taketwo_feature_bridge (
+        .clk_i            (clk_i),
+        .reset_i          (reset_i),
+        .axi_x_addr_o     (axi_x_addr_w),
+        .maxi_awready_o   (maxi_awready_w),
+        .maxi_wready_o    (maxi_wready_w),
+        .maxi_bresp_o     (maxi_bresp_w),
+        .maxi_bvalid_o    (maxi_bvalid_w),
+        .maxi_awvalid_i   (maxi_awvalid_w),
+        .maxi_awaddr_i    (maxi_awaddr_w),
+        .maxi_wvalid_i    (maxi_wvalid_w),
+        .maxi_wdata_i     (maxi_wdata_w),
+        .maxi_wstrb_i     (maxi_wstrb_w),
+        .maxi_bready_i    (maxi_bready_w),
+        .tk_maxi_awready_o(tk_maxi_awready_w),
+        .tk_maxi_wready_o (tk_maxi_wready_w),
+        .tk_maxi_bresp_o  (tk_maxi_bresp_w),
+        .tk_maxi_bvalid_o (tk_maxi_bvalid_w),
+        .tk_maxi_awvalid_i(tk_maxi_awvalid_w),
+        .tk_maxi_awaddr_i (tk_maxi_awaddr_w),
+        .tk_maxi_awlen_i  (tk_maxi_awlen_w),
+        .tk_maxi_awsize_i (tk_maxi_awsize_w),
+        .tk_maxi_awburst_i(tk_maxi_awburst_w),
+        .tk_maxi_wvalid_i (tk_maxi_wvalid_w),
+        .tk_maxi_wdata_i  (tk_maxi_wdata_w),
+        .tk_maxi_wstrb_i  (tk_maxi_wstrb_w),
+        .tk_maxi_wlast_i  (tk_maxi_wlast_w),
+        .tk_maxi_bready_i (tk_maxi_bready_w),
+        .tk_maxi_arready_o(tk_maxi_arready_w),
+        .tk_maxi_rdata_o  (tk_maxi_rdata_w),
+        .tk_maxi_rresp_o  (tk_maxi_rresp_w),
+        .tk_maxi_rlast_o  (tk_maxi_rlast_w),
+        .tk_maxi_rvalid_o (tk_maxi_rvalid_w),
+        .tk_maxi_arvalid_i(tk_maxi_arvalid_w),
+        .tk_maxi_araddr_i (tk_maxi_araddr_w),
+        .tk_maxi_arlen_i  (tk_maxi_arlen_w),
+        .tk_maxi_arsize_i (tk_maxi_arsize_w),
+        .tk_maxi_arburst_i(tk_maxi_arburst_w),
+        .tk_maxi_rready_i (tk_maxi_rready_w),
+        .tk_saxi_awcache_o(tk_saxi_awcache_w),
+        .tk_saxi_awprot_o (tk_saxi_awprot_w),
+        .tk_saxi_awvalid_o(tk_saxi_awvalid_w),
+        .tk_saxi_awready_i(tk_saxi_awready_w),
+        .tk_saxi_awaddr_o (tk_saxi_awaddr_w),
+        .tk_saxi_wdata_o  (tk_saxi_wdata_w),
+        .tk_saxi_wstrb_o  (tk_saxi_wstrb_w),
+        .tk_saxi_wvalid_o (tk_saxi_wvalid_w),
+        .tk_saxi_wready_i (tk_saxi_wready_w),
+        .tk_saxi_bresp_i  (tk_saxi_bresp_w),
+        .tk_saxi_bvalid_i (tk_saxi_bvalid_w),
+        .tk_saxi_bready_o (tk_saxi_bready_w),
+        .tk_saxi_arcache_o(tk_saxi_arcache_w),
+        .tk_saxi_arprot_o (tk_saxi_arprot_w),
+        .tk_saxi_arvalid_o(tk_saxi_arvalid_w),
+        .tk_saxi_araddr_o (tk_saxi_araddr_w),
+        .tk_saxi_arready_i(tk_saxi_arready_w),
+        .tk_saxi_rdata_i  (tk_saxi_rdata_w),
+        .tk_saxi_rresp_i  (tk_saxi_rresp_w),
+        .tk_saxi_rvalid_i (tk_saxi_rvalid_w),
+        .tk_saxi_rready_o (tk_saxi_rready_w),
+        .axi_done_i       (axi_done_w),
+        .feature_word0_o  (tk_shared_mem[16]),
+        .feature_word1_o  (tk_shared_mem[17])
+    );
 
     axi_interface u_axi_interface (
         .CLK         (clk_i),
         .RESETN      (~reset_i),
 
-        // Control – trigger a write burst on every valid feature vector.
-        .start       (feat_valid_o),        // feat_valid_o from feature_engine
+        .start       (feat_valid_o),
         .x_addr      (axi_x_addr_w),
 
-        // Feature inputs (match axi_interface port comments: x0=movement, x1=cosine, x2=delta_hr, x3=rmssd).
         .x0          (motion_feat_o),       // movement
         .x1          (time_feat_o),         // cosine time feature
         .x2          (delta_hr_feat_o),     // delta HR
         .x3          (rmssd_feat_o),        // RMSSD
 
-        // Status outputs.
         .done        (axi_done_w),
         .busy        (axi_busy_w),
 
-        // AXI4 write address channel.
         .maxi_awaddr (maxi_awaddr_w),
         .maxi_awlen  (maxi_awlen_w),
         .maxi_awsize (maxi_awsize_w),
@@ -483,6 +599,68 @@ module top #(
         .maxi_bresp  (maxi_bresp_w),
         .maxi_bvalid (maxi_bvalid_w),
         .maxi_bready (maxi_bready_w)
+    );
+
+    taketwo u_taketwo (
+        .CLK         (clk_i),
+        .RESETN      (~reset_i),
+        .irq         (taketwo_irq_w),
+        .maxi_awaddr (tk_maxi_awaddr_w),
+        .maxi_awlen  (tk_maxi_awlen_w),
+        .maxi_awsize (tk_maxi_awsize_w),
+        .maxi_awburst(tk_maxi_awburst_w),
+        .maxi_awlock (tk_maxi_awlock_w),
+        .maxi_awcache(tk_maxi_awcache_w),
+        .maxi_awprot (tk_maxi_awprot_w),
+        .maxi_awqos  (tk_maxi_awqos_w),
+        .maxi_awuser (tk_maxi_awuser_w),
+        .maxi_awvalid(tk_maxi_awvalid_w),
+        .maxi_awready(tk_maxi_awready_w),
+        .maxi_wdata  (tk_maxi_wdata_w),
+        .maxi_wstrb  (tk_maxi_wstrb_w),
+        .maxi_wlast  (tk_maxi_wlast_w),
+        .maxi_wvalid (tk_maxi_wvalid_w),
+        .maxi_wready (tk_maxi_wready_w),
+        .maxi_bresp  (tk_maxi_bresp_w),
+        .maxi_bvalid (tk_maxi_bvalid_w),
+        .maxi_bready (tk_maxi_bready_w),
+        .maxi_araddr (tk_maxi_araddr_w),
+        .maxi_arlen  (tk_maxi_arlen_w),
+        .maxi_arsize (tk_maxi_arsize_w),
+        .maxi_arburst(tk_maxi_arburst_w),
+        .maxi_arlock (tk_maxi_arlock_w),
+        .maxi_arcache(tk_maxi_arcache_w),
+        .maxi_arprot (tk_maxi_arprot_w),
+        .maxi_arqos  (tk_maxi_arqos_w),
+        .maxi_aruser (tk_maxi_aruser_w),
+        .maxi_arvalid(tk_maxi_arvalid_w),
+        .maxi_arready(tk_maxi_arready_w),
+        .maxi_rdata  (tk_maxi_rdata_w),
+        .maxi_rresp  (tk_maxi_rresp_w),
+        .maxi_rlast  (tk_maxi_rlast_w),
+        .maxi_rvalid (tk_maxi_rvalid_w),
+        .maxi_rready (tk_maxi_rready_w),
+        .saxi_awaddr (tk_saxi_awaddr_w),
+        .saxi_awcache(tk_saxi_awcache_w),
+        .saxi_awprot (tk_saxi_awprot_w),
+        .saxi_awvalid(tk_saxi_awvalid_w),
+        .saxi_awready(tk_saxi_awready_w),
+        .saxi_wdata  (tk_saxi_wdata_w),
+        .saxi_wstrb  (tk_saxi_wstrb_w),
+        .saxi_wvalid (tk_saxi_wvalid_w),
+        .saxi_wready (tk_saxi_wready_w),
+        .saxi_bresp  (tk_saxi_bresp_w),
+        .saxi_bvalid (tk_saxi_bvalid_w),
+        .saxi_bready (tk_saxi_bready_w),
+        .saxi_araddr (tk_saxi_araddr_w),
+        .saxi_arcache(tk_saxi_arcache_w),
+        .saxi_arprot (tk_saxi_arprot_w),
+        .saxi_arvalid(tk_saxi_arvalid_w),
+        .saxi_arready(tk_saxi_arready_w),
+        .saxi_rdata  (tk_saxi_rdata_w),
+        .saxi_rresp  (tk_saxi_rresp_w),
+        .saxi_rvalid (tk_saxi_rvalid_w),
+        .saxi_rready (tk_saxi_rready_w)
     );
 
     assign epoch_end_o = epoch_end_w;
