@@ -13,10 +13,14 @@
 //   0x60 FIFO_ACCESS   : streams one 16-bit PPG sample (red channel) per word
 //
 // CSV format: red_counts,ir_counts unsigned integers per row (14-bit)
+//
+// CSV path is set at runtime via plusarg:
+//   vvp sim.out +DATA_DIR=cocotb/sim/data   (from repo root)
+//   vvp sim.out +DATA_DIR=sim/data          (from cocotb/)
+//   vvp sim.out                             (uses default: sim/data)
 
 module i2c_slave_adpd144ri #(
     parameter [6:0]  I2C_ADDR          = 7'h64,
-    parameter string CSV_FILE          = "sim/data/ppg_digital.csv",
     parameter [7:0]  REG_STATUS        = 8'h00,
     parameter [7:0]  REG_FIFO_THRESH   = 8'h06,
     parameter [7:0]  REG_FIFO_ENA      = 8'h5F,
@@ -39,10 +43,12 @@ module i2c_slave_adpd144ri #(
     output reg         sim_err
 );
 
-    int  fd;
-    int  r;
-    int  raw_red, raw_ir;
+    int    fd;
+    int    r;
+    int    raw_red, raw_ir;
     reg [15:0] red16, ir16;
+    string data_dir;
+    string csv_file;
 
     typedef enum logic [2:0] {
         RSP_IDLE    = 3'd0,
@@ -57,12 +63,16 @@ module i2c_slave_adpd144ri #(
     reg [7:0]  bytes_left;
 
     initial begin
-        fd = $fopen(CSV_FILE, "r");
+        if (!$value$plusargs("DATA_DIR=%s", data_dir))
+            data_dir = "sim/data";          // default: invoke from cocotb/
+        csv_file = {data_dir, "/ppg_digital.csv"};
+
+        fd = $fopen(csv_file, "r");
         if (fd == 0) begin
-            $display("ERROR: i2c_slave_adpd144ri: cannot open %s", CSV_FILE);
+            $display("ERROR: i2c_slave_adpd144ri: cannot open %s", csv_file);
             $fatal(1);
         end
-        $display("i2c_slave_adpd144ri: opened %s", CSV_FILE);
+        $display("i2c_slave_adpd144ri: opened %s", csv_file);
         red16 = 16'h0;
         ir16  = 16'h0;
     end
@@ -100,7 +110,6 @@ module i2c_slave_adpd144ri #(
                         sim_ack <= 1'b1;
                         byte_cnt <= 2'd0;
                         if (sim_write) begin
-                            // Accept writes (FIFO enable/disable) silently
                             rsp_state <= RSP_WRITE;
                         end else if (sim_reg == REG_STATUS) begin
                             rsp_state <= RSP_STATUS;
@@ -119,18 +128,16 @@ module i2c_slave_adpd144ri #(
                 end
 
                 RSP_WRITE: begin
-                    // Write acknowledged, nothing to return
                     rsp_state <= RSP_IDLE;
                 end
 
                 RSP_STATUS: begin
-                    // 2 bytes: [overflow=0x00, count=0x02 (2 bytes = 1 sample)]
                     sim_rvalid <= 1'b1;
                     if (byte_cnt == 2'd0) begin
                         sim_rdata <= 8'h00;
                         byte_cnt  <= 2'd1;
                     end else begin
-                        sim_rdata <= 8'h10;   // 16 bytes available (8 samples)
+                        sim_rdata <= 8'h10;
                         sim_rlast <= 1'b1;
                         byte_cnt  <= 2'd0;
                         rsp_state <= RSP_IDLE;
@@ -138,13 +145,12 @@ module i2c_slave_adpd144ri #(
                 end
 
                 RSP_THRESH: begin
-                    // 2 bytes: threshold = 2 (trigger after 1 sample = 2 bytes)
                     sim_rvalid <= 1'b1;
                     if (byte_cnt == 2'd0) begin
                         sim_rdata <= 8'h00;
                         byte_cnt  <= 2'd1;
                     end else begin
-                        sim_rdata <= 8'h02; // thresh = 2 bytes
+                        sim_rdata <= 8'h02;
                         sim_rlast <= 1'b1;
                         byte_cnt  <= 2'd0;
                         rsp_state <= RSP_IDLE;
@@ -152,8 +158,6 @@ module i2c_slave_adpd144ri #(
                 end
 
                 RSP_FIFO: begin
-                    // Stream one 16-bit sample per word: red_lo, red_hi, ...
-                    // ppg_fifo_reader consumes one 16-bit sample every 2 bytes.
                     sim_rvalid <= 1'b1;
                     case (byte_cnt)
                         2'd0: sim_rdata <= red16[7:0];
@@ -168,7 +172,6 @@ module i2c_slave_adpd144ri #(
                     end else begin
                         byte_cnt   <= byte_cnt + 1'b1;
                         bytes_left <= bytes_left - 1;
-                        // Load next sample every 2 bytes.
                         if (byte_cnt == 2'd1) begin
                             read_next_sample;
                             byte_cnt <= 2'd0;
@@ -182,4 +185,3 @@ module i2c_slave_adpd144ri #(
     end
 
 endmodule
-

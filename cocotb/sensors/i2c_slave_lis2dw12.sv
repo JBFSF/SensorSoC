@@ -11,10 +11,14 @@
 //   0x28 DATA   : returns 6 bytes XL,XH,YL,YH,ZL,ZH (left-justified 16-bit)
 //
 // CSV format: ax,ay,az signed integers per row (14-bit values)
+//
+// CSV path is set at runtime via plusarg:
+//   vvp sim.out +DATA_DIR=cocotb/sim/data   (from repo root)
+//   vvp sim.out +DATA_DIR=sim/data          (from cocotb/)
+//   vvp sim.out                             (uses default: sim/data)
 
 module i2c_slave_lis2dw12 #(
     parameter [6:0]  I2C_ADDR   = 7'h18,
-    parameter string CSV_FILE   = "sim/data/accel_digital.csv",
     parameter [7:0]  REG_STATUS = 8'h27,
     parameter [7:0]  REG_DATA   = 8'h28
 )(
@@ -33,10 +37,12 @@ module i2c_slave_lis2dw12 #(
     output reg         sim_err
 );
 
-    int fd;
-    int r;
-    int raw_ax, raw_ay, raw_az;
+    int    fd;
+    int    r;
+    int    raw_ax, raw_ay, raw_az;
     reg [15:0] ax16, ay16, az16;
+    string data_dir;
+    string csv_file;
 
     typedef enum logic [1:0] {
         RSP_IDLE   = 2'd0,
@@ -48,12 +54,16 @@ module i2c_slave_lis2dw12 #(
     reg [2:0] byte_cnt;
 
     initial begin
-        fd = $fopen(CSV_FILE, "r");
+        if (!$value$plusargs("DATA_DIR=%s", data_dir))
+            data_dir = "sim/data";          // default: invoke from cocotb/
+        csv_file = {data_dir, "/accel_digital.csv"};
+
+        fd = $fopen(csv_file, "r");
         if (fd == 0) begin
-            $display("ERROR: i2c_slave_lis2dw12: cannot open %s", CSV_FILE);
+            $display("ERROR: i2c_slave_lis2dw12: cannot open %s", csv_file);
             $fatal(1);
         end
-        $display("i2c_slave_lis2dw12: opened %s", CSV_FILE);
+        $display("i2c_slave_lis2dw12: opened %s", csv_file);
     end
 
     task read_next_sample;
@@ -132,4 +142,3 @@ module i2c_slave_lis2dw12 #(
     end
 
 endmodule
-

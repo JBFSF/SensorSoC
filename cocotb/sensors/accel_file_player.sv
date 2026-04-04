@@ -14,10 +14,14 @@
 //   - Sensitivity: 0.488 mg/LSB
 //
 // Output width is 14 bits signed to match motion_preprocess.sv (AX_W=14).
+//
+// CSV path is set at runtime via plusarg:
+//   vvp sim.out +DATA_DIR=cocotb/sim/data   (from repo root)
+//   vvp sim.out +DATA_DIR=sim/data          (from cocotb/)
+//   vvp sim.out                             (uses default: sim/data)
 
 module accel_file_player #(
-    parameter int    FS_HZ    = 25,             // LIS2DW12 ODR (25 Hz)
-    parameter string CSV_FILE = "sim/data/accel_digital.csv"
+    parameter int    FS_HZ = 25             // LIS2DW12 ODR (25 Hz)
 )(
     input  logic        clk,
     input  logic        resetn,
@@ -32,20 +36,25 @@ module accel_file_player #(
     // Number of 50 MHz clock cycles between samples at FS_HZ
     localparam int DIVIDER = 50_000_000 / FS_HZ;   // 2_000_000 at 25 Hz
 
-    int  fd;
-    int  r;
-    int  cnt;
-    int  raw_ax, raw_ay, raw_az;   // temp storage before truncation
+    int    fd;
+    int    r;
+    int    cnt;
+    int    raw_ax, raw_ay, raw_az;
+    string data_dir;
+    string csv_file;
 
-    // Open file at simulation start
     initial begin
-        fd = $fopen(CSV_FILE, "r");
+        if (!$value$plusargs("DATA_DIR=%s", data_dir))
+            data_dir = "sim/data";          // default: invoke from cocotb/
+        csv_file = {data_dir, "/accel_digital.csv"};
+
+        fd = $fopen(csv_file, "r");
         if (fd == 0) begin
-            $display("ERROR: accel_file_player: cannot open %s", CSV_FILE);
+            $display("ERROR: accel_file_player: cannot open %s", csv_file);
             $fatal(1);
         end
         $display("accel_file_player: opened %s  (ODR=%0d Hz, divider=%0d)",
-                 CSV_FILE, FS_HZ, DIVIDER);
+                 csv_file, FS_HZ, DIVIDER);
     end
 
     always @(posedge clk) begin
@@ -57,23 +66,20 @@ module accel_file_player #(
             ay           <= '0;
             az           <= '0;
         end else begin
-            sample_valid <= 1'b0;   // default: no sample this cycle
+            sample_valid <= 1'b0;
 
             if (cnt >= DIVIDER - 1) begin
                 cnt <= 0;
 
-                // Read next row from CSV
                 r = $fscanf(fd, "%d,%d,%d\n", raw_ax, raw_ay, raw_az);
 
                 if (r == 3) begin
-                    // Clamp to 14-bit signed range [-8192, 8191] and assign
                     ax           <= raw_ax[13:0];
                     ay           <= raw_ay[13:0];
                     az           <= raw_az[13:0];
                     sample_valid <= 1'b1;
                     sample_ok    <= 1'b1;
                 end else begin
-                    // EOF or parse error — stop issuing samples
                     sample_valid <= 1'b0;
                     sample_ok    <= 1'b0;
                     $display("accel_file_player: EOF or read error (r=%0d) at time %0t", r, $time);

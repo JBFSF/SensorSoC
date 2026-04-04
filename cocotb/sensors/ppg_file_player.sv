@@ -14,35 +14,44 @@
 //   - ODR: 100 Hz
 //
 // Outputs two 14-bit unsigned sample values per clock tick.
+//
+// CSV path is set at runtime via plusarg:
+//   vvp sim.out +DATA_DIR=cocotb/sim/data   (from repo root)
+//   vvp sim.out +DATA_DIR=sim/data          (from cocotb/)
+//   vvp sim.out                             (uses default: sim/data)
 
 module ppg_file_player #(
-    parameter int    FS_HZ    = 100,            // ADPD144RI ODR (100 Hz)
-    parameter string CSV_FILE = "sim/data/ppg_digital.csv"
+    parameter int    FS_HZ = 100            // ADPD144RI ODR (100 Hz)
 )(
     input  logic         clk,
     input  logic         resetn,
 
-    output logic         sample_valid,          // pulses high 1 cycle when sample ready
-    output logic [13:0]  red_counts,            // 660nm red channel (14-bit unsigned)
-    output logic [13:0]  ir_counts              // 880nm IR channel  (14-bit unsigned)
+    output logic         sample_valid,      // pulses high 1 cycle when sample ready
+    output logic [13:0]  red_counts,        // 660nm red channel (14-bit unsigned)
+    output logic [13:0]  ir_counts          // 880nm IR channel  (14-bit unsigned)
 );
 
-    // Clock divider: 50 MHz / 100 Hz = 500_000 cycles per sample
     localparam int DIVIDER = 50_000_000 / FS_HZ;
 
-    int  fd;
-    int  r;
-    int  cnt;
-    int  raw_red, raw_ir;
+    int    fd;
+    int    r;
+    int    cnt;
+    int    raw_red, raw_ir;
+    string data_dir;
+    string csv_file;
 
     initial begin
-        fd = $fopen(CSV_FILE, "r");
+        if (!$value$plusargs("DATA_DIR=%s", data_dir))
+            data_dir = "sim/data";          // default: invoke from cocotb/
+        csv_file = {data_dir, "/ppg_digital.csv"};
+
+        fd = $fopen(csv_file, "r");
         if (fd == 0) begin
-            $display("ERROR: ppg_file_player: cannot open %s", CSV_FILE);
+            $display("ERROR: ppg_file_player: cannot open %s", csv_file);
             $fatal(1);
         end
         $display("ppg_file_player: opened %s  (ODR=%0d Hz, divider=%0d)",
-                 CSV_FILE, FS_HZ, DIVIDER);
+                 csv_file, FS_HZ, DIVIDER);
     end
 
     always @(posedge clk) begin
@@ -60,7 +69,6 @@ module ppg_file_player #(
                 r = $fscanf(fd, "%d,%d\n", raw_red, raw_ir);
 
                 if (r == 2) begin
-                    // Clamp to 14-bit unsigned range
                     red_counts   <= raw_red[13:0];
                     ir_counts    <= raw_ir[13:0];
                     sample_valid <= 1'b1;

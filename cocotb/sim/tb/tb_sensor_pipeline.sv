@@ -2,34 +2,47 @@
 
 // tb_sensor_pipeline.sv
 //
-// Testbench for the sensor pipeline:
-//   i2c_slave_lis2dw12  ─┐
-//                         ├─ sim bus ─ i2c_master ─ accel_reader  ─ motion_preprocess
-//   i2c_slave_adpd144ri ─┘                        ─ ppg_fifo_reader
+// Testbench for the full sensor pipeline. Two simulated I2C slaves
+// (LIS2DW12 accelerometer and ADPD144RI PPG sensor) feed data through
+// a shared I2C master into their respective readers. The accel path
+// continues into motion_preprocess for epoch energy computation.
 //
 // Pass criteria:
 //   - At least 1 accel sample received (accel_valid_o asserted)
 //   - At least 1 PPG sample received (ppg_sample_valid asserted)
 //   - At least 1 motion epoch completed (epoch_done_o asserted)
 //
-// Run:
-//   iverilog -g2012 -o sim_sensor \
-//     rtl\i2c_master.sv \
-//     rtl\accel_reader.sv \
-//     rtl\ppg_fifo_reader.sv \
-//     rtl\motion_preprocess.sv \
-//     rtl\globaltimer.sv \
-//     sim\sensors\i2c_slave_lis2dw12.sv \
-//     sim\sensors\i2c_slave_adpd144ri.sv \
-//     sim\tb\tb_sensor_pipeline.sv
+// Run from SensorSoC/cocotb/:
+//   iverilog -g2012 -o sim/sim_sensor \
+//     ../src/i2c_master.sv \
+//     ../src/accel_reader.sv \
+//     ../src/ppg_fifo_reader.sv \
+//     ../src/motion_preprocess.sv \
+//     ../src/globaltimer.sv \
+//     sensors/i2c_slave_lis2dw12.sv \
+//     sensors/i2c_slave_adpd144ri.sv \
+//     sim/tb/tb_sensor_pipeline.sv
 //
-//   vvp sim_sensor
+//   vvp sim/sim_sensor
+//
+// Or from SensorSoC/ (repo root):
+//   iverilog -g2012 -o cocotb/sim/sim_sensor \
+//     src/i2c_master.sv \
+//     src/accel_reader.sv \
+//     src/ppg_fifo_reader.sv \
+//     src/motion_preprocess.sv \
+//     src/globaltimer.sv \
+//     cocotb/sensors/i2c_slave_lis2dw12.sv \
+//     cocotb/sensors/i2c_slave_adpd144ri.sv \
+//     cocotb/sim/tb/tb_sensor_pipeline.sv
+//
+//   vvp cocotb/sim/sim_sensor +DATA_DIR=cocotb/sim/data
 
 module tb_sensor_pipeline;
 
-    // ----------------------------------------------------------------
+
     // Clock and reset
-    // ----------------------------------------------------------------
+
     logic clk    = 0;
     logic resetn = 0;
 
@@ -41,9 +54,9 @@ module tb_sensor_pipeline;
         resetn = 1;
     end
 
-    // ----------------------------------------------------------------
+
     // Shared functional sim bus (i2c_master <-> slaves)
-    // ----------------------------------------------------------------
+
     wire        sim_req;
     wire [6:0]  sim_addr;
     wire [7:0]  sim_reg;
@@ -64,9 +77,9 @@ module tb_sensor_pipeline;
     wire sim_rlast  = (sim_addr == 7'h18) ? accel_sim_rlast  : ppg_sim_rlast;
     wire sim_err    = (sim_addr == 7'h18) ? accel_sim_err    : ppg_sim_err;
 
-    // ----------------------------------------------------------------
+
     // I2C slave models
-    // ----------------------------------------------------------------
+
     i2c_slave_lis2dw12 u_accel_slave (
         .clk        (clk),
         .resetn     (resetn),
@@ -97,9 +110,9 @@ module tb_sensor_pipeline;
         .sim_err    (ppg_sim_err)
     );
 
-    // ----------------------------------------------------------------
+
     // I2C master <-> accel_reader wires
-    // ----------------------------------------------------------------
+
     wire        accel_cmd_valid, accel_cmd_ready;
     wire [6:0]  accel_cmd_addr;
     wire [7:0]  accel_cmd_reg, accel_cmd_len, accel_cmd_wdata;
@@ -107,9 +120,9 @@ module tb_sensor_pipeline;
     wire        accel_rsp_valid, accel_rsp_last, accel_rsp_done, accel_rsp_err;
     wire [7:0]  accel_rsp_data;
 
-    // ----------------------------------------------------------------
+
     // I2C master <-> ppg_fifo_reader wires
-    // ----------------------------------------------------------------
+
     wire        ppg_cmd_valid, ppg_cmd_ready;
     wire [6:0]  ppg_cmd_addr;
     wire [7:0]  ppg_cmd_reg, ppg_cmd_len, ppg_cmd_wdata;
@@ -118,9 +131,9 @@ module tb_sensor_pipeline;
     wire [7:0]  ppg_rsp_data;
     wire        ppg_rsp_ready;
 
-    // ----------------------------------------------------------------
+
     // I2C master
-    // ----------------------------------------------------------------
+
     i2c_master u_i2c_master (
         .clk                (clk),
         .resetn     (resetn),
@@ -166,9 +179,9 @@ module tb_sensor_pipeline;
         .sim_err            (sim_err)
     );
 
-    // ----------------------------------------------------------------
+
     // Global timer
-    // ----------------------------------------------------------------
+
     wire [15:0] time_in_night_seconds;
     wire        epoch_end_global;
     wire [9:0]  epoch_index;
@@ -193,9 +206,9 @@ module tb_sensor_pipeline;
         else         t_now <= t_now + 1;
     end
 
-    // ----------------------------------------------------------------
+
     // Accel reader
-    // ----------------------------------------------------------------
+
     wire signed [15:0] ax_o, ay_o, az_o;
     wire               accel_valid_o;
     wire               accel_init_done;
@@ -207,11 +220,11 @@ module tb_sensor_pipeline;
         .clk                    (clk),
         .rst_i                  (~resetn),
         .cfg_enable_i           (1'b1),
-        .cfg_init_en_i          (1'b0),   // skip init in sim
+        .cfg_init_en_i          (1'b0),
         .cfg_poll_period_ticks_i(32'd200_000),
         .cfg_ctrl1_data_i       (8'h00),
         .cfg_range_data_i       (8'h00),
-        
+
         .i2c_cmd_valid_o        (accel_cmd_valid),
         .i2c_cmd_ready_i        (accel_cmd_ready),
         .i2c_cmd_addr_o         (accel_cmd_addr),
@@ -227,17 +240,16 @@ module tb_sensor_pipeline;
         .ay_o                   (ay_o),
         .az_o                   (az_o),
         .accel_valid_o          (accel_valid_o),
-        
+
         .init_done_o            (accel_init_done),
         .i2c_error_o            (),
         .timeout_o              (),
         .nack_seen_o            ()
     );
 
-    // ----------------------------------------------------------------
+
     // Epoch scheduler (25 samples per epoch)
-    // In real hardware this comes from global_timer + epoch_scheduler
-    // ----------------------------------------------------------------
+
     reg [4:0]  epoch_sample_cnt;
     reg        epoch_end;
 
@@ -258,9 +270,9 @@ module tb_sensor_pipeline;
         end
     end
 
-    // ----------------------------------------------------------------
+
     // Motion preprocessor
-    // ----------------------------------------------------------------
+
     wire        epoch_done;
     wire [47:0] motion_energy_epoch;
 
@@ -277,9 +289,9 @@ module tb_sensor_pipeline;
         .motion_energy_epoch_o (motion_energy_epoch)
     );
 
-    // ----------------------------------------------------------------
+
     // PPG FIFO reader
-    // ----------------------------------------------------------------
+
     wire [15:0] ppg_sample;
     wire        ppg_sample_valid;
     wire [31:0] ppg_sample_time;
@@ -310,17 +322,17 @@ module tb_sensor_pipeline;
         .i2c_error_flag     ()
     );
 
-    // ----------------------------------------------------------------
+
     // Wave dump
-    // ----------------------------------------------------------------
+
     initial begin
         $dumpfile("sensor_pipeline.vcd");
         $dumpvars(0, tb_sensor_pipeline);
     end
 
-    // ----------------------------------------------------------------
+
     // Monitors
-    // ----------------------------------------------------------------
+
     initial begin
         wait(resetn == 1);
         forever begin
@@ -337,10 +349,10 @@ module tb_sensor_pipeline;
         end
     end
 
-    // ----------------------------------------------------------------
+
     // PASS/FAIL — wait for at least 3 accel samples, 3 PPG samples,
     // and 1 epoch, then declare PASS
-    // ----------------------------------------------------------------
+
     int accel_count = 0;
     int ppg_count   = 0;
     int epoch_count = 0;
@@ -348,9 +360,9 @@ module tb_sensor_pipeline;
     initial begin
         wait(resetn == 1);
         forever @(posedge clk) begin
-            if (accel_valid_o)  accel_count++;
+            if (accel_valid_o)    accel_count++;
             if (ppg_sample_valid) ppg_count++;
-            if (epoch_done)     epoch_count++;
+            if (epoch_done)       epoch_count++;
 
             if (accel_count >= 3 && ppg_count >= 3 && epoch_count >= 1) begin
                 $display("PASS: accel=%0d ppg=%0d epochs=%0d",
@@ -368,5 +380,3 @@ module tb_sensor_pipeline;
     end
 
 endmodule
-
-
