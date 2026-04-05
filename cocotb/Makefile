@@ -174,6 +174,7 @@ FW_C_test_gpio              := $(FW_TESTS)/test_gpio.c
 FW_C_test_sleepwake_periodic:= $(FW_TESTS)/test_sleepwake_periodic.c
 FW_C_test_ml_weights        := $(FW_TESTS)/test_ml_weights.c
 FW_C_test_ml_cpu_wake_i2c   := $(FW_TESTS)/test_ml_cpu_wake_i2c.c
+FW_C_test_top_feature_ml_cpu:= $(FW_TESTS)/test_top_feature_ml_cpu.c
 
 # Select the C source based on FW_VARIANT
 FW_SRC = $(FW_C_$(FW_VARIANT))
@@ -185,6 +186,7 @@ FW_EXTRA_DEPS := $(FW_EXTRA_DEPS_$(FW_VARIANT))
 FW_ARCH_DEFAULT := rv32imc
 FW_ARCH_test_ml_weights := rv32im
 FW_ARCH_test_ml_cpu_wake_i2c := rv32im
+FW_ARCH_test_top_feature_ml_cpu := rv32im
 FW_ARCH := $(if $(FW_ARCH_$(FW_VARIANT)),$(FW_ARCH_$(FW_VARIANT)),$(FW_ARCH_DEFAULT))
 FW_OPT_DEFAULT := -O2
 FW_OPT_test_ml_cpu_wake_i2c := -O0
@@ -247,6 +249,9 @@ firmware-ml-weights:
 
 firmware-ml-cpu-wake-i2c:
 	@$(SELF_MAKE) FW_VARIANT=test_ml_cpu_wake_i2c firmware
+
+firmware-top-feature-ml-cpu:
+	@$(SELF_MAKE) FW_VARIANT=test_top_feature_ml_cpu firmware
 
 
 
@@ -319,6 +324,50 @@ sim-ml-weight-load: $(SOC_ML_WEIGHT_LOAD_VVP) | $(SIM_BUILD)
 	@$(SELF_MAKE) FW_VARIANT=test_ml_weights firmware
 	@echo "== Running $(SOC_ML_WEIGHT_LOAD_TOP) (FW=$(FW_DIR)/build/test_ml_weights/firmware.hex) =="
 	$(VVP) $(SOC_ML_WEIGHT_LOAD_VVP)
+
+# Unified top: sensor models + feature MMIO + CPU-driven ML start.
+# This is the first full `top.sv` proof that:
+#   sensor pipeline -> feature MMIO -> CPU reads -> weight_ram_axi writes
+#   -> ml_axil_bridge_mmio start -> taketwo AXI traffic
+TOP_FEATURE_ML_CPU_TOP     := tb_top_feature_ml_cpu
+TOP_FEATURE_ML_CPU_VVP     := $(BUILD_DIR)/$(TOP_FEATURE_ML_CPU_TOP).vvp
+TOP_FEATURE_ML_CPU_SOURCES := \
+	$(TB_DIR)/tb_top_feature_ml_cpu.sv \
+	$(RTL_DIR)/top.sv \
+	$(RTL_DIR)/i2c_master.sv \
+	$(RTL_DIR)/accel_reader.sv \
+	$(RTL_DIR)/motion_preprocess.sv \
+	$(RTL_DIR)/ppg_fifo_reader.sv \
+	$(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
+	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/signal_quality.sv \
+	$(RTL_DIR)/feature_engine.sv \
+	$(RTL_DIR)/cos_lut_timer.sv \
+	$(RTL_DIR)/globaltimer.sv \
+	$(RTL_DIR)/simple_sram.v \
+	$(MAKEFILE_DIR)/../ip/picorv32.v \
+	$(RTL_DIR)/test_mmio.v \
+	$(RTL_DIR)/timer_mmio.v \
+	$(RTL_DIR)/ml_axil_bridge_mmio.v \
+	$(RTL_DIR)/weight_ram_axi.v \
+	$(RTL_DIR)/irq_ctrl_mmio.v \
+	$(RTL_DIR)/taketwo_wrap.v \
+	$(RTL_DIR)/taketwo.v \
+	$(RTL_DIR)/pwrctrl_mmio.v \
+	$(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v \
+	sensors/i2c_slave_lis2dw12.sv \
+	sensors/i2c_slave_adpd144ri.sv
+
+$(TOP_FEATURE_ML_CPU_VVP): $(TOP_FEATURE_ML_CPU_SOURCES)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_FEATURE_ML_CPU_TOP) -o $@ \
+	  $(TOP_FEATURE_ML_CPU_SOURCES)
+
+.PHONY: sim-top-feature-ml-cpu
+sim-top-feature-ml-cpu: $(TOP_FEATURE_ML_CPU_VVP) | $(SIM_BUILD)
+	@$(SELF_MAKE) FW_VARIANT=test_top_feature_ml_cpu firmware
+	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
+	@echo "== Running $(TOP_FEATURE_ML_CPU_TOP) (FW=$(FW_DIR)/build/test_top_feature_ml_cpu/firmware.hex) =="
+	$(VVP) $(TOP_FEATURE_ML_CPU_VVP)
 
 .PHONY: test-cpu-ml-pipeline
 test-cpu-ml-pipeline:

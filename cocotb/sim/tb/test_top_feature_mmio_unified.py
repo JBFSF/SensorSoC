@@ -16,6 +16,7 @@ async def reset_dut(dut, cycles: int = 20) -> None:
 
 @cocotb.test()
 async def test_sensor_features_latch_into_soc_visible_mmio_bank(dut):
+    """Verify the unified top captures sensor features into the sticky MMIO bank."""
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset_dut(dut)
 
