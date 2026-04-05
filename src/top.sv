@@ -285,6 +285,7 @@ module top #(
     logic signed [15:0] feat_rmssd_latched_r;
     logic       feat_gate_latched_r;
     logic [7:0] feat_invalid_reason_latched_r;
+    logic       feat_valid_d;
 
     // Lightweight feature register bank exposed to firmware. This is the
     // current handoff point between the sensor pipeline and the CPU-owned ML
@@ -618,6 +619,7 @@ module top #(
     // through MMIO without racing a one-cycle `feat_valid_o` pulse.
     always_ff @(posedge clk_i) begin
         if (reset_i) begin
+            feat_valid_d                 <= 1'b0;
             feat_latched_valid_r          <= 1'b0;
             feat_time_latched_r           <= '0;
             feat_motion_latched_r         <= '0;
@@ -626,7 +628,12 @@ module top #(
             feat_gate_latched_r           <= 1'b0;
             feat_invalid_reason_latched_r <= 8'h00;
         end else begin
-            if (feat_valid_o) begin
+            // `feat_valid_o` is produced by feature_engine in its own
+            // clocked block, so capture a delayed copy here before using it
+            // to load the sticky MMIO-visible feature bank.
+            feat_valid_d <= feat_valid_o;
+
+            if (feat_valid_o || feat_valid_d) begin
                 feat_latched_valid_r          <= 1'b1;
                 feat_time_latched_r           <= time_feat_o;
                 feat_motion_latched_r         <= motion_feat_o;

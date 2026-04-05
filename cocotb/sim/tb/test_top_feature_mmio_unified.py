@@ -24,6 +24,10 @@ async def test_sensor_features_latch_into_soc_visible_mmio_bank(dut):
 
     while feature_checks < target_checks:
         await with_timeout(RisingEdge(dut.feat_valid), 40, "ms")
+        # The unified top now captures feature events into the CPU-visible
+        # MMIO bank using a one-cycle delayed copy of feat_valid_o, so sample
+        # the sticky bank on the following clock edge.
+        await RisingEdge(dut.clk)
         await ReadOnly()
 
         time_feat = dut.time_feat.value.to_signed()
