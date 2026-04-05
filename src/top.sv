@@ -3,6 +3,18 @@
 `include "taketwo_feature_bridge.sv"
 
 module top #(
+    parameter int unsigned MEM_WORDS = 1024,
+    parameter string       FIRMWARE_HEX = "",
+    parameter string       WEIGHT_INIT_HEX = "",
+
+    parameter logic [31:0] PWR_BASE    = 32'h0300_1000,
+    parameter logic [31:0] TIMER_BASE  = 32'h0300_2000,
+    parameter logic [31:0] ML_BASE     = 32'h0300_3000,
+    parameter logic [31:0] FEATURE_BASE= 32'h0300_4000,
+    parameter logic [31:0] IRQC_BASE   = 32'h0300_5000,
+    parameter logic [31:0] WEIGHT_BASE = 32'h0300_6000,
+    parameter logic [31:0] TEST_BASE   = 32'h0300_F000,
+
     parameter int unsigned CLK_HZ = 10_000_000,
     parameter int unsigned GT_CLK_HZ = 10_000_000,
     parameter int unsigned GT_EPOCH_HZ = 100,
@@ -145,6 +157,145 @@ module top #(
     logic       ppg_i2c_rsp_err_w;       // i2c_master -> ppg_fifo_reader: transaction error (e.g., NACK)
     logic       ppg_i2c_rsp_ready_w;     // ppg_fifo_reader -> i2c_master: ready to accept response stream
 
+    // ---------------------------------------------------------------------
+    // Unified SoC/CPU/ML path
+    // ---------------------------------------------------------------------
+    // `top.sv` is now the single simulation top. The sensor pipeline above
+    // produces epoch features, while the logic below provides the CPU-owned
+    // SoC path that reads those features, writes them into shared ML memory,
+    // and starts the taketwo accelerator.
+    reg cpu_clk_en;
+    reg cpu_clk_en_lat;
+    wire cpu_clk;
+
+    wire        mem_valid;
+    wire        mem_instr;
+    wire        mem_ready;
+    wire [31:0] mem_addr;
+    wire [31:0] mem_wdata;
+    wire [3:0]  mem_wstrb;
+    wire [31:0] mem_rdata;
+    wire        trap;
+    wire [31:0] irq;
+
+    localparam logic [31:0] STACKADDR      = 4 * MEM_WORDS;
+    localparam logic [31:0] PROGADDR_RESET = 32'h0000_0000;
+    localparam logic [31:0] PROGADDR_IRQ   = 32'h0000_0010;
+
+    wire bus_valid;
+    wire sram_sel;
+    wire mmio_sel;
+    wire invalid_sel;
+
+    wire        sram_ready;
+    wire [31:0] sram_rdata;
+
+    wire        timer_ready;
+    wire [31:0] timer_rdata;
+    wire        timer_event;
+
+    wire        pwr_ready;
+    wire [31:0] pwr_rdata;
+    wire        sleep_req;
+
+    wire        feat_mmio_ready;
+    logic [31:0] feat_mmio_rdata;
+
+    wire        ml_ready;
+    wire [31:0] ml_rdata;
+    wire        ml_irq;
+
+    wire        weight_ready;
+    wire [31:0] weight_rdata;
+
+    wire        irqc_ready;
+    wire [31:0] irqc_rdata;
+    wire        irqc_wake_req;
+
+    wire        test_ready;
+    wire [31:0] test_rdata;
+    wire [31:0] test_status;
+    wire [31:0] test_code;
+    wire [31:0] ml_score_hw;
+
+    wire [31:0] ml_saxi_awaddr;
+    wire [2:0]  ml_saxi_awprot;
+    wire        ml_saxi_awvalid;
+    wire        ml_saxi_awready;
+    wire [31:0] ml_saxi_wdata;
+    wire [3:0]  ml_saxi_wstrb;
+    wire        ml_saxi_wvalid;
+    wire        ml_saxi_wready;
+    wire [1:0]  ml_saxi_bresp;
+    wire        ml_saxi_bvalid;
+    wire        ml_saxi_bready;
+    wire [31:0] ml_saxi_araddr;
+    wire [2:0]  ml_saxi_arprot;
+    wire        ml_saxi_arvalid;
+    wire        ml_saxi_arready;
+    wire [31:0] ml_saxi_rdata;
+    wire [1:0]  ml_saxi_rresp;
+    wire        ml_saxi_rvalid;
+    wire        ml_saxi_rready;
+
+    wire [0:0]  wram_awid;
+    wire [31:0] wram_awaddr;
+    wire [7:0]  wram_awlen;
+    wire [2:0]  wram_awsize;
+    wire [1:0]  wram_awburst;
+    wire [0:0]  wram_awlock;
+    wire [3:0]  wram_awcache;
+    wire [2:0]  wram_awprot;
+    wire [3:0]  wram_awqos;
+    wire [1:0]  wram_awuser;
+    wire        wram_awvalid;
+    wire        wram_awready;
+    wire [31:0] wram_wdata;
+    wire [3:0]  wram_wstrb;
+    wire        wram_wlast;
+    wire        wram_wvalid;
+    wire        wram_wready;
+    wire [0:0]  wram_bid;
+    wire [1:0]  wram_bresp;
+    wire        wram_bvalid;
+    wire        wram_bready;
+    wire [0:0]  wram_arid;
+    wire [31:0] wram_araddr;
+    wire [7:0]  wram_arlen;
+    wire [2:0]  wram_arsize;
+    wire [1:0]  wram_arburst;
+    wire [0:0]  wram_arlock;
+    wire [3:0]  wram_arcache;
+    wire [2:0]  wram_arprot;
+    wire [3:0]  wram_arqos;
+    wire [1:0]  wram_aruser;
+    wire        wram_arvalid;
+    wire        wram_arready;
+    wire [0:0]  wram_rid;
+    wire [31:0] wram_rdata;
+    wire [1:0]  wram_rresp;
+    wire        wram_rlast;
+    wire        wram_rvalid;
+    wire        wram_rready;
+
+    logic       feat_latched_valid_r;
+    logic signed [15:0] feat_time_latched_r;
+    logic signed [15:0] feat_motion_latched_r;
+    logic signed [15:0] feat_delta_hr_latched_r;
+    logic signed [15:0] feat_rmssd_latched_r;
+    logic       feat_gate_latched_r;
+    logic [7:0] feat_invalid_reason_latched_r;
+
+    // Lightweight feature register bank exposed to firmware. This is the
+    // current handoff point between the sensor pipeline and the CPU-owned ML
+    // path; firmware reads these latched values and copies them into WEIGHT_BASE.
+    wire        feat_sel = mmio_sel && (mem_addr[31:12] == FEATURE_BASE[31:12]);
+    wire [31:0] feat_off = mem_addr - FEATURE_BASE;
+    wire        feat_wr  = feat_sel && (mem_wstrb != 4'b0000);
+
+    wire [31:0] irq_sources;
+    wire [31:0] wake_sources;
+
     always_ff @(posedge clk_i) begin
         if (reset_i) begin
             ms_div_q  <= '0;
@@ -169,6 +320,63 @@ module top #(
     // permanently hold ML gating low across all future epochs.
     assign fifo_overflow_event_w = fifo_overflow_w & ~fifo_overflow_d;
     assign ppg_i2c_err_event_w = ppg_i2c_err_w & ~ppg_i2c_err_d;
+
+    always @(negedge clk_i or posedge reset_i) begin
+        if (reset_i)
+            cpu_clk_en_lat <= 1'b1;
+        else
+            cpu_clk_en_lat <= cpu_clk_en;
+    end
+
+    assign cpu_clk = clk_i & cpu_clk_en_lat;
+
+    // PicoRV32 remains the owner of ML orchestration in the unified top.
+    picorv32 #(
+        .STACKADDR(STACKADDR),
+        .PROGADDR_RESET(PROGADDR_RESET),
+        .PROGADDR_IRQ(PROGADDR_IRQ),
+        .BARREL_SHIFTER(1),
+        .COMPRESSED_ISA(1),
+        .ENABLE_COUNTERS(1),
+        .ENABLE_MUL(1),
+        .ENABLE_DIV(1),
+        .ENABLE_FAST_MUL(0),
+        .ENABLE_IRQ(1),
+        .ENABLE_IRQ_QREGS(1)
+    ) cpu (
+        .clk       (cpu_clk),
+        .resetn    (~reset_i),
+        .mem_valid (mem_valid),
+        .mem_instr (mem_instr),
+        .mem_ready (mem_ready),
+        .mem_addr  (mem_addr),
+        .mem_wdata (mem_wdata),
+        .mem_wstrb (mem_wstrb),
+        .mem_rdata (mem_rdata),
+        .irq       (irq),
+        .trap      (trap)
+    );
+
+    assign bus_valid  = mem_valid && cpu_clk_en_lat;
+    assign sram_sel   = bus_valid && (mem_addr < 4 * MEM_WORDS);
+    assign mmio_sel   = bus_valid && (mem_addr[31:24] == 8'h03);
+    assign invalid_sel = bus_valid && !sram_sel && !mmio_sel;
+
+    // Temporary CPU memory backing store for simulation. This is the block
+    // planned to be replaced by macro-backed SRAM plus a flash boot path later.
+    simple_sram #(
+        .WORDS(MEM_WORDS),
+        .INIT_HEX(FIRMWARE_HEX)
+    ) sram (
+        .clk   (cpu_clk),
+        .resetn(~reset_i),
+        .valid (sram_sel),
+        .ready (sram_ready),
+        .wstrb (mem_wstrb),
+        .addr  (mem_addr),
+        .wdata (mem_wdata),
+        .rdata (sram_rdata)
+    );
 
     globaltimer #(
         .clk_speed_hz(GT_CLK_HZ),
@@ -406,6 +614,342 @@ module top #(
         .ml_update_gate_i(ml_update_gate_o)     // gate emission/update when signal quality is poor
     );
 
+    // Latch the most recent valid feature vector so firmware can consume it
+    // through MMIO without racing a one-cycle `feat_valid_o` pulse.
+    always_ff @(posedge clk_i) begin
+        if (reset_i) begin
+            feat_latched_valid_r          <= 1'b0;
+            feat_time_latched_r           <= '0;
+            feat_motion_latched_r         <= '0;
+            feat_delta_hr_latched_r       <= '0;
+            feat_rmssd_latched_r          <= '0;
+            feat_gate_latched_r           <= 1'b0;
+            feat_invalid_reason_latched_r <= 8'h00;
+        end else begin
+            if (feat_valid_o) begin
+                feat_latched_valid_r          <= 1'b1;
+                feat_time_latched_r           <= time_feat_o;
+                feat_motion_latched_r         <= motion_feat_o;
+                feat_delta_hr_latched_r       <= delta_hr_feat_o;
+                feat_rmssd_latched_r          <= rmssd_feat_o;
+                feat_gate_latched_r           <= ml_update_gate_o;
+                feat_invalid_reason_latched_r <= invalid_reason_o;
+            end
+
+            if (feat_wr && (feat_off == 32'h0) && mem_wdata[0])
+                feat_latched_valid_r <= 1'b0;
+        end
+    end
+
+    // Feature MMIO register map:
+    //   +0x00 status / clear-valid control
+    //   +0x04 time feature
+    //   +0x08 motion feature
+    //   +0x0C delta-HR feature
+    //   +0x10 RMSSD feature
+    always_comb begin
+        case (feat_off)
+            32'h00: feat_mmio_rdata = {14'd0, feat_gate_latched_r, 8'd0, feat_invalid_reason_latched_r, feat_latched_valid_r};
+            32'h04: feat_mmio_rdata = {{16{feat_time_latched_r[15]}}, feat_time_latched_r};
+            32'h08: feat_mmio_rdata = {{16{feat_motion_latched_r[15]}}, feat_motion_latched_r};
+            32'h0C: feat_mmio_rdata = {{16{feat_delta_hr_latched_r[15]}}, feat_delta_hr_latched_r};
+            32'h10: feat_mmio_rdata = {{16{feat_rmssd_latched_r[15]}}, feat_rmssd_latched_r};
+            default: feat_mmio_rdata = 32'h0000_0000;
+        endcase
+    end
+
+    assign feat_mmio_ready = feat_sel;
+
+    // Always-on watchdog timer used by firmware for wake/scheduling.
+    timer_mmio #(.BASE_ADDR(TIMER_BASE)) u_timer (
+        .clk      (clk_i),
+        .resetn   (~reset_i),
+        .mem_valid(mmio_sel),
+        .mem_addr (mem_addr),
+        .mem_wdata(mem_wdata),
+        .mem_wstrb(mem_wstrb),
+        .mem_ready(timer_ready),
+        .mem_rdata(),
+        .event_o  (timer_event),
+        .rdata_o  (timer_rdata)
+    );
+
+    // CPU MMIO -> AXI-Lite bridge into the taketwo control/status port.
+    ml_axil_bridge_mmio #(.BASE_ADDR(ML_BASE)) u_ml (
+        .clk         (clk_i),
+        .resetn      (~reset_i),
+        .mem_valid   (mmio_sel),
+        .mem_addr    (mem_addr),
+        .mem_wdata   (mem_wdata),
+        .mem_wstrb   (mem_wstrb),
+        .mem_ready   (ml_ready),
+        .mem_rdata   (ml_rdata),
+        .event_o     (),
+        .score_o     (),
+        .saxi_awaddr (ml_saxi_awaddr),
+        .saxi_awprot (ml_saxi_awprot),
+        .saxi_awvalid(ml_saxi_awvalid),
+        .saxi_awready(ml_saxi_awready),
+        .saxi_wdata  (ml_saxi_wdata),
+        .saxi_wstrb  (ml_saxi_wstrb),
+        .saxi_wvalid (ml_saxi_wvalid),
+        .saxi_wready (ml_saxi_wready),
+        .saxi_bresp  (ml_saxi_bresp),
+        .saxi_bvalid (ml_saxi_bvalid),
+        .saxi_bready (ml_saxi_bready),
+        .saxi_araddr (ml_saxi_araddr),
+        .saxi_arprot (ml_saxi_arprot),
+        .saxi_arvalid(ml_saxi_arvalid),
+        .saxi_arready(ml_saxi_arready),
+        .saxi_rdata  (ml_saxi_rdata),
+        .saxi_rresp  (ml_saxi_rresp),
+        .saxi_rvalid (ml_saxi_rvalid),
+        .saxi_rready (ml_saxi_rready)
+    );
+
+    // ML accelerator instance. Firmware talks to it through u_ml above,
+    // and the core reads/writes its working set through weight_ram_axi below.
+    taketwo_wrap u_taketwo_wrap (
+        .CLK   (clk_i),
+        .RESETN(~reset_i),
+        .irq   (ml_irq),
+        .maxi_awid   (wram_awid),
+        .maxi_awaddr (wram_awaddr),
+        .maxi_awlen  (wram_awlen),
+        .maxi_awsize (wram_awsize),
+        .maxi_awburst(wram_awburst),
+        .maxi_awlock (wram_awlock),
+        .maxi_awcache(wram_awcache),
+        .maxi_awprot (wram_awprot),
+        .maxi_awqos  (wram_awqos),
+        .maxi_awuser (wram_awuser),
+        .maxi_awvalid(wram_awvalid),
+        .maxi_awready(wram_awready),
+        .maxi_wdata  (wram_wdata),
+        .maxi_wstrb  (wram_wstrb),
+        .maxi_wlast  (wram_wlast),
+        .maxi_wvalid (wram_wvalid),
+        .maxi_wready (wram_wready),
+        .maxi_bid    (wram_bid),
+        .maxi_bresp  (wram_bresp),
+        .maxi_bvalid (wram_bvalid),
+        .maxi_bready (wram_bready),
+        .maxi_arid   (wram_arid),
+        .maxi_araddr (wram_araddr),
+        .maxi_arlen  (wram_arlen),
+        .maxi_arsize (wram_arsize),
+        .maxi_arburst(wram_arburst),
+        .maxi_arlock (wram_arlock),
+        .maxi_arcache(wram_arcache),
+        .maxi_arprot (wram_arprot),
+        .maxi_arqos  (wram_arqos),
+        .maxi_aruser (wram_aruser),
+        .maxi_arvalid(wram_arvalid),
+        .maxi_arready(wram_arready),
+        .maxi_rid    (wram_rid),
+        .maxi_rdata  (wram_rdata),
+        .maxi_rresp  (wram_rresp),
+        .maxi_rlast  (wram_rlast),
+        .maxi_rvalid (wram_rvalid),
+        .maxi_rready (wram_rready),
+        .saxi_awaddr (ml_saxi_awaddr),
+        .saxi_awprot (ml_saxi_awprot),
+        .saxi_awvalid(ml_saxi_awvalid),
+        .saxi_awready(ml_saxi_awready),
+        .saxi_wdata  (ml_saxi_wdata),
+        .saxi_wstrb  (ml_saxi_wstrb),
+        .saxi_wvalid (ml_saxi_wvalid),
+        .saxi_wready (ml_saxi_wready),
+        .saxi_bresp  (ml_saxi_bresp),
+        .saxi_bvalid (ml_saxi_bvalid),
+        .saxi_bready (ml_saxi_bready),
+        .saxi_araddr (ml_saxi_araddr),
+        .saxi_arprot (ml_saxi_arprot),
+        .saxi_arvalid(ml_saxi_arvalid),
+        .saxi_arready(ml_saxi_arready),
+        .saxi_rdata  (ml_saxi_rdata),
+        .saxi_rresp  (ml_saxi_rresp),
+        .saxi_rvalid (ml_saxi_rvalid),
+        .saxi_rready (ml_saxi_rready)
+    );
+
+    // Shared ML memory. Firmware writes inputs/weights through MMIO, while
+    // taketwo accesses the same storage through its AXI master interface.
+    weight_ram_axi #(
+        .WORDS          (4096),
+        .BASE_ADDR      (WEIGHT_BASE),
+        .WEIGHT_INIT_HEX(WEIGHT_INIT_HEX)
+    ) u_weight_ram (
+        .clk         (clk_i),
+        .resetn      (~reset_i),
+        .mem_valid   (mmio_sel),
+        .mem_addr    (mem_addr),
+        .mem_wdata   (mem_wdata),
+        .mem_wstrb   (mem_wstrb),
+        .mem_ready   (weight_ready),
+        .mem_rdata   (weight_rdata),
+        .saxi_awid   (wram_awid),
+        .saxi_awaddr (wram_awaddr),
+        .saxi_awlen  (wram_awlen),
+        .saxi_awsize (wram_awsize),
+        .saxi_awburst(wram_awburst),
+        .saxi_awlock (wram_awlock),
+        .saxi_awcache(wram_awcache),
+        .saxi_awprot (wram_awprot),
+        .saxi_awqos  (wram_awqos),
+        .saxi_awuser (wram_awuser),
+        .saxi_awvalid(wram_awvalid),
+        .saxi_awready(wram_awready),
+        .saxi_wdata  (wram_wdata),
+        .saxi_wstrb  (wram_wstrb),
+        .saxi_wlast  (wram_wlast),
+        .saxi_wvalid (wram_wvalid),
+        .saxi_wready (wram_wready),
+        .saxi_bid    (wram_bid),
+        .saxi_bresp  (wram_bresp),
+        .saxi_bvalid (wram_bvalid),
+        .saxi_bready (wram_bready),
+        .saxi_arid   (wram_arid),
+        .saxi_araddr (wram_araddr),
+        .saxi_arlen  (wram_arlen),
+        .saxi_arsize (wram_arsize),
+        .saxi_arburst(wram_arburst),
+        .saxi_arlock (wram_arlock),
+        .saxi_arcache(wram_arcache),
+        .saxi_arprot (wram_arprot),
+        .saxi_arqos  (wram_arqos),
+        .saxi_aruser (wram_aruser),
+        .saxi_arvalid(wram_arvalid),
+        .saxi_arready(wram_arready),
+        .saxi_rid    (wram_rid),
+        .saxi_rdata  (wram_rdata),
+        .saxi_rresp  (wram_rresp),
+        .saxi_rlast  (wram_rlast),
+        .saxi_rvalid (wram_rvalid),
+        .saxi_rready (wram_rready)
+    );
+
+    assign irq_sources = {30'b0, ml_irq, timer_event};
+    assign wake_sources = irq_sources;
+
+    // Minimal interrupt controller used for CPU-visible pending bits and wake.
+    irq_ctrl_mmio #(.BASE_ADDR(IRQC_BASE)) u_irqc (
+        .clk        (clk_i),
+        .resetn     (~reset_i),
+        .mem_valid  (mmio_sel),
+        .mem_addr   (mem_addr),
+        .mem_wdata  (mem_wdata),
+        .mem_wstrb  (mem_wstrb),
+        .mem_ready  (irqc_ready),
+        .mem_rdata  (irqc_rdata),
+        .host_req_i (1'b0),
+        .host_we_i  (1'b0),
+        .host_off_i (8'h00),
+        .host_wdata_i(32'h0),
+        .host_ready_o(),
+        .host_rdata_o(),
+        .irq_src_i  (irq_sources),
+        .irq_o      (irq),
+        .wake_req_o (irqc_wake_req)
+    );
+
+    // Power/sleep control block.
+    pwrctrl_mmio #(.BASE_ADDR(PWR_BASE)) u_pwr (
+        .clk        (clk_i),
+        .resetn     (~reset_i),
+        .mem_valid  (mmio_sel),
+        .mem_addr   (mem_addr),
+        .mem_wdata  (mem_wdata),
+        .mem_wstrb  (mem_wstrb),
+        .mem_ready  (pwr_ready),
+        .mem_rdata  (pwr_rdata),
+        .sleep_req_o(sleep_req),
+        .wake_src_i (wake_sources),
+        .cpu_awake_i(cpu_clk_en_lat)
+    );
+
+    // Simulation/debug mailbox for firmware-driven status and result reporting.
+    test_mmio #(.BASE_ADDR(TEST_BASE)) u_test (
+        .clk(clk_i),
+        .resetn(~reset_i),
+        .mem_valid(mmio_sel),
+        .mem_addr(mem_addr),
+        .mem_wdata(mem_wdata),
+        .mem_wstrb(mem_wstrb),
+        .cfg_target_wake_sec_i(32'h0),
+        .cfg_window_sec_i(32'h0),
+        .cfg_step_sec_i(16'h0),
+        .cfg_motion_hi_th_i(16'h0),
+        .cfg_motion_hi_count_i(8'h0),
+        .cfg_policy_i(8'h0),
+        .cfg_conf_thr_i(16'h0),
+        .mem_ready(test_ready),
+        .mem_rdata(test_rdata),
+        .status_o(test_status),
+        .code_o(test_code),
+        .score_o(ml_score_hw)
+    );
+
+    // MMIO response mux
+    wire mmio_ready = pwr_ready | timer_ready | ml_ready | weight_ready | irqc_ready | test_ready | feat_mmio_ready;
+    wire [31:0] mmio_rdata =
+        pwr_ready      ? pwr_rdata      :
+        timer_ready    ? timer_rdata    :
+        ml_ready       ? ml_rdata       :
+        weight_ready   ? weight_rdata   :
+        irqc_ready     ? irqc_rdata     :
+        test_ready     ? test_rdata     :
+        feat_mmio_ready? feat_mmio_rdata:
+        32'h0000_0000;
+
+    assign mem_ready = sram_ready | mmio_ready | invalid_sel;
+    assign mem_rdata = sram_ready ? sram_rdata :
+                       mmio_ready ? mmio_rdata :
+                       32'h0000_0000;
+
+    // Sleep/wake control copied from soc_top.
+    reg sleeping_r;
+    reg cpu_idle_seen_r;
+    reg [31:0] wake_sources_d_r;
+    wire [31:0] wake_rise_w = wake_sources & ~wake_sources_d_r;
+    wire        wake_event_w = |wake_rise_w;
+
+    always_ff @(posedge clk_i) begin
+        if (reset_i)
+            wake_sources_d_r <= 32'h0;
+        else
+            wake_sources_d_r <= wake_sources;
+    end
+
+    always_ff @(posedge clk_i) begin
+        if (reset_i) begin
+            cpu_clk_en    <= 1'b1;
+            sleeping_r    <= 1'b0;
+            cpu_idle_seen_r <= 1'b0;
+        end else begin
+            if (cpu_clk_en)
+                cpu_idle_seen_r <= cpu_idle_seen_r | (~mem_valid);
+
+            if (sleeping_r) begin
+                if (irqc_wake_req || wake_event_w) begin
+                    cpu_clk_en      <= 1'b1;
+                    sleeping_r      <= 1'b0;
+                    cpu_idle_seen_r <= 1'b0;
+                end
+            end else begin
+                if (sleep_req && cpu_idle_seen_r && !(irqc_wake_req || wake_event_w)) begin
+                    cpu_clk_en      <= 1'b0;
+                    sleeping_r      <= 1'b1;
+                    cpu_idle_seen_r <= 1'b0;
+                end
+            end
+        end
+    end
+
+    // ---------------------------------------------------------------------
+    // Legacy local bridge path kept commented out temporarily during merge.
+    // ---------------------------------------------------------------------
+    /*
     // axi wires 
     logic [31:0] axi_x_addr_w;       // destination address for feature writes (placeholder)
     logic        axi_done_w;         // one-cycle pulse when writes complete
@@ -662,6 +1206,7 @@ module top #(
         .saxi_rvalid (tk_saxi_rvalid_w),
         .saxi_rready (tk_saxi_rready_w)
     );
+    */
 
     assign epoch_end_o = epoch_end_w;
     assign alarm_o = 1'b0;

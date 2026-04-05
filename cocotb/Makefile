@@ -705,6 +705,52 @@ test-top-mlp-features: $(TOP_MLP_FEATURES_VVP)
 	export COCOTB_TEST_MODULES=$(TOP_MLP_FEATURES_PYMOD); \
 	$(call RUN_COCOTB_ICARUS,$(TOP_MLP_FEATURES_VVP))
 
+# ============================================================
+# Cocotb: unified top feature latch/MMIO check
+# ============================================================
+
+TOP_FEATURE_MMIO_TOP    := sim_top_feature_mmio_unified
+TOP_FEATURE_MMIO_TOP_V  := $(TB_DIR)/sim_top_feature_mmio_unified.sv
+TOP_FEATURE_MMIO_VVP    := sim_top_feature_mmio_unified.vvp
+TOP_FEATURE_MMIO_PYMOD  := test_top_feature_mmio_unified
+TOP_FEATURE_MMIO_SRCS   := \
+  $(TOP_FEATURE_MMIO_TOP_V) \
+  $(RTL_DIR)/top.sv \
+  $(RTL_DIR)/i2c_master.sv \
+  $(RTL_DIR)/accel_reader.sv \
+  $(RTL_DIR)/motion_preprocess.sv \
+  $(RTL_DIR)/ppg_fifo_reader.sv \
+  $(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
+  $(RTL_DIR)/rmssd_engine.sv \
+  $(RTL_DIR)/signal_quality.sv \
+  $(RTL_DIR)/feature_engine.sv \
+  $(RTL_DIR)/cos_lut_timer.sv \
+  $(RTL_DIR)/globaltimer.sv \
+  $(RTL_DIR)/simple_sram.v \
+  $(MAKEFILE_DIR)/../ip/picorv32.v \
+  $(RTL_DIR)/test_mmio.v \
+  $(RTL_DIR)/timer_mmio.v \
+  $(RTL_DIR)/ml_axil_bridge_mmio.v \
+  $(RTL_DIR)/weight_ram_axi.v \
+  $(RTL_DIR)/irq_ctrl_mmio.v \
+  $(RTL_DIR)/taketwo_wrap.v \
+  $(RTL_DIR)/taketwo.v \
+  $(RTL_DIR)/pwrctrl_mmio.v \
+  $(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v \
+  sensors/i2c_slave_lis2dw12.sv \
+  sensors/i2c_slave_adpd144ri.sv
+
+$(TOP_FEATURE_MMIO_VVP): $(TOP_FEATURE_MMIO_SRCS)
+	@echo "[COCOTB] Building $@"
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_FEATURE_MMIO_TOP) -o $@ $(TOP_FEATURE_MMIO_SRCS)
+
+.PHONY: test-top-feature-mmio-unified
+test-top-feature-mmio-unified: $(TOP_FEATURE_MMIO_VVP)
+	@echo "[COCOTB] Running $(TOP_FEATURE_MMIO_PYMOD) on $(TOP_FEATURE_MMIO_TOP)"
+	@export COCOTB_TOPLEVEL=$(TOP_FEATURE_MMIO_TOP); \
+	export COCOTB_TEST_MODULES=$(TOP_FEATURE_MMIO_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(TOP_FEATURE_MMIO_VVP))
+
 
 # ============================================================
 # HOST I2C TARGET
