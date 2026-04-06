@@ -13,6 +13,7 @@ module top #(
     parameter logic [31:0] FEATURE_BASE= 32'h0300_4000,
     parameter logic [31:0] IRQC_BASE   = 32'h0300_5000,
     parameter logic [31:0] WEIGHT_BASE = 32'h0300_6000,
+    parameter logic [31:0] SPI_BASE    = 32'h0300_A000,
     parameter logic [31:0] TEST_BASE   = 32'h0300_F000,
 
     parameter int unsigned CLK_HZ = 10_000_000,
@@ -45,6 +46,8 @@ module top #(
 ) (
     input  logic clk_i,
     input  logic reset_i,
+    input  logic i2c_scl_i,
+    inout  wire  i2c_sda_io,
 
     // Functional simulation bus to sensor models (through i2c_master).
     output logic        sim_req_o,     // request strobe from i2c_master into simulated sensor bus
@@ -69,6 +72,12 @@ module top #(
     // Signal quality outputs
     output logic                      ml_update_gate_o,  // gate: only update ML when signal-quality checks pass
     output logic [7:0]                invalid_reason_o,  // reason code when ML update is gated off
+
+    // SPI flash interface used by the simulation boot stub.
+    output logic                      spi_clk_o,
+    output logic                      spi_mosi_o,
+    input  logic                      spi_miso_i,
+    output logic                      spi_cs_n_o,
 
     // Epoch pulse for TB orchestration
     output logic                      epoch_end_o,      // epoch boundary pulse (from globaltimer)
@@ -186,6 +195,14 @@ module top #(
     wire sram_sel;
     wire mmio_sel;
     wire invalid_sel;
+    wire pwr_sel;
+    wire timer_sel;
+    wire ml_sel;
+    wire weight_sel;
+    wire irqc_sel;
+    wire spi_sel;
+    wire test_sel;
+    wire [31:0] weight_off_sel;
 
     wire        sram_ready;
     wire [31:0] sram_rdata;
@@ -210,6 +227,8 @@ module top #(
 
     wire        irqc_ready;
     wire [31:0] irqc_rdata;
+    wire        spi_ready;
+    wire [31:0] spi_rdata;
     wire        irqc_wake_req;
 
     wire        test_ready;
@@ -296,6 +315,26 @@ module top #(
 
     wire [31:0] irq_sources;
     wire [31:0] wake_sources;
+    wire        host_i2c_wr_en;
+    wire [7:0]  host_i2c_wr_addr;
+    wire [7:0]  host_i2c_wr_data;
+    wire [7:0]  host_i2c_rd_addr;
+    wire [7:0]  host_i2c_rd_data;
+    wire        host_i2c_proto_err;
+    wire        host_i2c_irq_event;
+    wire        host_i2c_irqc_req;
+    wire        host_i2c_irqc_we;
+    wire [7:0]  host_i2c_irqc_off;
+    wire [31:0] host_i2c_irqc_wdata;
+    wire        host_i2c_irqc_ready;
+    wire [31:0] host_i2c_irqc_rdata;
+    wire [31:0] host_cfg_target_wake_sec;
+    wire [31:0] host_cfg_window_sec;
+    wire [15:0] host_cfg_step_sec;
+    wire [15:0] host_cfg_motion_hi_th;
+    wire [7:0]  host_cfg_motion_hi_count;
+    wire [7:0]  host_cfg_policy;
+    wire [15:0] host_cfg_conf_thr;
 
     always_ff @(posedge clk_i) begin
         if (reset_i) begin
@@ -362,6 +401,14 @@ module top #(
     assign sram_sel   = bus_valid && (mem_addr < 4 * MEM_WORDS);
     assign mmio_sel   = bus_valid && (mem_addr[31:24] == 8'h03);
     assign invalid_sel = bus_valid && !sram_sel && !mmio_sel;
+    assign weight_off_sel = mem_addr - WEIGHT_BASE;
+    assign pwr_sel    = mmio_sel && (mem_addr[31:12] == PWR_BASE[31:12]);
+    assign timer_sel  = mmio_sel && (mem_addr[31:12] == TIMER_BASE[31:12]);
+    assign ml_sel     = mmio_sel && (mem_addr[31:12] == ML_BASE[31:12]);
+    assign weight_sel = mmio_sel && (weight_off_sel[31:14] == 18'h0);
+    assign irqc_sel   = mmio_sel && (mem_addr[31:12] == IRQC_BASE[31:12]);
+    assign spi_sel    = mmio_sel && (mem_addr[31:12] == SPI_BASE[31:12]);
+    assign test_sel   = mmio_sel && (mem_addr[31:12] == TEST_BASE[31:12]);
 
     // Temporary CPU memory backing store for simulation. This is the block
     // planned to be replaced by macro-backed SRAM plus a flash boot path later.
@@ -836,7 +883,68 @@ module top #(
         .saxi_rready (wram_rready)
     );
 
-    assign irq_sources = {30'b0, ml_irq, timer_event};
+    // CPU-driven SPI master used by the simulation boot stub to stream
+    // taketwo weights from external flash into shared WRAM.
+    spi_master_mmio #(.BASE_ADDR(SPI_BASE)) u_spi (
+        .clk       (clk_i),
+        .resetn    (~reset_i),
+        .mem_valid (mmio_sel),
+        .mem_addr  (mem_addr),
+        .mem_wdata (mem_wdata),
+        .mem_wstrb (mem_wstrb),
+        .mem_ready (spi_ready),
+        .mem_rdata (spi_rdata),
+        .spi_clk_o (spi_clk_o),
+        .spi_mosi_o(spi_mosi_o),
+        .spi_miso_i(spi_miso_i),
+        .spi_cs_n_o(spi_cs_n_o)
+    );
+
+    // Off-chip host I2C target bridge in the always-on domain. This mirrors
+    // soc_top so the unified top can participate in end-to-end host config and
+    // score visibility tests without changing production firmware.
+    host_i2c_target #(
+        .SLAVE_ADDR(7'h42)
+    ) u_host_i2c_target (
+        .clk        (clk_i),
+        .resetn     (~reset_i),
+        .i2c_scl_i  (i2c_scl_i),
+        .i2c_sda_io (i2c_sda_io),
+        .wr_en_o    (host_i2c_wr_en),
+        .wr_addr_o  (host_i2c_wr_addr),
+        .wr_data_o  (host_i2c_wr_data),
+        .rd_addr_o  (host_i2c_rd_addr),
+        .rd_data_i  (host_i2c_rd_data),
+        .proto_err_o(host_i2c_proto_err)
+    );
+
+    host_i2c_bridge_regs u_host_i2c_bridge_regs (
+        .clk                  (clk_i),
+        .resetn               (~reset_i),
+        .wr_en_i              (host_i2c_wr_en),
+        .wr_addr_i            (host_i2c_wr_addr),
+        .wr_data_i            (host_i2c_wr_data),
+        .rd_addr_i            (host_i2c_rd_addr),
+        .rd_data_o            (host_i2c_rd_data),
+        .proto_err_i          (host_i2c_proto_err),
+        .ml_score_i           (ml_score_hw),
+        .event_o              (host_i2c_irq_event),
+        .cfg_target_wake_sec_o(host_cfg_target_wake_sec),
+        .cfg_window_sec_o     (host_cfg_window_sec),
+        .cfg_step_sec_o       (host_cfg_step_sec),
+        .cfg_motion_hi_th_o   (host_cfg_motion_hi_th),
+        .cfg_motion_hi_count_o(host_cfg_motion_hi_count),
+        .cfg_policy_o         (host_cfg_policy),
+        .cfg_conf_thr_o       (host_cfg_conf_thr),
+        .irqc_req_o           (host_i2c_irqc_req),
+        .irqc_we_o            (host_i2c_irqc_we),
+        .irqc_off_o           (host_i2c_irqc_off),
+        .irqc_wdata_o         (host_i2c_irqc_wdata),
+        .irqc_ready_i         (host_i2c_irqc_ready),
+        .irqc_rdata_i         (host_i2c_irqc_rdata)
+    );
+
+    assign irq_sources = {29'b0, host_i2c_irq_event, ml_irq, timer_event};
     assign wake_sources = irq_sources;
 
     // Minimal interrupt controller used for CPU-visible pending bits and wake.
@@ -849,12 +957,12 @@ module top #(
         .mem_wstrb  (mem_wstrb),
         .mem_ready  (irqc_ready),
         .mem_rdata  (irqc_rdata),
-        .host_req_i (1'b0),
-        .host_we_i  (1'b0),
-        .host_off_i (8'h00),
-        .host_wdata_i(32'h0),
-        .host_ready_o(),
-        .host_rdata_o(),
+        .host_req_i (host_i2c_irqc_req),
+        .host_we_i  (host_i2c_irqc_we),
+        .host_off_i (host_i2c_irqc_off),
+        .host_wdata_i(host_i2c_irqc_wdata),
+        .host_ready_o(host_i2c_irqc_ready),
+        .host_rdata_o(host_i2c_irqc_rdata),
         .irq_src_i  (irq_sources),
         .irq_o      (irq),
         .wake_req_o (irqc_wake_req)
@@ -883,13 +991,13 @@ module top #(
         .mem_addr(mem_addr),
         .mem_wdata(mem_wdata),
         .mem_wstrb(mem_wstrb),
-        .cfg_target_wake_sec_i(32'h0),
-        .cfg_window_sec_i(32'h0),
-        .cfg_step_sec_i(16'h0),
-        .cfg_motion_hi_th_i(16'h0),
-        .cfg_motion_hi_count_i(8'h0),
-        .cfg_policy_i(8'h0),
-        .cfg_conf_thr_i(16'h0),
+        .cfg_target_wake_sec_i(host_cfg_target_wake_sec),
+        .cfg_window_sec_i(host_cfg_window_sec),
+        .cfg_step_sec_i(host_cfg_step_sec),
+        .cfg_motion_hi_th_i(host_cfg_motion_hi_th),
+        .cfg_motion_hi_count_i(host_cfg_motion_hi_count),
+        .cfg_policy_i(host_cfg_policy),
+        .cfg_conf_thr_i(host_cfg_conf_thr),
         .mem_ready(test_ready),
         .mem_rdata(test_rdata),
         .status_o(test_status),
@@ -898,14 +1006,23 @@ module top #(
     );
 
     // MMIO response mux
-    wire mmio_ready = pwr_ready | timer_ready | ml_ready | weight_ready | irqc_ready | test_ready | feat_mmio_ready;
+    wire mmio_ready =
+        (pwr_sel && pwr_ready) |
+        (timer_sel && timer_ready) |
+        (ml_sel && ml_ready) |
+        (weight_sel && weight_ready) |
+        (irqc_sel && irqc_ready) |
+        (spi_sel && spi_ready) |
+        (test_sel && test_ready) |
+        feat_mmio_ready;
     wire [31:0] mmio_rdata =
-        pwr_ready      ? pwr_rdata      :
-        timer_ready    ? timer_rdata    :
-        ml_ready       ? ml_rdata       :
-        weight_ready   ? weight_rdata   :
-        irqc_ready     ? irqc_rdata     :
-        test_ready     ? test_rdata     :
+        (pwr_sel && pwr_ready)        ? pwr_rdata      :
+        (timer_sel && timer_ready)    ? timer_rdata    :
+        (ml_sel && ml_ready)          ? ml_rdata       :
+        (weight_sel && weight_ready)  ? weight_rdata   :
+        (irqc_sel && irqc_ready)      ? irqc_rdata     :
+        (spi_sel && spi_ready)        ? spi_rdata      :
+        (test_sel && test_ready)      ? test_rdata     :
         feat_mmio_ready? feat_mmio_rdata:
         32'h0000_0000;
 
@@ -917,9 +1034,11 @@ module top #(
     // Sleep/wake control copied from soc_top.
     reg sleeping_r;
     reg cpu_idle_seen_r;
+    reg sleep_req_d_r;
     reg [31:0] wake_sources_d_r;
     wire [31:0] wake_rise_w = wake_sources & ~wake_sources_d_r;
     wire        wake_event_w = |wake_rise_w;
+    wire        sleep_req_rise_w = sleep_req & ~sleep_req_d_r;
 
     always_ff @(posedge clk_i) begin
         if (reset_i)
@@ -933,8 +1052,13 @@ module top #(
             cpu_clk_en    <= 1'b1;
             sleeping_r    <= 1'b0;
             cpu_idle_seen_r <= 1'b0;
+            sleep_req_d_r <= 1'b0;
         end else begin
-            if (cpu_clk_en)
+            sleep_req_d_r <= sleep_req;
+
+            if (cpu_clk_en && sleep_req_rise_w)
+                cpu_idle_seen_r <= 1'b0;
+            else if (cpu_clk_en)
                 cpu_idle_seen_r <= cpu_idle_seen_r | (~mem_valid);
 
             if (sleeping_r) begin

@@ -48,6 +48,11 @@ module sim_top_feature_mmio_unified;
   wire        ppg_sim_rvalid;
   wire        ppg_sim_rlast;
   wire        ppg_sim_err;
+  wire        spi_clk;
+  wire        spi_mosi;
+  wire        spi_cs_n;
+  wire        host_i2c_scl;
+  tri1        host_i2c_sda;
 
   localparam [6:0] ACC_ADDR = 7'h19;
   localparam [6:0] PPG_ADDR = 7'h64;
@@ -89,6 +94,8 @@ module sim_top_feature_mmio_unified;
   ) u_dut (
     .clk_i(clk),
     .reset_i(reset),
+    .i2c_scl_i(host_i2c_scl),
+    .i2c_sda_io(host_i2c_sda),
     .sim_req_o(sim_req),
     .sim_addr_o(sim_addr),
     .sim_reg_o(sim_reg),
@@ -100,6 +107,10 @@ module sim_top_feature_mmio_unified;
     .sim_rvalid_i(sim_rvalid),
     .sim_rlast_i(sim_rlast),
     .sim_err_i(sim_err),
+    .spi_clk_o(spi_clk),
+    .spi_mosi_o(spi_mosi),
+    .spi_miso_i(1'b1),
+    .spi_cs_n_o(spi_cs_n),
     .feat_valid_o(feat_valid),
     .time_feat_o(time_feat),
     .motion_feat_o(motion_feat),
@@ -110,6 +121,8 @@ module sim_top_feature_mmio_unified;
     .epoch_end_o(epoch_end),
     .alarm_o(alarm)
   );
+
+  assign host_i2c_scl = 1'b1;
 
   i2c_slave_lis2dw12 #(
     .I2C_ADDR(ACC_ADDR)

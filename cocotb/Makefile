@@ -169,12 +169,14 @@ FW_VARIANT ?= test_sleepwake
 
 # Variant sources
 FW_C_main                  := $(FW_DIR)/main.c
+FW_C_prod_main             := $(FW_DIR)/prod_main.c
 FW_C_test_sleepwake         := $(FW_TESTS)/test_sleepwake.c
 FW_C_test_gpio              := $(FW_TESTS)/test_gpio.c
 FW_C_test_sleepwake_periodic:= $(FW_TESTS)/test_sleepwake_periodic.c
 FW_C_test_ml_weights        := $(FW_TESTS)/test_ml_weights.c
 FW_C_test_ml_cpu_wake_i2c   := $(FW_TESTS)/test_ml_cpu_wake_i2c.c
 FW_C_test_top_feature_ml_cpu:= $(FW_TESTS)/test_top_feature_ml_cpu.c
+FW_C_test_top_feature_ml_cpu_spi_flash:= $(FW_TESTS)/test_top_feature_ml_cpu_spi_flash.c
 
 # Select the C source based on FW_VARIANT
 FW_SRC = $(FW_C_$(FW_VARIANT))
@@ -186,7 +188,9 @@ FW_EXTRA_DEPS := $(FW_EXTRA_DEPS_$(FW_VARIANT))
 FW_ARCH_DEFAULT := rv32imc
 FW_ARCH_test_ml_weights := rv32im
 FW_ARCH_test_ml_cpu_wake_i2c := rv32im
+FW_ARCH_prod_main := rv32im
 FW_ARCH_test_top_feature_ml_cpu := rv32im
+FW_ARCH_test_top_feature_ml_cpu_spi_flash := rv32im
 FW_ARCH := $(if $(FW_ARCH_$(FW_VARIANT)),$(FW_ARCH_$(FW_VARIANT)),$(FW_ARCH_DEFAULT))
 FW_OPT_DEFAULT := -O2
 FW_OPT_test_ml_cpu_wake_i2c := -O0
@@ -252,6 +256,9 @@ firmware-ml-cpu-wake-i2c:
 
 firmware-top-feature-ml-cpu:
 	@$(SELF_MAKE) FW_VARIANT=test_top_feature_ml_cpu firmware
+
+firmware-top-feature-ml-cpu-spi-flash:
+	@$(SELF_MAKE) FW_VARIANT=test_top_feature_ml_cpu_spi_flash firmware
 
 
 
@@ -334,6 +341,8 @@ TOP_FEATURE_ML_CPU_VVP     := $(BUILD_DIR)/$(TOP_FEATURE_ML_CPU_TOP).vvp
 TOP_FEATURE_ML_CPU_SOURCES := \
 	$(TB_DIR)/tb_top_feature_ml_cpu.sv \
 	$(RTL_DIR)/top.sv \
+	$(RTL_DIR)/host_i2c_target.v \
+	$(RTL_DIR)/host_i2c_bridge_regs.v \
 	$(RTL_DIR)/i2c_master.sv \
 	$(RTL_DIR)/accel_reader.sv \
 	$(RTL_DIR)/motion_preprocess.sv \
@@ -345,6 +354,7 @@ TOP_FEATURE_ML_CPU_SOURCES := \
 	$(RTL_DIR)/cos_lut_timer.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_master_mmio.v \
 	$(MAKEFILE_DIR)/../ip/picorv32.v \
 	$(RTL_DIR)/test_mmio.v \
 	$(RTL_DIR)/timer_mmio.v \
@@ -368,6 +378,94 @@ sim-top-feature-ml-cpu: $(TOP_FEATURE_ML_CPU_VVP) | $(SIM_BUILD)
 	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
 	@echo "== Running $(TOP_FEATURE_ML_CPU_TOP) (FW=$(FW_DIR)/build/test_top_feature_ml_cpu/firmware.hex) =="
 	$(VVP) $(TOP_FEATURE_ML_CPU_VVP)
+
+TOP_FEATURE_ML_CPU_SPI_FLASH_TOP     := tb_top_feature_ml_cpu_spi_flash
+TOP_FEATURE_ML_CPU_SPI_FLASH_VVP     := $(BUILD_DIR)/$(TOP_FEATURE_ML_CPU_SPI_FLASH_TOP).vvp
+TOP_FEATURE_ML_CPU_SPI_FLASH_SOURCES := \
+	$(TB_DIR)/tb_top_feature_ml_cpu_spi_flash.sv \
+	$(TB_DIR)/spi_flash_model.v \
+	$(RTL_DIR)/top.sv \
+	$(RTL_DIR)/host_i2c_target.v \
+	$(RTL_DIR)/host_i2c_bridge_regs.v \
+	$(RTL_DIR)/i2c_master.sv \
+	$(RTL_DIR)/accel_reader.sv \
+	$(RTL_DIR)/motion_preprocess.sv \
+	$(RTL_DIR)/ppg_fifo_reader.sv \
+	$(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
+	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/signal_quality.sv \
+	$(RTL_DIR)/feature_engine.sv \
+	$(RTL_DIR)/cos_lut_timer.sv \
+	$(RTL_DIR)/globaltimer.sv \
+	$(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_master_mmio.v \
+	$(MAKEFILE_DIR)/../ip/picorv32.v \
+	$(RTL_DIR)/test_mmio.v \
+	$(RTL_DIR)/timer_mmio.v \
+	$(RTL_DIR)/ml_axil_bridge_mmio.v \
+	$(RTL_DIR)/weight_ram_axi.v \
+	$(RTL_DIR)/irq_ctrl_mmio.v \
+	$(RTL_DIR)/taketwo_wrap.v \
+	$(RTL_DIR)/taketwo.v \
+	$(RTL_DIR)/pwrctrl_mmio.v \
+	$(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v \
+	sensors/i2c_slave_lis2dw12.sv \
+	sensors/i2c_slave_adpd144ri.sv
+
+$(TOP_FEATURE_ML_CPU_SPI_FLASH_VVP): $(TOP_FEATURE_ML_CPU_SPI_FLASH_SOURCES)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_FEATURE_ML_CPU_SPI_FLASH_TOP) -o $@ \
+	  $(TOP_FEATURE_ML_CPU_SPI_FLASH_SOURCES)
+
+.PHONY: sim-top-feature-ml-cpu-spi-flash
+sim-top-feature-ml-cpu-spi-flash: $(TOP_FEATURE_ML_CPU_SPI_FLASH_VVP) | $(SIM_BUILD)
+	@$(SELF_MAKE) FW_VARIANT=test_top_feature_ml_cpu_spi_flash firmware
+	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
+	@echo "== Running $(TOP_FEATURE_ML_CPU_SPI_FLASH_TOP) (FW=$(FW_DIR)/build/test_top_feature_ml_cpu_spi_flash/firmware.hex FLASH=$(TAKETWO_PARAMS_HEX)) =="
+	$(VVP) $(TOP_FEATURE_ML_CPU_SPI_FLASH_VVP)
+
+TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP     := tb_top_feature_ml_prod_main_host_i2c
+TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP     := $(BUILD_DIR)/$(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP).vvp
+TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES := \
+	$(TB_DIR)/tb_top_feature_ml_prod_main_host_i2c.sv \
+	$(TB_DIR)/spi_flash_model.v \
+	$(RTL_DIR)/top.sv \
+	$(RTL_DIR)/host_i2c_target.v \
+	$(RTL_DIR)/host_i2c_bridge_regs.v \
+	$(RTL_DIR)/i2c_master.sv \
+	$(RTL_DIR)/accel_reader.sv \
+	$(RTL_DIR)/motion_preprocess.sv \
+	$(RTL_DIR)/ppg_fifo_reader.sv \
+	$(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
+	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/signal_quality.sv \
+	$(RTL_DIR)/feature_engine.sv \
+	$(RTL_DIR)/cos_lut_timer.sv \
+	$(RTL_DIR)/globaltimer.sv \
+	$(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_master_mmio.v \
+	$(MAKEFILE_DIR)/../ip/picorv32.v \
+	$(RTL_DIR)/test_mmio.v \
+	$(RTL_DIR)/timer_mmio.v \
+	$(RTL_DIR)/ml_axil_bridge_mmio.v \
+	$(RTL_DIR)/weight_ram_axi.v \
+	$(RTL_DIR)/irq_ctrl_mmio.v \
+	$(RTL_DIR)/taketwo_wrap.v \
+	$(RTL_DIR)/taketwo.v \
+	$(RTL_DIR)/pwrctrl_mmio.v \
+	$(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v \
+	sensors/i2c_slave_lis2dw12.sv \
+	sensors/i2c_slave_adpd144ri.sv
+
+$(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP): $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP) -o $@ \
+	  $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES)
+
+.PHONY: sim-top-feature-ml-prod-main-host-i2c
+sim-top-feature-ml-prod-main-host-i2c: $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP) | $(SIM_BUILD)
+	@$(SELF_MAKE) FW_VARIANT=prod_main firmware
+	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
+	@echo "== Running $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP) (FW=$(FW_DIR)/build/prod_main/firmware.hex FLASH=$(TAKETWO_PARAMS_HEX)) =="
+	$(VVP) $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP)
 
 .PHONY: test-cpu-ml-pipeline
 test-cpu-ml-pipeline:
@@ -694,6 +792,8 @@ TOP_PIPELINE_TOP     := top_pipeline_tb
 TOP_PIPELINE_VVP     := $(BUILD_DIR)/$(TOP_PIPELINE_TOP).vvp
 TOP_PIPELINE_SOURCES := sim/tb/top_pipeline_tb.sv \
                         $(RTL_DIR)/top.sv \
+                        $(RTL_DIR)/host_i2c_target.v \
+                        $(RTL_DIR)/host_i2c_bridge_regs.v \
                         $(RTL_DIR)/i2c_master.sv \
                         $(RTL_DIR)/accel_reader.sv \
                         $(RTL_DIR)/motion_preprocess.sv \
@@ -729,6 +829,8 @@ TOP_MLP_FEATURES_SRCS   := \
   $(TOP_MLP_FEATURES_TOP_V) \
   $(TB_DIR)/taketwo_core_only.v \
   $(RTL_DIR)/top.sv \
+  $(RTL_DIR)/host_i2c_target.v \
+  $(RTL_DIR)/host_i2c_bridge_regs.v \
   $(RTL_DIR)/axi_interface.sv \
   $(RTL_DIR)/i2c_master.sv \
   $(RTL_DIR)/accel_reader.sv \
@@ -765,6 +867,8 @@ TOP_FEATURE_MMIO_PYMOD  := test_top_feature_mmio_unified
 TOP_FEATURE_MMIO_SRCS   := \
   $(TOP_FEATURE_MMIO_TOP_V) \
   $(RTL_DIR)/top.sv \
+  $(RTL_DIR)/host_i2c_target.v \
+  $(RTL_DIR)/host_i2c_bridge_regs.v \
   $(RTL_DIR)/i2c_master.sv \
   $(RTL_DIR)/accel_reader.sv \
   $(RTL_DIR)/motion_preprocess.sv \
