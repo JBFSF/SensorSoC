@@ -794,6 +794,7 @@ TOP_PIPELINE_SOURCES := sim/tb/top_pipeline_tb.sv \
                         $(RTL_DIR)/top.sv \
                         $(RTL_DIR)/host_i2c_target.v \
                         $(RTL_DIR)/host_i2c_bridge_regs.v \
+                        $(RTL_DIR)/spi_master_mmio.v \
                         $(RTL_DIR)/i2c_master.sv \
                         $(RTL_DIR)/accel_reader.sv \
                         $(RTL_DIR)/motion_preprocess.sv \
@@ -831,6 +832,7 @@ TOP_MLP_FEATURES_SRCS   := \
   $(RTL_DIR)/top.sv \
   $(RTL_DIR)/host_i2c_target.v \
   $(RTL_DIR)/host_i2c_bridge_regs.v \
+  $(RTL_DIR)/spi_master_mmio.v \
   $(RTL_DIR)/axi_interface.sv \
   $(RTL_DIR)/i2c_master.sv \
   $(RTL_DIR)/accel_reader.sv \
@@ -869,6 +871,7 @@ TOP_FEATURE_MMIO_SRCS   := \
   $(RTL_DIR)/top.sv \
   $(RTL_DIR)/host_i2c_target.v \
   $(RTL_DIR)/host_i2c_bridge_regs.v \
+  $(RTL_DIR)/spi_master_mmio.v \
   $(RTL_DIR)/i2c_master.sv \
   $(RTL_DIR)/accel_reader.sv \
   $(RTL_DIR)/motion_preprocess.sv \
