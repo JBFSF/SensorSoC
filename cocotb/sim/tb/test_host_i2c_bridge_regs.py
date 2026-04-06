@@ -30,6 +30,12 @@ REG_CONF_THR_L = 0x30
 REG_CONF_THR_H = 0x31
 REG_CONF_CTRL = 0x32
 REG_CONF_STAT = 0x33
+REG_LOGIT0_L = 0x34
+REG_LOGIT0_H = 0x35
+REG_LOGIT1_L = 0x36
+REG_LOGIT1_H = 0x37
+REG_CONF_ABS_L = 0x38
+REG_CONF_ABS_H = 0x39
 
 
 async def reset_dut(dut):
@@ -61,6 +67,12 @@ async def read_reg(dut, addr: int) -> int:
     dut.rd_addr_i.value = addr & 0xFF
     await Timer(1, unit="ns")
     return int(dut.rd_data_o.value) & 0xFF
+
+
+async def read_reg16(dut, addr_lo: int, addr_hi: int) -> int:
+    lo = await read_reg(dut, addr_lo)
+    hi = await read_reg(dut, addr_hi)
+    return (hi << 8) | lo
 
 
 @cocotb.test()
@@ -111,6 +123,9 @@ async def test_confidence_threshold_rearm_and_sticky(dut):
     # Keep below threshold: armed should stay set, no event.
     dut.ml_score_i.value = 0x00000010
     await ClockCycles(dut.clk, 2)
+    assert await read_reg16(dut, REG_CONF_ABS_L, REG_CONF_ABS_H) == 0x0010
+    assert await read_reg16(dut, REG_LOGIT0_L, REG_LOGIT0_H) == 0x0010
+    assert await read_reg16(dut, REG_LOGIT1_L, REG_LOGIT1_H) == 0x0000
     stat = await read_reg(dut, REG_CONF_STAT)
     assert (stat & 0x08) != 0, "Expected armed=1 before first threshold crossing"
 
@@ -126,6 +141,9 @@ async def test_confidence_threshold_rearm_and_sticky(dut):
     stat = await read_reg(dut, REG_CONF_STAT)
     assert (stat & 0x06) == 0x06, f"Expected sticky bits set after crossing, got 0x{stat:02x}"
     assert (stat & 0x08) == 0, "Expected armed=0 after crossing"
+    assert await read_reg16(dut, REG_CONF_ABS_L, REG_CONF_ABS_H) == 0x0030
+    assert await read_reg16(dut, REG_LOGIT0_L, REG_LOGIT0_H) == 0x0030
+    assert await read_reg16(dut, REG_LOGIT1_L, REG_LOGIT1_H) == 0x0000
 
     # Hold above threshold: no second pulse while unarmed.
     for _ in range(3):

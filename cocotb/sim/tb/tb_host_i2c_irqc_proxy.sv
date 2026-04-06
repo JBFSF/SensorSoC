@@ -258,17 +258,21 @@ module tb_host_i2c_irqc_proxy;
         force dut.u_ml.score_o = 32'h0000_1000;
         repeat (10) @(posedge clk);
 
-        // Check derived logits/confidence internally.
-        if (dut.u_host_i2c_bridge_regs.logit0_s !== 16'sh1000) begin
-            $display("FAIL: LOGIT0 mismatch, got %04x", dut.u_host_i2c_bridge_regs.logit0_s);
+        // Check direct score/confidence contract internally.
+        if (dut.u_host_i2c_bridge_regs.score_conf !== 16'h1000) begin
+            $display("FAIL: SCORE_CONF mismatch, got %04x", dut.u_host_i2c_bridge_regs.score_conf);
             failures = failures + 1;
         end
-        if (dut.u_host_i2c_bridge_regs.logit1_s !== -16'sh1000) begin
-            $display("FAIL: LOGIT1 mismatch, got %04x", dut.u_host_i2c_bridge_regs.logit1_s);
+        if (dut.u_host_i2c_bridge_regs.score_proxy0 !== 16'h1000) begin
+            $display("FAIL: SCORE_PROXY0 mismatch, got %04x", dut.u_host_i2c_bridge_regs.score_proxy0);
             failures = failures + 1;
         end
-        if (dut.u_host_i2c_bridge_regs.conf_abs !== 16'h1000) begin
-            $display("FAIL: CONF_ABS mismatch, got %04x", dut.u_host_i2c_bridge_regs.conf_abs);
+        if (dut.u_host_i2c_bridge_regs.score_proxy1 !== 16'h0000) begin
+            $display("FAIL: SCORE_PROXY1 mismatch, got %04x", dut.u_host_i2c_bridge_regs.score_proxy1);
+            failures = failures + 1;
+        end
+        if (dut.u_host_i2c_bridge_regs.score_conf !== 16'h1000) begin
+            $display("FAIL: CONF_ABS source mismatch, got %04x", dut.u_host_i2c_bridge_regs.score_conf);
             failures = failures + 1;
         end
 

@@ -108,10 +108,12 @@ module host_i2c_bridge_regs (
     reg [7:0]  cfg_motion_hi_count;
     reg [7:0]  cfg_policy;
 
-    wire signed [15:0] logit0_s = ml_score_i[15:0];
-    wire signed [15:0] logit1_s = -logit0_s;
-    wire [15:0] conf_abs = logit0_s[15] ? (~logit0_s + 16'd1) : logit0_s;
-    wire        above_thr_live = (conf_abs >= conf_thr);
+    // Firmware writes the final confidence score into ml_score_i. The host
+    // register bridge exposes that score directly for thresholding and readback.
+    wire [15:0] score_conf = ml_score_i[15:0];
+    wire [15:0] score_proxy0 = score_conf;
+    wire [15:0] score_proxy1 = 16'h0000;
+    wire        above_thr_live = (score_conf >= conf_thr);
 
     wire in_cfg_window    = (wr_addr_i >= 8'h10) && (wr_addr_i <= 8'h1B);
     wire in_irqc_window   = (wr_addr_i >= 8'h20) && (wr_addr_i <= 8'h2B);
@@ -311,12 +313,12 @@ module host_i2c_bridge_regs (
             REG_CONF_THR_H:  rd_data_o = conf_thr[15:8];
             REG_CONF_CTRL:   rd_data_o = {5'b0, 1'b0, conf_irq_en, conf_en};
             REG_CONF_STAT:   rd_data_o = {4'b0, conf_armed, conf_thr_irq_fired_sticky, conf_cross_seen_sticky, above_thr_live};
-            REG_LOGIT0_L:    rd_data_o = logit0_s[7:0];
-            REG_LOGIT0_H:    rd_data_o = logit0_s[15:8];
-            REG_LOGIT1_L:    rd_data_o = logit1_s[7:0];
-            REG_LOGIT1_H:    rd_data_o = logit1_s[15:8];
-            REG_CONF_ABS_L:  rd_data_o = conf_abs[7:0];
-            REG_CONF_ABS_H:  rd_data_o = conf_abs[15:8];
+            REG_LOGIT0_L:    rd_data_o = score_proxy0[7:0];
+            REG_LOGIT0_H:    rd_data_o = score_proxy0[15:8];
+            REG_LOGIT1_L:    rd_data_o = score_proxy1[7:0];
+            REG_LOGIT1_H:    rd_data_o = score_proxy1[15:8];
+            REG_CONF_ABS_L:  rd_data_o = score_conf[7:0];
+            REG_CONF_ABS_H:  rd_data_o = score_conf[15:8];
 
             default:         rd_data_o = 8'h00;
         endcase
