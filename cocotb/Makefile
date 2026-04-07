@@ -345,9 +345,9 @@ TOP_FEATURE_ML_CPU_SOURCES := \
 	$(RTL_DIR)/host_i2c_bridge_regs.v \
 	$(RTL_DIR)/i2c_master.sv \
 	$(RTL_DIR)/accel_reader.sv \
-	$(RTL_DIR)/motion_preprocess.sv \
+	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
-	$(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
+	$(RTL_DIR)/ppg_process.sv \
 	$(RTL_DIR)/rmssd_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
@@ -389,9 +389,9 @@ TOP_FEATURE_ML_CPU_SPI_FLASH_SOURCES := \
 	$(RTL_DIR)/host_i2c_bridge_regs.v \
 	$(RTL_DIR)/i2c_master.sv \
 	$(RTL_DIR)/accel_reader.sv \
-	$(RTL_DIR)/motion_preprocess.sv \
+	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
-	$(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
+	$(RTL_DIR)/ppg_process.sv \
 	$(RTL_DIR)/rmssd_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
@@ -433,9 +433,9 @@ TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES := \
 	$(RTL_DIR)/host_i2c_bridge_regs.v \
 	$(RTL_DIR)/i2c_master.sv \
 	$(RTL_DIR)/accel_reader.sv \
-	$(RTL_DIR)/motion_preprocess.sv \
+	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
-	$(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
+	$(RTL_DIR)/ppg_process.sv \
 	$(RTL_DIR)/rmssd_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
@@ -662,19 +662,19 @@ clean-reset-ctrl:
 # MOTION PREPROCESS
 # ============================================================
 
-MOTION_PREPROCESS_TOP     := motion_preprocess_tb
-MOTION_PREPROCESS_VVP     := $(BUILD_DIR)/$(MOTION_PREPROCESS_TOP).vvp
-MOTION_PREPROCESS_SOURCES := sim/tb/motion_preprocess_tb.sv $(RTL_DIR)/motion_preprocess.sv
-MOTION_PREPROCESS_VCD     := $(WAVE_DIR)/motion_preprocess_tb.vcd
+motion_process_TOP     := motion_process_tb
+motion_process_VVP     := $(BUILD_DIR)/$(motion_process_TOP).vvp
+motion_process_SOURCES := sim/tb/motion_process_tb.sv $(RTL_DIR)/motion_process.sv
+motion_process_VCD     := $(WAVE_DIR)/motion_process_tb.vcd
 
-$(MOTION_PREPROCESS_VVP): $(MOTION_PREPROCESS_SOURCES)
+$(motion_process_VVP): $(motion_process_SOURCES)
 	$(IVERILOG) -g2012 -o $@ $^
 
 .PHONY: sim-motion-preprocess
-sim-motion-preprocess: $(MOTION_PREPROCESS_VVP)
-	@echo "== Running $(MOTION_PREPROCESS_TOP) (VCD -> $(MOTION_PREPROCESS_VCD)) =="
+sim-motion-preprocess: $(motion_process_VVP)
+	@echo "== Running $(motion_process_TOP) (VCD -> $(motion_process_VCD)) =="
 	@mkdir -p $(WAVE_DIR)
-	@cd $(WAVE_DIR) && $(VVP) $(abspath $(MOTION_PREPROCESS_VVP))
+	@cd $(WAVE_DIR) && $(VVP) $(abspath $(motion_process_VVP))
 
 # ============================================================
 # PPG FIFO READER
@@ -698,10 +698,10 @@ sim-ppg-fifo-reader: $(PPG_FIFO_READER_VVP)
 # PPG BEAT DETECT + RR CALC
 # ============================================================
 
-PPG_BEAT_RR_TOP     := ppg_beat_detect_rr_calc_tb
+PPG_BEAT_RR_TOP     := ppg_process_tb
 PPG_BEAT_RR_VVP     := $(BUILD_DIR)/$(PPG_BEAT_RR_TOP).vvp
-PPG_BEAT_RR_SOURCES := sim/tb/ppg_beat_detect_rr_calc_tb.sv $(RTL_DIR)/ppg_beat_detect_rr_calc.sv $(RTL_DIR)/ewma_baseline.sv
-PPG_BEAT_RR_VCD     := $(WAVE_DIR)/ppg_beat_detect_rr_calc_tb.vcd
+PPG_BEAT_RR_SOURCES := sim/tb/ppg_process_tb.sv $(RTL_DIR)/ppg_process.sv $(RTL_DIR)/ewma_baseline.sv
+PPG_BEAT_RR_VCD     := $(WAVE_DIR)/ppg_process_tb.vcd
 
 $(PPG_BEAT_RR_VVP): $(PPG_BEAT_RR_SOURCES)
 	$(IVERILOG) -g2012 -o $@ $^
@@ -797,9 +797,9 @@ TOP_PIPELINE_SOURCES := sim/tb/top_pipeline_tb.sv \
                         $(RTL_DIR)/spi_master_mmio.v \
                         $(RTL_DIR)/i2c_master.sv \
                         $(RTL_DIR)/accel_reader.sv \
-                        $(RTL_DIR)/motion_preprocess.sv \
+                        $(RTL_DIR)/motion_process.sv \
                         $(RTL_DIR)/ppg_fifo_reader.sv \
-                        $(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
+                        $(RTL_DIR)/ppg_process.sv \
                         $(RTL_DIR)/rmssd_engine.sv \
                         $(RTL_DIR)/signal_quality.sv \
                         $(RTL_DIR)/feature_engine.sv \
@@ -836,9 +836,9 @@ TOP_MLP_FEATURES_SRCS   := \
   $(RTL_DIR)/axi_interface.sv \
   $(RTL_DIR)/i2c_master.sv \
   $(RTL_DIR)/accel_reader.sv \
-  $(RTL_DIR)/motion_preprocess.sv \
+  $(RTL_DIR)/motion_process.sv \
   $(RTL_DIR)/ppg_fifo_reader.sv \
-  $(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
+  $(RTL_DIR)/ppg_process.sv \
   $(RTL_DIR)/rmssd_engine.sv \
   $(RTL_DIR)/signal_quality.sv \
   $(RTL_DIR)/feature_engine.sv \
@@ -874,9 +874,9 @@ TOP_FEATURE_MMIO_SRCS   := \
   $(RTL_DIR)/spi_master_mmio.v \
   $(RTL_DIR)/i2c_master.sv \
   $(RTL_DIR)/accel_reader.sv \
-  $(RTL_DIR)/motion_preprocess.sv \
+  $(RTL_DIR)/motion_process.sv \
   $(RTL_DIR)/ppg_fifo_reader.sv \
-  $(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
+  $(RTL_DIR)/ppg_process.sv \
   $(RTL_DIR)/rmssd_engine.sv \
   $(RTL_DIR)/signal_quality.sv \
   $(RTL_DIR)/feature_engine.sv \
@@ -1040,7 +1040,7 @@ SENSOR_PIPELINE_SOURCES := sim/tb/tb_sensor_pipeline.sv \
                            $(RTL_DIR)/i2c_master.sv \
                            $(RTL_DIR)/accel_reader.sv \
                            $(RTL_DIR)/ppg_fifo_reader.sv \
-                           $(RTL_DIR)/motion_preprocess.sv \
+                           $(RTL_DIR)/motion_process.sv \
                            $(RTL_DIR)/globaltimer.sv \
                            sensors/i2c_slave_lis2dw12.sv \
                            sensors/i2c_slave_adpd144ri.sv

@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-module ppg_beat_detect_rr_calc_tb;
+module ppg_process_tb;
 
   localparam int SAMPLE_W = 16;
   localparam int T_W = 32;
@@ -28,7 +28,6 @@ module ppg_beat_detect_rr_calc_tb;
   logic [T_W-1:0]      cfg_refrac_ticks;
   logic [T_W-1:0]      cfg_rr_min_ticks;
   logic [T_W-1:0]      cfg_rr_max_ticks;
-  logic                cfg_peak_mode;
   logic [7:0]          cfg_q_amp_w;
   logic [7:0]          cfg_q_slope_w;
   logic [7:0]          cfg_q_refrac_penalty;
@@ -44,7 +43,7 @@ module ppg_beat_detect_rr_calc_tb;
   wire                 missed_beat;
   wire                 ppg_invalid;
 
-  ppg_beat_detect_rr_calc #(
+  ppg_process #(
     .SAMPLE_W(SAMPLE_W),
     .T_W(T_W),
     .COEFF_W(COEFF_W),
@@ -67,7 +66,6 @@ module ppg_beat_detect_rr_calc_tb;
     .cfg_refrac_ticks_i(cfg_refrac_ticks),
     .cfg_rr_min_ticks_i(cfg_rr_min_ticks),
     .cfg_rr_max_ticks_i(cfg_rr_max_ticks),
-    .cfg_peak_mode_i(cfg_peak_mode),
     .cfg_q_amp_w_i(cfg_q_amp_w),
     .cfg_q_slope_w_i(cfg_q_slope_w),
     .cfg_q_refrac_penalty_i(cfg_q_refrac_penalty),
@@ -170,7 +168,6 @@ module ppg_beat_detect_rr_calc_tb;
       cfg_refrac_ticks      = 32'd250;
       cfg_rr_min_ticks      = 32'd300;
       cfg_rr_max_ticks      = 32'd2000;
-      cfg_peak_mode         = 1'b0;
       cfg_q_amp_w           = 8'd4;
       cfg_q_slope_w         = 8'd2;
       cfg_q_refrac_penalty  = 8'd8;
@@ -297,8 +294,8 @@ module ppg_beat_detect_rr_calc_tb;
   end
 
   initial begin
-    $dumpfile("ppg_beat_detect_rr_calc_tb.vcd");
-    $dumpvars(0, ppg_beat_detect_rr_calc_tb);
+    $dumpfile("ppg_process_tb.vcd");
+    $dumpvars(0, ppg_process_tb);
   end
 
 endmodule

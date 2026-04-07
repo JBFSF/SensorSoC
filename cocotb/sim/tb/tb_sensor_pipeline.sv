@@ -5,7 +5,7 @@
 // Testbench for the full sensor pipeline. Two simulated I2C slaves
 // (LIS2DW12 accelerometer and ADPD144RI PPG sensor) feed data through
 // a shared I2C master into their respective readers. The accel path
-// continues into motion_preprocess for epoch energy computation.
+// continues into motion_process for epoch energy computation.
 //
 // Pass criteria:
 //   - At least 1 accel sample received (accel_valid_o asserted)
@@ -17,7 +17,7 @@
 //     ../src/i2c_master.sv \
 //     ../src/accel_reader.sv \
 //     ../src/ppg_fifo_reader.sv \
-//     ../src/motion_preprocess.sv \
+//     ../src/motion_process.sv \
 //     ../src/globaltimer.sv \
 //     sensors/i2c_slave_lis2dw12.sv \
 //     sensors/i2c_slave_adpd144ri.sv \
@@ -30,7 +30,7 @@
 //     src/i2c_master.sv \
 //     src/accel_reader.sv \
 //     src/ppg_fifo_reader.sv \
-//     src/motion_preprocess.sv \
+//     src/motion_process.sv \
 //     src/globaltimer.sv \
 //     cocotb/sensors/i2c_slave_lis2dw12.sv \
 //     cocotb/sensors/i2c_slave_adpd144ri.sv \
@@ -276,7 +276,7 @@ module tb_sensor_pipeline;
     wire        epoch_done;
     wire [47:0] motion_energy_epoch;
 
-    motion_preprocess u_motion (
+    motion_process u_motion (
         .clk                   (clk),
         .rst_i                 (~resetn),
         .sample_valid_i        (accel_valid_o),

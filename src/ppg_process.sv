@@ -1,13 +1,32 @@
 `timescale 1ns/1ps
 
-module ppg_beat_detect_rr_calc #(
+module ppg_process #(
     parameter integer SAMPLE_W = 16,
     parameter integer T_W = 32,
     parameter integer X_W = 24,
     parameter integer ENV_W = 24,
     parameter integer COEFF_W = 12,
     parameter integer COEFF_FRAC = 10,
-    parameter integer QUALITY_MARGIN_SHIFT = 4
+    parameter integer QUALITY_MARGIN_SHIFT = 4,
+
+    // Optional compile-time configuration mode for area reduction.
+    parameter integer STATIC_CFG = 0,
+    parameter         STATIC_ENABLE = 1'b1,
+    parameter         STATIC_BYPASS = 1'b0,
+    parameter         STATIC_SIGNED = 1'b0,
+    parameter [COEFF_W-1:0] STATIC_LP_BETA = 12'd128,
+    parameter [COEFF_W-1:0] STATIC_BASE_ALPHA = 12'd16,
+    parameter [ENV_W-1:0]   STATIC_ENV_DECAY = 24'd8,
+    parameter         STATIC_ABS_EN = 1'b1,
+    parameter [COEFF_W-1:0] STATIC_THR_K = 12'd512,
+    parameter [ENV_W-1:0]   STATIC_THR_MIN = 24'd32,
+    parameter [T_W-1:0]     STATIC_REFRACT_TICKS = 32'd250,
+    parameter [T_W-1:0]     STATIC_RR_MIN_TICKS = 32'd300,
+    parameter [T_W-1:0]     STATIC_RR_MAX_TICKS = 32'd2000,
+    parameter [7:0]   STATIC_Q_AMP_W = 8'd4,
+    parameter [7:0]   STATIC_Q_SLOPE_W = 8'd2,
+    parameter [7:0]   STATIC_Q_REFRAC_PENALTY = 8'd24,
+    parameter [7:0]   STATIC_Q_MIN_ACCEPT = 8'd10
 ) (
     input  logic                         clk_i,
     input  logic                         rst_i,
@@ -31,7 +50,6 @@ module ppg_beat_detect_rr_calc #(
     input  logic [T_W-1:0]               cfg_refrac_ticks_i,
     input  logic [T_W-1:0]               cfg_rr_min_ticks_i,
     input  logic [T_W-1:0]               cfg_rr_max_ticks_i,
-    input  logic                         cfg_peak_mode_i,      // 0: local-max, 1: rising-edge
 
     input  logic [7:0]                   cfg_q_amp_w_i,
     input  logic [7:0]                   cfg_q_slope_w_i,
@@ -88,9 +106,43 @@ module ppg_beat_detect_rr_calc #(
     logic [T_W-1:0] elapsed_since_last_w;
     logic in_refrac_w;
 
+    logic                   cfg_enable_w;
+    logic                   cfg_bypass_w;
+    logic                   cfg_signed_w;
+    logic [COEFF_W-1:0]     cfg_lp_beta_w;
+    logic [COEFF_W-1:0]     cfg_base_alpha_w;
+    logic [ENV_W-1:0]       cfg_env_decay_w;
+    logic                   cfg_abs_en_w;
+    logic [COEFF_W-1:0]     cfg_thr_k_w;
+    logic [ENV_W-1:0]       cfg_thr_min_w;
+    logic [T_W-1:0]         cfg_refrac_ticks_w;
+    logic [T_W-1:0]         cfg_rr_min_ticks_w;
+    logic [T_W-1:0]         cfg_rr_max_ticks_w;
+    logic [7:0]             cfg_q_amp_w_w;
+    logic [7:0]             cfg_q_slope_w_w;
+    logic [7:0]             cfg_q_refrac_penalty_w;
+    logic [7:0]             cfg_q_min_accept_w;
+
+    assign cfg_enable_w           = STATIC_CFG ? STATIC_ENABLE : cfg_enable_i;
+    assign cfg_bypass_w           = STATIC_CFG ? STATIC_BYPASS : cfg_bypass_i;
+    assign cfg_signed_w           = STATIC_CFG ? STATIC_SIGNED : cfg_signed_i;
+    assign cfg_lp_beta_w          = STATIC_CFG ? STATIC_LP_BETA : cfg_lp_beta_i;
+    assign cfg_base_alpha_w       = STATIC_CFG ? STATIC_BASE_ALPHA : cfg_base_alpha_i;
+    assign cfg_env_decay_w        = STATIC_CFG ? STATIC_ENV_DECAY : cfg_env_decay_i;
+    assign cfg_abs_en_w           = STATIC_CFG ? STATIC_ABS_EN : cfg_abs_en_i;
+    assign cfg_thr_k_w            = STATIC_CFG ? STATIC_THR_K : cfg_thr_k_i;
+    assign cfg_thr_min_w          = STATIC_CFG ? STATIC_THR_MIN : cfg_thr_min_i;
+    assign cfg_refrac_ticks_w     = STATIC_CFG ? STATIC_REFRACT_TICKS : cfg_refrac_ticks_i;
+    assign cfg_rr_min_ticks_w     = STATIC_CFG ? STATIC_RR_MIN_TICKS : cfg_rr_min_ticks_i;
+    assign cfg_rr_max_ticks_w     = STATIC_CFG ? STATIC_RR_MAX_TICKS : cfg_rr_max_ticks_i;
+    assign cfg_q_amp_w_w          = STATIC_CFG ? STATIC_Q_AMP_W : cfg_q_amp_w_i;
+    assign cfg_q_slope_w_w        = STATIC_CFG ? STATIC_Q_SLOPE_W : cfg_q_slope_w_i;
+    assign cfg_q_refrac_penalty_w = STATIC_CFG ? STATIC_Q_REFRAC_PENALTY : cfg_q_refrac_penalty_i;
+    assign cfg_q_min_accept_w     = STATIC_CFG ? STATIC_Q_MIN_ACCEPT : cfg_q_min_accept_i;
+
     assign t_now_w = ppg_sample_time_i;
     assign elapsed_since_last_w = t_now_w - last_beat_time_r;
-    assign in_refrac_w = have_last_beat_r && (elapsed_since_last_w < cfg_refrac_ticks_i);
+    assign in_refrac_w = have_last_beat_r && (elapsed_since_last_w < cfg_refrac_ticks_w);
 
     always @(posedge clk_i) begin
         logic signed [X_W-1:0] x_raw_v;
@@ -115,8 +167,6 @@ module ppg_beat_detect_rr_calc #(
         logic [ENV_W-1:0] thr_next_v;
 
         logic localmax_candidate_v;
-        logic rise_candidate_v;
-        logic candidate_v;
 
         logic [X_W-1:0] peak_abs_v;
         logic signed [X_W-1:0] slope_signed_v;
@@ -175,15 +225,15 @@ module ppg_beat_detect_rr_calc #(
             double_beat_o  <= 1'b0;
             missed_beat_o  <= 1'b0;
 
-            if (!cfg_enable_i || cfg_bypass_i) begin
+            if (!cfg_enable_w || cfg_bypass_w) begin
                 ppg_invalid_o <= 1'b0;
                 have_init_r <= 1'b0;
-            end else if (have_last_beat_r && (elapsed_since_last_w > cfg_rr_max_ticks_i)) begin
+            end else if (have_last_beat_r && (elapsed_since_last_w > cfg_rr_max_ticks_w)) begin
                 ppg_invalid_o <= 1'b1;
             end
 
             if (ppg_valid_i) begin
-                x_raw_v = sample_to_signed(ppg_sample_i, cfg_signed_i);
+                x_raw_v = sample_to_signed(ppg_sample_i, cfg_signed_w);
                 if (!have_init_r) begin
                     // Seed filters to first sample to avoid large startup transients
                     // that can keep threshold too high for a long time.
@@ -191,84 +241,71 @@ module ppg_beat_detect_rr_calc #(
                     x_base_r <= x_raw_v;
                     x_hp_r <= '0;
                     env_r <= '0;
-                    thr_r <= cfg_thr_min_i;
+                    thr_r <= cfg_thr_min_w;
                     xhp_d2_r <= '0;
                     xhp_d1_r <= '0;
-                    thr_d1_r <= cfg_thr_min_i;
+                    thr_d1_r <= cfg_thr_min_w;
                     t_d1_r <= t_now_w;
                     beat_quality_o <= 8'd0;
                     have_init_r <= 1'b1;
                 end else begin
 
                 lp_err_v = x_raw_v - x_lp_r;
-                if (cfg_lp_beta_i == {COEFF_W{1'b0}}) begin
+                if (cfg_lp_beta_w == {COEFF_W{1'b0}}) begin
                     x_lp_next_v = x_lp_r;
-                end else if (cfg_lp_beta_i >= COEFF_ONE) begin
+                end else if (cfg_lp_beta_w >= COEFF_ONE) begin
                     x_lp_next_v = x_raw_v;
                 end else begin
-                    lp_mul_v = lp_err_v * $signed({1'b0, cfg_lp_beta_i});
+                    lp_mul_v = lp_err_v * $signed({1'b0, cfg_lp_beta_w});
                     lp_step_v = lp_mul_v >>> COEFF_FRAC;
                     x_lp_next_v = x_lp_r + lp_step_v;
                 end
 
                 base_err_v = x_lp_next_v - x_base_r;
-                if (cfg_base_alpha_i == {COEFF_W{1'b0}}) begin
+                if (cfg_base_alpha_w == {COEFF_W{1'b0}}) begin
                     x_base_next_v = x_base_r;
-                end else if (cfg_base_alpha_i >= COEFF_ONE) begin
+                end else if (cfg_base_alpha_w >= COEFF_ONE) begin
                     x_base_next_v = x_lp_next_v;
                 end else begin
-                    base_mul_v = base_err_v * $signed({1'b0, cfg_base_alpha_i});
+                    base_mul_v = base_err_v * $signed({1'b0, cfg_base_alpha_w});
                     base_step_v = base_mul_v >>> COEFF_FRAC;
                     x_base_next_v = x_base_r + base_step_v;
                 end
 
                 x_hp_next_v = x_lp_next_v - x_base_next_v;
-                x_mag_v = cfg_abs_en_i ? abs_x(x_hp_next_v) : (x_hp_next_v[X_W-1] ? {X_W{1'b0}} : x_hp_next_v[X_W-1:0]);
+                x_mag_v = cfg_abs_en_w ? abs_x(x_hp_next_v) : (x_hp_next_v[X_W-1] ? {X_W{1'b0}} : x_hp_next_v[X_W-1:0]);
 
-                env_decay_v = (env_r > cfg_env_decay_i) ? (env_r - cfg_env_decay_i) : {ENV_W{1'b0}};
+                env_decay_v = (env_r > cfg_env_decay_w) ? (env_r - cfg_env_decay_w) : {ENV_W{1'b0}};
                 env_next_v  = (x_mag_v[ENV_W-1:0] > env_decay_v) ? x_mag_v[ENV_W-1:0] : env_decay_v;
 
-                thr_mul_v = env_next_v * cfg_thr_k_i;
+                thr_mul_v = env_next_v * cfg_thr_k_w;
                 thr_scaled_v = thr_mul_v >>> COEFF_FRAC;
-                thr_next_v = (thr_scaled_v > cfg_thr_min_i) ? thr_scaled_v : cfg_thr_min_i;
+                thr_next_v = (thr_scaled_v > cfg_thr_min_w) ? thr_scaled_v : cfg_thr_min_w;
 
                 localmax_candidate_v = (xhp_d1_r > xhp_d2_r) &&
                                        (xhp_d1_r > x_hp_next_v) &&
                                        (!xhp_d1_r[X_W-1]) &&
                                        (xhp_d1_r[X_W-1:0] > thr_d1_r);
 
-                rise_candidate_v = (!xhp_d1_r[X_W-1]) &&
-                                   (xhp_d1_r[X_W-1:0] <= thr_d1_r) &&
-                                   (!x_hp_next_v[X_W-1]) &&
-                                   (x_hp_next_v[X_W-1:0] > thr_next_v);
-
-                candidate_v = cfg_peak_mode_i ? rise_candidate_v : localmax_candidate_v;
-
-                if (cfg_peak_mode_i) begin
-                    peak_abs_v = x_mag_v;
-                    slope_signed_v = x_hp_next_v - xhp_d1_r;
-                    beat_time_v = t_now_w;
-                end else begin
-                    peak_abs_v = abs_x(xhp_d1_r);
-                    slope_signed_v = xhp_d1_r - xhp_d2_r;
-                    beat_time_v = t_d1_r;
-                end
+                peak_abs_v = abs_x(xhp_d1_r);
+                slope_signed_v = xhp_d1_r - xhp_d2_r;
+                beat_time_v = t_d1_r;
 
                 slope_mag_v = slope_signed_v[X_W-1] ? {X_W{1'b0}} : slope_signed_v[X_W-1:0];
                 amp_margin_v = (peak_abs_v > thr_d1_r) ? (peak_abs_v - thr_d1_r) : {X_W{1'b0}};
                 slope_margin_v = slope_mag_v;
 
-                amp_term_v = cfg_q_amp_w_i * (amp_margin_v >> QUALITY_MARGIN_SHIFT);
-                slope_term_v = cfg_q_slope_w_i * (slope_margin_v >> QUALITY_MARGIN_SHIFT);
+                amp_term_v = cfg_q_amp_w_w * (amp_margin_v >> QUALITY_MARGIN_SHIFT);
+                slope_term_v = cfg_q_slope_w_w * (slope_margin_v >> QUALITY_MARGIN_SHIFT);
                 quality_raw_v = amp_term_v + slope_term_v;
 
                 penalty_v = ((have_last_beat_r) &&
-                             (elapsed_since_last_w < (cfg_refrac_ticks_i + (cfg_refrac_ticks_i >> 2)))) ?
-                             cfg_q_refrac_penalty_i : 8'd0;
+                             (elapsed_since_last_w < (cfg_refrac_ticks_w + (cfg_refrac_ticks_w >> 2)))) ?
+                             cfg_q_refrac_penalty_w : 8'd0;
 
                 quality_minus_pen_v = (quality_raw_v > penalty_v) ? (quality_raw_v - penalty_v) : 32'd0;
                 quality_v = (quality_minus_pen_v > 32'd255) ? 8'd255 : quality_minus_pen_v[7:0];
-                quality_ok_v = (quality_v >= cfg_q_min_accept_i);
+                quality_ok_v = (quality_v >= cfg_q_min_accept_w);
 
                 accept_v = 1'b0;
                 reject_short_rr_v = 1'b0;
@@ -278,21 +315,21 @@ module ppg_beat_detect_rr_calc #(
                 hr_bpm_new_v = prev_hr_bpm_r;
                 delta_hr_v = 17'sd0;
 
-                if (cfg_enable_i && !cfg_bypass_i && candidate_v && !in_refrac_w && quality_ok_v) begin
+                if (cfg_enable_w && !cfg_bypass_w && localmax_candidate_v && !in_refrac_w && quality_ok_v) begin
                     if (!have_last_beat_r) begin
                         accept_v = 1'b1;
-                    end else if (rr_v < cfg_rr_min_ticks_i) begin
+                    end else if (rr_v < cfg_rr_min_ticks_w) begin
                         reject_short_rr_v = 1'b1;
                     end else begin
                         accept_v = 1'b1;
                         rr_should_pulse_v = 1'b1;
-                        if (rr_v > cfg_rr_max_ticks_i) begin
+                        if (rr_v > cfg_rr_max_ticks_w) begin
                             flag_missed_v = 1'b1;
                         end
                     end
                 end
 
-                if (candidate_v && !in_refrac_w) begin
+                if (localmax_candidate_v && !in_refrac_w) begin
                     beat_quality_o <= quality_v;
                 end
 
@@ -309,7 +346,7 @@ module ppg_beat_detect_rr_calc #(
 
                 if (rr_should_pulse_v) begin
                     rr_valid_o <= 1'b1;
-                    rr_accepted_o <= !reject_short_rr_v && (rr_v <= cfg_rr_max_ticks_i);
+                    rr_accepted_o <= !reject_short_rr_v && (rr_v <= cfg_rr_max_ticks_w);
                     rr_interval_o <= rr_v;
                     if (rr_v != {T_W{1'b0}}) begin
                         hr_bpm_new_v = 16'(32'd60000 / rr_v);

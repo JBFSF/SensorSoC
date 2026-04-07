@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-module motion_preprocess #(
+module motion_process #(
     parameter integer AX_W = 14,
     parameter integer MAG_W = (AX_W + 2),
     parameter integer DYN_W = (MAG_W + 1),

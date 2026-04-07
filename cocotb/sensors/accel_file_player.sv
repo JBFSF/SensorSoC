@@ -13,7 +13,7 @@
 //   - ODR: 25 Hz (low-power mode, suitable for sleep tracking)
 //   - Sensitivity: 0.488 mg/LSB
 //
-// Output width is 14 bits signed to match motion_preprocess.sv (AX_W=14).
+// Output width is 14 bits signed to match motion_process.sv (AX_W=14).
 //
 // CSV path is set at runtime via plusarg:
 //   vvp sim.out +DATA_DIR=cocotb/sim/data   (from repo root)
