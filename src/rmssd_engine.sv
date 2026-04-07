@@ -5,7 +5,7 @@ module rmssd_engine #(
     parameter integer ACC_W = 40,
     parameter integer CNT_W = 16,
     parameter integer MIN_RR_COUNT = 1,
-    parameter integer   = 64
+    parameter integer MAX_DIFF_COUNT = 64
 ) (
     input  logic                         clk_i,
     input  logic                         rst_i,

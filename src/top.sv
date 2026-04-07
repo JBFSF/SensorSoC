@@ -111,7 +111,7 @@ module top #(
     logic accel_error_w;                 // sticky flag: accel_reader saw an I2C error
     logic [15:0] motion_inst_mag_w;      // per-sample motion magnitude proxy (|ax|+|ay|+|az|) for signal quality
 
-    logic motion_epoch_w;                // strobe: motion_preprocess completed an epoch accumulation
+    logic motion_epoch_w;                // strobe: motion_process completed an epoch accumulation
     logic [47:0] motion_energy_w;        // per-epoch motion energy accumulator output
 
     logic [15:0] ppg_sample_w;           // raw PPG sample from FIFO reader
@@ -522,9 +522,9 @@ module top #(
         .nack_seen_o()                           // unused: NACK-seen flag
     );
 
-    motion_preprocess #(
+    motion_process #(
         .AX_W(16)
-    ) u_motion_preprocess (
+    ) u_motion_process (
         .clk(clk_i),
         .rst_i(reset_i),
         .sample_valid_i(accel_valid_w),     // drive motion accumulation with each valid accel sample
@@ -572,7 +572,7 @@ module top #(
         .i2c_error_flag(ppg_i2c_err_w)          // sticky I2C error flag on PPG path
     );
 
-    ppg_beat_detect_rr_calc u_beat_detect (
+    ppg_process u_beat_detect (
         .clk_i(clk_i),
         .rst_i(reset_i),
         .ppg_sample_i(ppg_sample_w),            // raw PPG sample stream input
@@ -590,7 +590,6 @@ module top #(
         .cfg_refrac_ticks_i(CFG_REFRACT_MS),    // refractory time between beats (ms)
         .cfg_rr_min_ticks_i(CFG_RR_MIN_MS),     // minimum plausible RR interval (ms)
         .cfg_rr_max_ticks_i(CFG_RR_MAX_MS),     // maximum plausible RR interval (ms)
-        .cfg_peak_mode_i(1'b0),                 // detection mode select (0=local max)
         .cfg_q_amp_w_i(CFG_Q_AMP_W),            // beat-quality amplitude weight
         .cfg_q_slope_w_i(CFG_Q_SLOPE_W),        // beat-quality slope weight
         .cfg_q_refrac_penalty_i(CFG_Q_REFRAC_PENALTY), // penalty weight for refractory violations
@@ -611,11 +610,11 @@ module top #(
     ) u_rmssd (
         .clk_i(clk_i),
         .rst_i(reset_i),
-        .rr_interval_i(rr_interval_w),  // RR interval input for HRV calculation
+        .rr_interval_i(rr_interval_w[15:0]),  // RR interval input for HRV calculation
         .rr_valid_i(rr_valid_w),        // strobe: RR interval input valid
         .rr_accepted_i(rr_accepted_w),  // only include accepted RR intervals
         .epoch_end_i(epoch_end_w),      // epoch boundary: finalize RMSSD and reset accumulators
-        .rmssd_epoch_o(rmssd_w),        // RMSSD result for epoch
+        .rmssd_epoch_o(rmssd_w[15:0]),        // RMSSD result for epoch
         .rmssd_valid_o(rmssd_valid_w),  // strobe: RMSSD output valid
         .rr_diff_count_o()              // unused: number of RR diffs included
     );
@@ -701,7 +700,7 @@ module top #(
     //   +0x08 motion feature
     //   +0x0C delta-HR feature
     //   +0x10 RMSSD feature
-    always_comb begin
+    always @(*) begin
         case (feat_off)
             32'h00: feat_mmio_rdata = {14'd0, feat_gate_latched_r, 8'd0, feat_invalid_reason_latched_r, feat_latched_valid_r};
             32'h04: feat_mmio_rdata = {{16{feat_time_latched_r[15]}}, feat_time_latched_r};

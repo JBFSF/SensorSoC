@@ -499,7 +499,7 @@ initial begin
 end
 
 initial begin
-    $dumpfile("/tmp/top_feature_ml_cpu_spi_flash.vcd");
+    $dumpfile("sim/build/top_feature_ml_cpu_spi_flash.vcd");
     $dumpvars(0, tb_top_feature_ml_cpu_spi_flash);
 end
 
