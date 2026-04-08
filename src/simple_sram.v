@@ -18,42 +18,159 @@ module simple_sram #(
     input  wire [31:0] addr,   // byte address
     input  wire [31:0] wdata,
     output reg  [31:0] rdata
-);
-    reg [31:0] mem [0:WORDS-1];
+); 
+    //8 RAM banks: for 1024 words, each word 32bits, so 4 rams for 512 32bit words, times 2 for 1024 words
+    //1 is bottom, 2, 3, 4 is top
+    //can CEN be pulsed with the valid signal? maybe for GWEN check for valid too, can do it with the addr[9] bit too maybe?
+    
+    supply1 vdd;
+    supply0 vss;
+    wire [7:0] gwen;
+    wire cen_w = ~valid;
+    wire [31:0] rdata_a;
+    wire [31:0] rdata_b;
 
-    // optional init
-    integer i;
-    initial begin
-        if (INIT_HEX != "") begin
-            $display("simple_sram: loading INIT_HEX=%s", INIT_HEX);
-            $readmemh(INIT_HEX, mem);
-            $display("SRAM[0]=%08x SRAM[1]=%08x SRAM[2]=%08x SRAM[3]=%08x",
-         mem[0], mem[1], mem[2], mem[3]);
+    assign gwen = {~(wstrb & {4{valid&addr[9]}}),~(wstrb & {4{valid&~addr[9]}})};
+    // we want only if it's valid and were writing this bit for it to be 0
+    // bc it's global write enable negated, so only pass it a 0 if we are ready to write it
+    //expand to 8, if addr[9] is 0, activate write for bank A
+    // otherwise, go gwen on for bank B
 
-        end else begin
-            // default clear (optional)
-            for (i = 0; i < WORDS; i = i + 1)
-                mem[i] = 32'h0000_0000;
-        end
-    end
+    gf180mcu_fd_ip_sram__sram512x8m8wm1 
+    mem_A_1 (
+        .CLK(clk), 
+        .CEN(~valid), 
+        .GWEN(gwen[0]),
+        .WEN(8'b00000000), 
+        .A(addr[8:0]),
+        .D(wdata[7:0]),
+        .Q(rdata_a[7:0]),
+        .VDD(vdd), 
+        .VSS(vss)
+    );
+    gf180mcu_fd_ip_sram__sram512x8m8wm1 
+    mem_A_2 (
+        .CLK(clk), 
+        .CEN(~valid), 
+        .GWEN(gwen[1]),
+        .WEN(8'b00000000), 
+        .A(addr[8:0]),
+        .D(wdata[15:8]),
+        .Q(rdata_a[15:8]),
+        .VDD(vdd), 
+        .VSS(vss)
+    );
+    gf180mcu_fd_ip_sram__sram512x8m8wm1 
+    mem_A_3 (
+        .CLK(clk), 
+        .CEN(~valid), 
+        .GWEN(gwen[2]),
+        .WEN(8'b00000000), 
+        .A(addr[8:0]),
+        .D(wdata[23:16]),
+        .Q(rdata_a[23:16]),
+        .VDD(vdd), 
+        .VSS(vss)
+    );
+    gf180mcu_fd_ip_sram__sram512x8m8wm1 
+    mem_A_4 (
+        .CLK(clk), 
+        .CEN(~valid), 
+        .GWEN(gwen[3]),
+        .WEN(8'b00000000), 
+        .A(addr[8:0]),
+        .D(wdata[31:24]),
+        .Q(rdata_a[31:24]),
+        .VDD(vdd), 
+        .VSS(vss)
+    );
 
-    wire [31:0] word_index = addr >> 2;
+    gf180mcu_fd_ip_sram__sram512x8m8wm1 
+    mem_B_1 (
+        .CLK(clk), 
+        .CEN(~valid), 
+        .GWEN(gwen[4]),
+        .WEN(8'b00000000), 
+        .A(addr[8:0]),
+        .D(wdata[7:0]),
+        .Q(rdata_b[7:0]),
+        .VDD(vdd), 
+        .VSS(vss)
+    );
+    gf180mcu_fd_ip_sram__sram512x8m8wm1 
+    mem_B_2 (
+        .CLK(clk), 
+        .CEN(~valid), 
+        .GWEN(gwen[5]),
+        .WEN(8'b00000000), 
+        .A(addr[8:0]),
+        .D(wdata[15:8]),
+        .Q(rdata_b[15:8]),
+        .VDD(vdd), 
+        .VSS(vss)
+    );
+    gf180mcu_fd_ip_sram__sram512x8m8wm1 
+    mem_B_3 (
+        .CLK(clk), 
+        .CEN(~valid), 
+        .GWEN(gwen[6]),
+        .WEN(8'b00000000), 
+        .A(addr[8:0]),
+        .D(wdata[23:16]),
+        .Q(rdata_b[23:16]),
+        .VDD(vdd), 
+        .VSS(vss)
+    );
+    gf180mcu_fd_ip_sram__sram512x8m8wm1 
+    mem_B_4 (
+        .CLK(clk), 
+        .CEN(~valid), 
+        .GWEN(gwen[7]),
+        .WEN(8'b00000000), 
+        .A(addr[8:0]),
+        .D(wdata[31:24]),
+        .Q(rdata_b[31:24]),
+        .VDD(vdd), 
+        .VSS(vss)
+    );
 
-    always @(posedge clk) begin
-        if (!resetn) begin
-            ready <= 1'b0;
-            rdata <= 32'h0;
-        end else begin
-            ready <= 1'b0;
-            if (valid) begin
-                ready <= 1'b1;
-                rdata <= mem[word_index];
+    assign rdata = (addr[9]) ? rdata_b : rdata_a;
+    assign ready = 1'b1; // is this ok? look at how ready is used in soc_top
+    // reg [31:0] mem [0:WORDS-1];
 
-                if (wstrb[0]) mem[word_index][ 7: 0] <= wdata[ 7: 0];
-                if (wstrb[1]) mem[word_index][15: 8] <= wdata[15: 8];
-                if (wstrb[2]) mem[word_index][23:16] <= wdata[23:16];
-                if (wstrb[3]) mem[word_index][31:24] <= wdata[31:24];
-            end
-        end
-    end
+    // // optional init
+    // integer i;
+    // initial begin
+    //     if (INIT_HEX != "") begin
+    //         $display("simple_sram: loading INIT_HEX=%s", INIT_HEX);
+    //         $readmemh(INIT_HEX, mem);
+    //         $display("SRAM[0]=%08x SRAM[1]=%08x SRAM[2]=%08x SRAM[3]=%08x",
+    //      mem[0], mem[1], mem[2], mem[3]);
+
+    //     end else begin
+    //         // default clear (optional)
+    //         for (i = 0; i < WORDS; i = i + 1)
+    //             mem[i] = 32'h0000_0000;
+    //     end
+    // end
+
+    // wire [31:0] word_index = addr >> 2;
+
+    // always @(posedge clk) begin
+    //     if (!resetn) begin
+    //         ready <= 1'b0;
+    //         rdata <= 32'h0;
+    //     end else begin
+    //         ready <= 1'b0;
+    //         if (valid) begin
+    //             ready <= 1'b1;
+    //             rdata <= mem[word_index];
+
+    //             if (wstrb[0]) mem[word_index][ 7: 0] <= wdata[ 7: 0];
+    //             if (wstrb[1]) mem[word_index][15: 8] <= wdata[15: 8];
+    //             if (wstrb[2]) mem[word_index][23:16] <= wdata[23:16];
+    //             if (wstrb[3]) mem[word_index][31:24] <= wdata[31:24];
+    //         end
+    //     end
+    // end
 endmodule
