@@ -28,9 +28,29 @@
 #   make sim-reset-ctrl
 #   make sim-globaltimer
 #   make sim-logit-confidence
+#   make sim-top-feature-ml-cpu
+#   make sim-top-feature-ml-cpu-spi-flash
+#   make sim-top-feature-ml-prod-main-host-i2c
+#   make sim-top-sleep-wake-unified
 #
 #   # Cleanup
 #   make clean
+#
+# Unified top command guide:
+#   make test-top-feature-mmio-unified
+#     Sensor pipeline -> feature MMIO latch proof for unified top.sv.
+#
+#   make sim-top-feature-ml-cpu
+#     CPU reads feature MMIO, writes weight_ram_axi, and starts ML.
+#
+#   make sim-top-feature-ml-cpu-spi-flash
+#     Same CPU-owned ML path, but with weights streamed from simulated SPI flash.
+#
+#   make sim-top-feature-ml-prod-main-host-i2c
+#     Most production-like unified-top flow: SPI load + ML loop + host-I2C visibility.
+#
+#   make sim-top-sleep-wake-unified
+#     Repeated timer-wake + ML-IRQ-wake regression for unified top.sv.
 #
 # NOTE:
 #   This Makefile expects a small helper script at:
@@ -177,6 +197,7 @@ FW_C_test_ml_weights        := $(FW_TESTS)/test_ml_weights.c
 FW_C_test_ml_cpu_wake_i2c   := $(FW_TESTS)/test_ml_cpu_wake_i2c.c
 FW_C_test_top_feature_ml_cpu:= $(FW_TESTS)/test_top_feature_ml_cpu.c
 FW_C_test_top_feature_ml_cpu_spi_flash:= $(FW_TESTS)/test_top_feature_ml_cpu_spi_flash.c
+FW_C_test_top_sleep_wake_unified := $(FW_TESTS)/test_top_sleep_wake_unified.c
 
 # Select the C source based on FW_VARIANT
 FW_SRC = $(FW_C_$(FW_VARIANT))
@@ -191,6 +212,7 @@ FW_ARCH_test_ml_cpu_wake_i2c := rv32im
 FW_ARCH_prod_main := rv32im
 FW_ARCH_test_top_feature_ml_cpu := rv32im
 FW_ARCH_test_top_feature_ml_cpu_spi_flash := rv32im
+FW_ARCH_test_top_sleep_wake_unified := rv32im
 FW_ARCH := $(if $(FW_ARCH_$(FW_VARIANT)),$(FW_ARCH_$(FW_VARIANT)),$(FW_ARCH_DEFAULT))
 FW_OPT_DEFAULT := -O2
 FW_OPT_test_ml_cpu_wake_i2c := -O0
@@ -259,6 +281,9 @@ firmware-top-feature-ml-cpu:
 
 firmware-top-feature-ml-cpu-spi-flash:
 	@$(SELF_MAKE) FW_VARIANT=test_top_feature_ml_cpu_spi_flash firmware
+
+firmware-top-sleep-wake-unified:
+	@$(SELF_MAKE) FW_VARIANT=test_top_sleep_wake_unified firmware
 
 
 
@@ -466,6 +491,53 @@ sim-top-feature-ml-prod-main-host-i2c: $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP) 
 	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
 	@echo "== Running $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP) (FW=$(FW_DIR)/build/prod_main/firmware.hex FLASH=$(TAKETWO_PARAMS_HEX)) =="
 	$(VVP) $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP)
+
+# Unified top: dedicated timer sleep/wake regression.
+# This bench isolates the always-on timer + pwrctrl + irq_ctrl sleep path:
+#   firmware requests sleep -> CPU clock gates -> timer wake arrives
+#   -> wake bookkeeping latches -> firmware clears sticky state.
+TOP_SLEEP_WAKE_UNIFIED_TOP     := tb_top_sleep_wake_unified
+TOP_SLEEP_WAKE_UNIFIED_VVP     := $(BUILD_DIR)/$(TOP_SLEEP_WAKE_UNIFIED_TOP).vvp
+TOP_SLEEP_WAKE_UNIFIED_SOURCES := \
+	$(TB_DIR)/tb_top_sleep_wake_unified.sv \
+	$(RTL_DIR)/top.sv \
+	$(RTL_DIR)/host_i2c_target.v \
+	$(RTL_DIR)/host_i2c_bridge_regs.v \
+	$(RTL_DIR)/i2c_master.sv \
+	$(RTL_DIR)/accel_reader.sv \
+	$(RTL_DIR)/motion_process.sv \
+	$(RTL_DIR)/ppg_fifo_reader.sv \
+	$(RTL_DIR)/ppg_process.sv \
+	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/signal_quality.sv \
+	$(RTL_DIR)/feature_engine.sv \
+	$(RTL_DIR)/cos_lut_timer.sv \
+	$(RTL_DIR)/globaltimer.sv \
+	$(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_master_mmio.v \
+	$(MAKEFILE_DIR)/../ip/picorv32.v \
+	$(RTL_DIR)/test_mmio.v \
+	$(RTL_DIR)/timer_mmio.v \
+	$(RTL_DIR)/ml_axil_bridge_mmio.v \
+	$(RTL_DIR)/weight_ram_axi.v \
+	$(RTL_DIR)/irq_ctrl_mmio.v \
+	$(RTL_DIR)/taketwo_wrap.v \
+	$(RTL_DIR)/taketwo.v \
+	$(RTL_DIR)/pwrctrl_mmio.v \
+	$(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v \
+	sensors/i2c_slave_lis2dw12.sv \
+	sensors/i2c_slave_adpd144ri.sv
+
+$(TOP_SLEEP_WAKE_UNIFIED_VVP): $(TOP_SLEEP_WAKE_UNIFIED_SOURCES)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_SLEEP_WAKE_UNIFIED_TOP) -o $@ \
+	  $(TOP_SLEEP_WAKE_UNIFIED_SOURCES)
+
+.PHONY: sim-top-sleep-wake-unified
+sim-top-sleep-wake-unified: $(TOP_SLEEP_WAKE_UNIFIED_VVP) | $(SIM_BUILD)
+	@$(SELF_MAKE) FW_VARIANT=test_top_sleep_wake_unified firmware
+	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
+	@echo "== Running $(TOP_SLEEP_WAKE_UNIFIED_TOP) (FW=$(FW_DIR)/build/test_top_sleep_wake_unified/firmware.hex) =="
+	$(VVP) $(TOP_SLEEP_WAKE_UNIFIED_VVP)
 
 .PHONY: test-cpu-ml-pipeline
 test-cpu-ml-pipeline:
