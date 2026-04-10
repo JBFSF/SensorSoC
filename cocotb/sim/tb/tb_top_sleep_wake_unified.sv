@@ -3,9 +3,10 @@
 module tb_top_sleep_wake_unified;
 
 // Dedicated unified-top sleep/wake regression.
-// Repeated timer + ML wake verification.
+// Repeated timer + ML + host-I2C wake verification.
 // Each firmware iteration performs:
 //   timer wake, then ML IRQ wake.
+//   then host-I2C wake through the always-on host bridge.
 // The bench checks that the same mechanisms stay coherent across multiple
 // cycles rather than only the first one.
 
@@ -36,6 +37,7 @@ localparam [31:0] TEST_PASS     = 32'hCAFEBABE;
 localparam [31:0] TEST_FAIL     = 32'hDEADBEEF;
 localparam [31:0] IRQ_TIMER_BIT = 32'h0000_0001;
 localparam [31:0] IRQ_ML_BIT    = 32'h0000_0002;
+localparam [31:0] IRQ_HOST_BIT  = 32'h0000_0004;
 localparam integer EXPECTED_ITERS = 2;
 
 localparam int unsigned TB_TIMEOUT_CYCLES = 2_000_000;
@@ -73,6 +75,8 @@ wire        spi_mosi;
 wire        spi_cs_n;
 wire        host_i2c_scl;
 tri1        host_i2c_sda;
+reg         scl_drv;
+reg         sda_drv_low;
 
 localparam [6:0] ACC_ADDR = 7'h19;
 localparam [6:0] PPG_ADDR = 7'h64;
@@ -103,6 +107,10 @@ integer timer_event_rises;
 integer ml_sleep_edges;
 integer ml_wake_edges;
 integer ml_pending_rises;
+integer host_sleep_edges;
+integer host_wake_edges;
+integer host_pending_rises;
+integer host_event_pulses;
 integer irq_claim_reads;
 integer irq_complete_writes;
 integer ml_irq_clr_writes;
@@ -111,8 +119,11 @@ reg prev_cpu_clk_en;
 reg prev_timer_event;
 reg prev_timer_pending;
 reg prev_ml_pending;
+reg prev_host_pending;
 reg saw_timer_reason_bit;
 reg saw_ml_reason_bit;
+reg saw_host_reason_bit;
+reg issued_host_kick;
 
 assign sim_ack    = (sim_addr == ACC_ADDR) ? accel_sim_ack    :
                     (sim_addr == PPG_ADDR) ? ppg_sim_ack      : 1'b0;
@@ -182,7 +193,8 @@ top #(
     .alarm_o(alarm)
 );
 
-assign host_i2c_scl = 1'b1;
+assign host_i2c_scl = scl_drv;
+assign host_i2c_sda = sda_drv_low ? 1'b0 : 1'bz;
 
 i2c_slave_lis2dw12 #(
     .I2C_ADDR(ACC_ADDR)
@@ -220,8 +232,104 @@ i2c_slave_adpd144ri #(
 
 always #10 clk = ~clk;
 
+task i2c_tick;
+begin
+    #120;
+end
+endtask
+
+task i2c_start;
+begin
+    sda_drv_low = 1'b0;
+    scl_drv     = 1'b1;
+    i2c_tick();
+    sda_drv_low = 1'b1;
+    i2c_tick();
+    scl_drv     = 1'b0;
+    i2c_tick();
+end
+endtask
+
+task i2c_stop;
+begin
+    sda_drv_low = 1'b1;
+    scl_drv     = 1'b0;
+    i2c_tick();
+    scl_drv     = 1'b1;
+    i2c_tick();
+    sda_drv_low = 1'b0;
+    i2c_tick();
+end
+endtask
+
+task i2c_write_bit;
+    input bitval;
+begin
+    scl_drv     = 1'b0;
+    sda_drv_low = bitval ? 1'b0 : 1'b1;
+    i2c_tick();
+    scl_drv     = 1'b1;
+    i2c_tick();
+    scl_drv     = 1'b0;
+    i2c_tick();
+end
+endtask
+
+task i2c_read_bit;
+    output bitval;
+begin
+    scl_drv     = 1'b0;
+    sda_drv_low = 1'b0;
+    i2c_tick();
+    scl_drv     = 1'b1;
+    i2c_tick();
+    bitval      = host_i2c_sda;
+    scl_drv     = 1'b0;
+    i2c_tick();
+end
+endtask
+
+task i2c_write_byte;
+    input [7:0] byte_in;
+    output ack;
+    integer i;
+    reg bitv;
+begin
+    for (i = 7; i >= 0; i = i - 1) i2c_write_bit(byte_in[i]);
+    i2c_read_bit(bitv);
+    ack = ~bitv;
+end
+endtask
+
+task i2c_write_reg;
+    input [7:0] reg_addr;
+    input [7:0] reg_data;
+    reg ack;
+begin
+    i2c_start();
+    i2c_write_byte(8'h84, ack);
+    if (!ack) begin
+        $display("FAIL: no ACK on host write address");
+        failures = failures + 1;
+    end
+    i2c_write_byte(reg_addr, ack);
+    if (!ack) begin
+        $display("FAIL: no ACK on host register pointer");
+        failures = failures + 1;
+    end
+    i2c_write_byte(reg_data, ack);
+    if (!ack) begin
+        $display("FAIL: no ACK on host register data");
+        failures = failures + 1;
+    end
+    i2c_stop();
+end
+endtask
+
 always @(posedge clk) begin
     if (reset) begin
+        scl_drv <= 1'b1;
+        sda_drv_low <= 1'b0;
         sleep_edges <= 0;
         wake_edges <= 0;
         sleep_writes <= 0;
@@ -233,6 +341,10 @@ always @(posedge clk) begin
         ml_sleep_edges <= 0;
         ml_wake_edges <= 0;
         ml_pending_rises <= 0;
+        host_sleep_edges <= 0;
+        host_wake_edges <= 0;
+        host_pending_rises <= 0;
+        host_event_pulses <= 0;
         irq_claim_reads <= 0;
         irq_complete_writes <= 0;
         ml_irq_clr_writes <= 0;
@@ -241,8 +353,11 @@ always @(posedge clk) begin
         prev_timer_event <= 1'b0;
         prev_timer_pending <= 1'b0;
         prev_ml_pending <= 1'b0;
+        prev_host_pending <= 1'b0;
         saw_timer_reason_bit <= 1'b0;
         saw_ml_reason_bit <= 1'b0;
+        saw_host_reason_bit <= 1'b0;
+        issued_host_kick <= 1'b0;
     end else begin
         // Count the specific MMIO accesses that prove firmware is exercising
         // the intended power-control and IRQ-controller contract.
@@ -280,11 +395,19 @@ always @(posedge clk) begin
             saw_timer_reason_bit <= 1'b1;
         if (dut.u_pwr.wake_reason[1] || dut.u_pwr.wake_status[1])
             saw_ml_reason_bit <= 1'b1;
+        if (dut.u_pwr.wake_reason[2] || dut.u_pwr.wake_status[2])
+            saw_host_reason_bit <= 1'b1;
+        if (dut.host_i2c_irq_event)
+            host_event_pulses <= host_event_pulses + 1;
 
         if (prev_cpu_clk_en && !dut.cpu_clk_en) begin
             sleep_edges <= sleep_edges + 1;
             $display("[%0t] TB: CPU -> SLEEP (%0d) pc=0x%08x sleep_req=%0b wake_status=0x%08x",
                      $time, sleep_edges + 1, dut.cpu.reg_pc, dut.sleep_req, dut.u_pwr.wake_status);
+            if (dut.sleep_req && dut.u_irqc.wake_en[2]) begin
+                host_sleep_edges <= host_sleep_edges + 1;
+                issued_host_kick <= 1'b0;
+            end
         end
 
         if (!prev_cpu_clk_en && dut.cpu_clk_en) begin
@@ -293,6 +416,8 @@ always @(posedge clk) begin
                      $time, wake_edges + 1, dut.cpu.reg_pc, dut.u_pwr.wake_reason, dut.u_irqc.pending);
             if (dut.u_pwr.wake_status[1] || dut.u_pwr.wake_reason[1] || dut.u_irqc.pending[1])
                 ml_wake_edges <= ml_wake_edges + 1;
+            if (dut.u_pwr.wake_status[2] || dut.u_pwr.wake_reason[2] || dut.u_irqc.pending[2])
+                host_wake_edges <= host_wake_edges + 1;
         end
 
         if (!prev_timer_pending && dut.u_irqc.pending[0]) begin
@@ -304,6 +429,11 @@ always @(posedge clk) begin
             $display("[%0t] TB: ML pending rise wake_status=0x%08x wake_reason=0x%08x active=0x%08x claim=0x%08x",
                      $time, dut.u_pwr.wake_status, dut.u_pwr.wake_reason, dut.u_irqc.active, dut.u_irqc.claim_id);
         end
+        if (!prev_host_pending && dut.u_irqc.pending[2]) begin
+            host_pending_rises <= host_pending_rises + 1;
+            $display("[%0t] TB: HOST pending rise wake_status=0x%08x wake_reason=0x%08x",
+                     $time, dut.u_pwr.wake_status, dut.u_pwr.wake_reason);
+        end
         if (prev_cpu_clk_en && !dut.cpu_clk_en && dut.sleep_req && dut.u_irqc.wake_en[1])
             ml_sleep_edges <= ml_sleep_edges + 1;
 
@@ -311,12 +441,15 @@ always @(posedge clk) begin
         prev_timer_event <= dut.timer_event;
         prev_timer_pending <= dut.u_irqc.pending[0];
         prev_ml_pending <= dut.u_irqc.pending[1];
+        prev_host_pending <= dut.u_irqc.pending[2];
     end
 end
 
 initial begin
     clk = 1'b0;
     reset = 1'b1;
+    scl_drv = 1'b1;
+    sda_drv_low = 1'b0;
     failures = 0;
     cycles = 0;
 
@@ -337,6 +470,12 @@ initial begin
             $display("[%0t] TB: progress cycles=%0d pc=0x%08x cpu_clk_en=%0b sleeping=%0b sleep_req=%0b wake_status=0x%08x wake_reason=0x%08x pending=0x%08x",
                      $time, cycles, dut.cpu.reg_pc, dut.cpu_clk_en, dut.sleeping_r, dut.sleep_req,
                      dut.u_pwr.wake_status, dut.u_pwr.wake_reason, dut.u_irqc.pending);
+        end
+
+        if (!reset && dut.cpu_clk_en == 1'b0 && dut.sleep_req && dut.u_irqc.wake_en[2] && !issued_host_kick) begin
+            issued_host_kick = 1'b1;
+            i2c_write_reg(8'h04, 8'h01);
+            $display("[%0t] TB: issued host-I2C wake kick while CPU asleep", $time);
         end
     end
 
@@ -398,6 +537,22 @@ initial begin
         $display("FAIL: observed too few ML pending rises: %0d", ml_pending_rises);
         failures = failures + 1;
     end
+    if (host_sleep_edges < EXPECTED_ITERS) begin
+        $display("FAIL: observed too few host-armed sleep edges: %0d", host_sleep_edges);
+        failures = failures + 1;
+    end
+    if (host_wake_edges < EXPECTED_ITERS) begin
+        $display("FAIL: observed too few host-attributed wake edges: %0d", host_wake_edges);
+        failures = failures + 1;
+    end
+    if (host_pending_rises < EXPECTED_ITERS) begin
+        $display("FAIL: observed too few host pending rises: %0d", host_pending_rises);
+        failures = failures + 1;
+    end
+    if (host_event_pulses < EXPECTED_ITERS) begin
+        $display("FAIL: observed too few host_i2c_irq_event pulses: %0d", host_event_pulses);
+        failures = failures + 1;
+    end
     if (irq_claim_reads < EXPECTED_ITERS) begin
         $display("FAIL: observed too few IRQC_CLAIM reads: %0d", irq_claim_reads);
         failures = failures + 1;
@@ -418,6 +573,10 @@ initial begin
         $display("FAIL: never observed ML bit in wake_reason/wake_status");
         failures = failures + 1;
     end
+    if (!saw_host_reason_bit) begin
+        $display("FAIL: never observed HOST bit in wake_reason/wake_status");
+        failures = failures + 1;
+    end
     if (dut.u_irqc.pending[0]) begin
         $display("FAIL: timer pending bit still set at end of test");
         failures = failures + 1;
@@ -430,15 +589,24 @@ initial begin
         $display("FAIL: ML pending bit still set at end of test");
         failures = failures + 1;
     end
+    if (dut.u_irqc.pending[2]) begin
+        $display("FAIL: HOST pending bit still set at end of test");
+        failures = failures + 1;
+    end
     if (dut.u_pwr.wake_status[1]) begin
         $display("FAIL: pwr wake_status ML bit still set at end of test");
         failures = failures + 1;
     end
+    if (dut.u_pwr.wake_status[2]) begin
+        $display("FAIL: pwr wake_status HOST bit still set at end of test");
+        failures = failures + 1;
+    end
 
     if (failures == 0) begin
-        $display("PASS: tb_top_sleep_wake_unified sleep_edges=%0d wake_edges=%0d timer_event_rises=%0d ml=%0d/%0d/%0d claims=%0d/%0d mlclr=%0d code=0x%08x",
+        $display("PASS: tb_top_sleep_wake_unified sleep_edges=%0d wake_edges=%0d timer_event_rises=%0d ml=%0d/%0d/%0d host=%0d/%0d/%0d evt=%0d claims=%0d/%0d mlclr=%0d code=0x%08x",
                  sleep_edges, wake_edges, timer_event_rises,
                  ml_sleep_edges, ml_wake_edges, ml_pending_rises,
+                 host_sleep_edges, host_wake_edges, host_pending_rises, host_event_pulses,
                  irq_claim_reads, irq_complete_writes, ml_irq_clr_writes,
                  dut.test_code);
     end else begin

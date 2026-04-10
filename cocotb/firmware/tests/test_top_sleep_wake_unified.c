@@ -4,6 +4,7 @@
 // Each iteration runs:
 //   1. timer_mmio -> pwrctrl_mmio sleep -> timer wake -> clear sticky state
 //   2. taketwo completion IRQ -> irq_ctrl_mmio claim/complete -> wake CPU
+//   3. host-I2C manual kick event -> wake CPU -> clear sticky state
 // The goal is to prove that the sleep/wake machinery keeps working across
 // multiple cycles, not just the first one.
 
@@ -37,6 +38,7 @@
 
 #define IRQ_TIMER_BIT  (1u << 0)
 #define IRQ_ML_BIT     (1u << 1)
+#define IRQ_HOST_BIT   (1u << 2)
 
 #define ML_REG(off)    (*(volatile uint32_t*)(ML_BASE + (off)))
 #define WRAM_U32(off)  (*(volatile uint32_t*)(WEIGHT_BASE + (off)))
@@ -56,6 +58,8 @@
 // bench can tell whether the IRQ service path is behaving repeatedly.
 static volatile uint32_t g_ml_done_flag;
 static volatile uint32_t g_ml_irq_count;
+static volatile uint32_t g_host_done_flag;
+static volatile uint32_t g_host_irq_count;
 static volatile uint32_t g_irq_claims;
 static volatile uint32_t g_irq_bad_claims;
 
@@ -83,13 +87,24 @@ static int wait_until_clear(volatile uint32_t *reg, uint32_t mask, uint32_t limi
     return 0;
 }
 
+static int clear_until_clear(volatile uint32_t *reg, uint32_t mask, uint32_t limit)
+{
+    while (limit--) {
+        *reg = mask;
+        if (((*reg) & mask) == 0u) return 1;
+        __asm__ volatile ("nop");
+    }
+    return 0;
+}
+
 static inline void cpu_irq_unmask_all(void) {
     __asm__ volatile (".word 0x0600000b" ::: "memory");
 }
 
 // Minimal IRQ service routine for the dedicated sleep/wake regression.
-// Only the ML path uses CPU IRQ service here; timer wake is intentionally
-// validated through the polling path so the two wake mechanisms are separated.
+// Timer wake is intentionally validated through the polling path so it stays
+// separate from the IRQ-driven flows. ML and host wake both use claim/complete
+// so the regression checks repeated interrupt-driven wake service as well.
 void irq_handler(void)
 {
     uint32_t guard = 16u;
@@ -113,6 +128,12 @@ void irq_handler(void)
             IRQC_MASK = 0u;
             ML_IRQ_CLR = 1u;
             g_ml_done_flag = 1u;
+        }
+
+        if (bit & IRQ_HOST_BIT) {
+            g_host_irq_count++;
+            IRQC_MASK = 0u;
+            g_host_done_flag = 1u;
         }
 
         IRQC_PENDING = bit;
@@ -214,6 +235,47 @@ static void run_ml_phase(uint32_t iter,
     if (!wait_until_clear(&P_WAKE_STATUS, IRQ_ML_BIT, 200000u)) fail(0xE9F0u | iter);
 }
 
+static void run_host_phase(uint32_t iter,
+                           uint32_t *wake_status_out,
+                           uint32_t *wake_reason_out,
+                           uint32_t *pending_out)
+{
+    uint32_t prev_host_irq_count = g_host_irq_count;
+
+    P_CTRL = 0u;
+    P_WAKE_STATUS = 0xFFFFFFFFu;
+    IRQC_PENDING = 0xFFFFFFFFu;
+    IRQC_MASK = IRQ_HOST_BIT;
+    IRQC_WAKE_EN = IRQ_HOST_BIT;
+    g_host_done_flag = 0u;
+
+    // The bench will issue a host-I2C manual kick while the CPU is sleeping.
+    // This path is IRQ-driven: the handler may claim/complete the host source
+    // before this function snapshots IRQC_PENDING.
+    P_CTRL = 1u;
+
+    if (!wait_until_set(&P_WAKE_STATUS, IRQ_HOST_BIT, 500000u)) fail(0xEA00u | iter);
+    if (!wait_until_set(&g_host_done_flag, 1u, 500000u)) fail(0xEA10u | iter);
+    if (g_host_irq_count == prev_host_irq_count) fail(0xEA11u | iter);
+    if (g_irq_bad_claims != 0u) fail(0xEA12u | iter);
+
+    *wake_status_out = P_WAKE_STATUS;
+    *wake_reason_out = P_WAKE_REASON;
+    *pending_out = IRQC_PENDING;
+
+    if (((*wake_status_out) & IRQ_HOST_BIT) == 0u) fail(0xEA20u | iter);
+    if (((*wake_reason_out) & IRQ_HOST_BIT) == 0u) fail(0xEA30u | iter);
+    // Host wake is IRQ-driven in this regression, so by the time software
+    // snapshots IRQC_PENDING the handler may already have claimed/completed it.
+    // We still record the snapshot for bench visibility, but host wake
+    // correctness is proven by wake_status/wake_reason plus host IRQ service.
+
+    P_CTRL = 0u;
+
+    if (!clear_until_clear(&IRQC_PENDING, IRQ_HOST_BIT, 200000u)) fail(0xEA50u | iter);
+    if (!clear_until_clear(&P_WAKE_STATUS, IRQ_HOST_BIT, 200000u)) fail(0xEA60u | iter);
+}
+
 int main(void) {
     uint32_t iter;
     uint32_t wake_status;
@@ -222,12 +284,17 @@ int main(void) {
     uint32_t ml_wake_status;
     uint32_t ml_wake_reason;
     uint32_t ml_pending_after_wake;
+    uint32_t host_wake_status;
+    uint32_t host_wake_reason;
+    uint32_t host_pending_after_wake;
     uint32_t summary;
 
     TEST_STATUS = 0u;
     TEST_CODE = 0u;
     g_ml_done_flag = 0u;
     g_ml_irq_count = 0u;
+    g_host_done_flag = 0u;
+    g_host_irq_count = 0u;
     g_irq_claims = 0u;
     g_irq_bad_claims = 0u;
 
@@ -247,18 +314,19 @@ int main(void) {
     for (iter = 0u; iter < NUM_ITERS; iter++) {
         run_timer_phase(iter, &wake_status, &wake_reason, &pending_after_wake);
         run_ml_phase(iter, &ml_wake_status, &ml_wake_reason, &ml_pending_after_wake);
+        run_host_phase(iter, &host_wake_status, &host_wake_reason, &host_pending_after_wake);
     }
 
     // Compact summary for bench-side visibility:
     //   [31:24] iteration count
-    //   [23:16] ML IRQ count low byte
+    //   [23:16] host IRQ count low byte
     //   [15:8]  IRQ claim count low byte
-    //   [7:0]   combined last wake-reason low bits
+    //   [7:0]   combined last timer/ML/host wake-reason bits
     summary =
         ((NUM_ITERS & 0xFFu) << 24) |
-        ((g_ml_irq_count & 0xFFu) << 16) |
+        ((g_host_irq_count & 0xFFu) << 16) |
         ((g_irq_claims & 0xFFu) << 8) |
-        ((wake_reason | ml_wake_reason) & 0xFFu);
+        ((wake_reason | ml_wake_reason | host_wake_reason) & 0xFFu);
 
     TEST_CODE = summary;
     TEST_STATUS = TEST_PASS;
