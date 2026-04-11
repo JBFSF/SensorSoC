@@ -167,6 +167,8 @@ top #(
     .reset_i(reset),
     .i2c_scl_i(host_i2c_scl),
     .i2c_sda_io(host_i2c_sda),
+    .i2c_sda_i(host_i2c_sda),
+    .i2c_sda_drive_low_o(),
     .sim_req_o(sim_req),
     .sim_addr_o(sim_addr),
     .sim_reg_o(sim_reg),

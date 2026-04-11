@@ -53,6 +53,9 @@
 #   make sim-top-feature-ml-prod-main-host-i2c
 #     Most production-like unified-top flow: SPI load + ML loop + host-I2C visibility.
 #
+#   make test-top-e2e-inference
+#     Cocotb smoke test: 4 sensor-pipeline ML inferences produce logit words.
+#
 #   make sim-top-sleep-wake-unified
 #     Repeated timer-wake + ML-IRQ-wake regression for unified top.sv.
 #
@@ -79,7 +82,7 @@ PYTHON   ?= python3
 # ------------------------------------------------------------
 
 # Cocotb VPI library
-COCOTB_LIBDIR := $(shell $(PYTHON) -c "import cocotb, os; print(os.path.join(os.path.dirname(cocotb.__file__), 'libs'))" 2>/dev/null)
+COCOTB_LIBDIR := $(shell $(PYTHON) -c "import cocotb, os; f=getattr(cocotb, '__file__', None); print(os.path.join(os.path.dirname(f), 'libs') if f else '')" 2>/dev/null)
 
 # Python interpreter for cocotb
 PYGPI_PYTHON_BIN := $(shell $(PYTHON) -c "import sys; print(sys.executable)")
@@ -152,6 +155,7 @@ SOC_RTL_SRCS := \
   $(RTL_DIR)/irq_ctrl_mmio.v \
   $(RTL_DIR)/taketwo_wrap.v \
   $(RTL_DIR)/taketwo.v \
+  $(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v \
   $(RTL_DIR)/pwrctrl_mmio.v \
   $(RTL_DIR)/host_i2c_target.v \
   $(RTL_DIR)/host_i2c_bridge_regs.v
@@ -165,7 +169,7 @@ IRQ_VVP      := sim_irq.vvp
 # Cocotb configuration helper
 # ----------------------------
 # cocotb's Icarus VPI shared library directory:
-COCOTB_LIBDIR := $(shell $(PYTHON) -c "import cocotb, os; print(os.path.join(os.path.dirname(cocotb.__file__), 'libs'))")
+COCOTB_LIBDIR := $(shell $(PYTHON) -c "import cocotb, os; f=getattr(cocotb, '__file__', None); print(os.path.join(os.path.dirname(f), 'libs') if f else '')" 2>/dev/null)
 
 # Use the same python interpreter cocotb will embed
 export PYGPI_PYTHON_BIN := $(shell $(PYTHON) -c "import sys; print(sys.executable)")
@@ -545,6 +549,39 @@ sim-top-feature-ml-prod-main-host-i2c: $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP) 
 	@echo "== Running $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP) (FW=$(FW_DIR)/build/prod_main/firmware.hex FLASH=$(TAKETWO_PARAMS_HEX)) =="
 	$(VVP) $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP)
 
+# Cocotb: real top.sv sensor-pipeline -> prod_main firmware -> taketwo logits.
+TOP_E2E_INFERENCE_TOP     := sim_top_e2e_inference
+TOP_E2E_INFERENCE_VVP     := $(BUILD_DIR)/$(TOP_E2E_INFERENCE_TOP).vvp
+TOP_E2E_INFERENCE_PYMOD   := test_top_e2e_inference
+TOP_E2E_INFERENCE_RESULTS := $(BUILD_DIR)/$(TOP_E2E_INFERENCE_TOP).results.xml
+TOP_E2E_INFERENCE_SOURCES := \
+	$(TB_DIR)/sim_top_e2e_inference.sv \
+	$(filter-out $(TB_DIR)/tb_top_feature_ml_prod_main_host_i2c.sv,$(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES))
+
+$(TOP_E2E_INFERENCE_VVP): $(TOP_E2E_INFERENCE_SOURCES)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_E2E_INFERENCE_TOP) -o $@ \
+	  $(TOP_E2E_INFERENCE_SOURCES)
+
+.PHONY: test-top-e2e-inference
+test-top-e2e-inference: $(TOP_E2E_INFERENCE_VVP) | $(SIM_BUILD)
+	@$(SELF_MAKE) FW_VARIANT=prod_main firmware
+	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
+	@if [ -z "$(COCOTB_LIBDIR)" ]; then \
+		echo "ERROR: cocotb is not importable by $(PYTHON); set PYTHON=/path/to/python-with-cocotb"; \
+		exit 1; \
+	fi
+	@echo "== Running $(TOP_E2E_INFERENCE_TOP) cocotb smoke (4 real sensor-pipeline inferences) =="
+	@rm -f $(TOP_E2E_INFERENCE_RESULTS)
+	@export COCOTB_TOPLEVEL=$(TOP_E2E_INFERENCE_TOP); \
+	export COCOTB_TEST_MODULES=$(TOP_E2E_INFERENCE_PYMOD); \
+	export COCOTB_RESULTS_FILE=$(TOP_E2E_INFERENCE_RESULTS); \
+	$(call RUN_COCOTB_ICARUS,$(TOP_E2E_INFERENCE_VVP))
+	@test -f $(TOP_E2E_INFERENCE_RESULTS) || (echo "ERROR: cocotb did not write $(TOP_E2E_INFERENCE_RESULTS)"; exit 1)
+	@if grep -Eq '<(failure|error)' $(TOP_E2E_INFERENCE_RESULTS); then \
+		echo "ERROR: cocotb reported a failure in $(TOP_E2E_INFERENCE_RESULTS)"; \
+		exit 1; \
+	fi
+
 # Unified top: dedicated timer sleep/wake regression.
 # This bench isolates the always-on timer + pwrctrl + irq_ctrl sleep path:
 #   firmware requests sleep -> CPU clock gates -> timer wake arrives
@@ -685,7 +722,8 @@ CPU_ML_RTL_SRCS := \
   $(RTL_DIR)/cpu_to_ml.v \
   $(RTL_DIR)/ml_axil_bridge_mmio.v \
   $(RTL_DIR)/taketwo_wrap.v \
-  $(RTL_DIR)/taketwo.v
+  $(RTL_DIR)/taketwo.v \
+  $(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v
 
 $(CPU_ML_VVP): $(CPU_ML_TOP_V) $(CPU_ML_RTL_SRCS)
 	@echo "[COCOTB] Building $@"

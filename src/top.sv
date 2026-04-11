@@ -48,7 +48,8 @@ module top #(
     input  logic reset_i,
     input  logic i2c_scl_i,
     inout  wire  i2c_sda_io,
-
+    input  logic i2c_sda_i,
+    output logic i2c_sda_drive_low_o,
     // Functional simulation bus to sensor models (through i2c_master).
     output logic        sim_req_o,     // request strobe from i2c_master into simulated sensor bus
     output logic [6:0]  sim_addr_o,    // 7-bit I2C address for the active simulated sensor transaction
@@ -83,6 +84,8 @@ module top #(
     output logic                      epoch_end_o,      // epoch boundary pulse (from globaltimer)
 
     output logic                      alarm_o           // placeholder alarm output (unused in current RTL)
+
+
 );
 
     localparam logic [11:0] CFG_LP_BETA_Q10      = 12'd128;
@@ -905,16 +908,18 @@ module top #(
     host_i2c_target #(
         .SLAVE_ADDR(7'h42)
     ) u_host_i2c_target (
-        .clk        (clk_i),
-        .resetn     (~reset_i),
-        .i2c_scl_i  (i2c_scl_i),
-        .i2c_sda_io (i2c_sda_io),
-        .wr_en_o    (host_i2c_wr_en),
-        .wr_addr_o  (host_i2c_wr_addr),
-        .wr_data_o  (host_i2c_wr_data),
-        .rd_addr_o  (host_i2c_rd_addr),
-        .rd_data_i  (host_i2c_rd_data),
-        .proto_err_o(host_i2c_proto_err)
+        .clk                (clk_i),
+        .resetn             (~reset_i),
+        .i2c_scl_i          (i2c_scl_i),
+        .i2c_sda_io         (i2c_sda_io),
+        .i2c_sda_i          (i2c_sda_i),
+        .i2c_sda_drive_low_o(i2c_sda_drive_low_o),
+        .wr_en_o            (host_i2c_wr_en),
+        .wr_addr_o          (host_i2c_wr_addr),
+        .wr_data_o          (host_i2c_wr_data),
+        .rd_addr_o          (host_i2c_rd_addr),
+        .rd_data_i          (host_i2c_rd_data),
+        .proto_err_o        (host_i2c_proto_err)
     );
 
     host_i2c_bridge_regs u_host_i2c_bridge_regs (

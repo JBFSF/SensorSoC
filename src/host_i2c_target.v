@@ -20,7 +20,10 @@ module host_i2c_target #(
     output reg  [7:0] rd_addr_o,
     input  wire [7:0] rd_data_i,
 
-    output reg        proto_err_o
+    output reg        proto_err_o,
+
+    input  wire       i2c_sda_i,
+    output wire       i2c_sda_drive_low_o
 );
     localparam [2:0] ST_IDLE     = 3'd0;
     localparam [2:0] ST_ADDR_RX  = 3'd1;
@@ -41,7 +44,11 @@ module host_i2c_target #(
     reg [7:0] reg_ptr;
 
     reg sda_drive_low;
-    wire sda_in = i2c_sda_io;
+    wire sda_in = i2c_sda_i;
+    assign i2c_sda_drive_low_o = sda_drive_low;
+
+    // added these to use for inout logic in chip_core - Shane
+    
     assign i2c_sda_io = sda_drive_low ? 1'b0 : 1'bz;
 
     reg scl_sync, scl_prev;
