@@ -9,3 +9,5 @@ img/
 sim/data/
 sensor_output/
 sim/waves/
+*.vcd
+*.vvp
