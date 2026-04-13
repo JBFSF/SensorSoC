@@ -532,7 +532,6 @@ module top #(
         .rst_i(reset_i),
         .sample_valid_i(accel_valid_w),     // drive motion accumulation with each valid accel sample
         // accel_valid_o already indicates a completed good read.
-        .sample_ok_i(1'b1),                 // treat all valid samples as OK (no separate quality bit)
         .ax_i(ax_w),                        // accel X input for motion energy
         .ay_i(ay_w),                        // accel Y input for motion energy
         .az_i(az_w),                        // accel Z input for motion energy

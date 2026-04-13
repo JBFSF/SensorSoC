@@ -280,7 +280,6 @@ module tb_sensor_pipeline;
         .clk                   (clk),
         .rst_i                 (~resetn),
         .sample_valid_i        (accel_valid_o),
-        .sample_ok_i           (1'b1),
         .ax_i                  (ax_o[13:0]),
         .ay_i                  (ay_o[13:0]),
         .az_i                  (az_o[13:0]),
