@@ -821,6 +821,29 @@ sim-reset-ctrl: $(RESET_CTRL_VVP)
 .PHONY: clean-reset-ctrl
 clean-reset-ctrl:
 	rm -f $(RESET_CTRL_VVP) $(RESET_CTRL_VCD)
+
+# ============================================================
+# CLOCK MUX TB (test_clock_mux)
+# ============================================================
+
+CLOCK_MUX_TOP     := test_clock_mux
+CLOCK_MUX_VVP     := $(BUILD_DIR)/$(CLOCK_MUX_TOP).vvp
+CLOCK_MUX_SOURCES := sim/tb/test_clock_mux.sv $(RTL_DIR)/clock_mux.sv
+CLOCK_MUX_VCD     := $(WAVE_DIR)/clock_mux.vcd
+
+$(CLOCK_MUX_VVP): $(CLOCK_MUX_SOURCES) | $(BUILD_DIR)
+	@echo "[SIM] Building $@"
+	$(IVERILOG) -g2012 -Wall -s $(CLOCK_MUX_TOP) -o $@ $^
+
+.PHONY: sim-clock-mux
+sim-clock-mux: $(CLOCK_MUX_VVP)
+	@echo "== Running $(CLOCK_MUX_TOP) (VCD -> $(CLOCK_MUX_VCD)) =="
+	@mkdir -p $(WAVE_DIR)
+	@cd $(WAVE_DIR) && $(VVP) $(abspath $(CLOCK_MUX_VVP))
+
+.PHONY: view-clock-mux
+view-clock-mux: sim-clock-mux
+	gtkwave $(CLOCK_MUX_VCD)
 # ============================================================
 # MOTION PREPROCESS
 # ============================================================
@@ -1216,20 +1239,6 @@ $(SENSOR_PIPELINE_VVP): $(SENSOR_PIPELINE_SOURCES) | $(BUILD_DIR)
 sim-sensor-pipeline: $(SENSOR_PIPELINE_VVP)
 	$(VVP) $(SENSOR_PIPELINE_VVP)
 	
-# ============================================================
-# Cleanup
-# ============================================================
-
-.PHONY: clean
-clean:
-	rm -f sim/build/*.vvp
-	rm -f *.vcd
-	rm -f sim/waves/*.vcd
-	@echo "[COCOTB] Running $(TIMER_PYMOD) on $(TIMER_TOP)"
-	@export COCOTB_TOPLEVEL=$(TIMER_TOP); \
-	export COCOTB_TEST_MODULES=$(TIMER_PYMOD); \
-	$(call RUN_COCOTB_ICARUS,$(TIMER_VVP))
-
 # ----------------------------
 # Convenience
 # ----------------------------
@@ -1252,5 +1261,6 @@ show-tree:
 .PHONY: clean
 clean:
 	rm -f *.vvp *.vcd results.xml
-	rm -rf $(SIM_BUILD)/*.vcd $(SIM_BUILD)/*.fst $(SIM_BUILD)/*.gtkw
+	rm -f $(SIM_BUILD)/*.vvp $(SIM_BUILD)/*.vcd $(SIM_BUILD)/*.fst $(SIM_BUILD)/*.gtkw
+	rm -f $(WAVE_DIR)/*.vcd
 	rm -f $(FW_BUILD)/firmware.elf $(FW_BUILD)/firmware.bin $(FW_BUILD)/firmware.hex

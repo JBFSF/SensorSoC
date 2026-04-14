@@ -144,7 +144,9 @@ top #(
     .ml_update_gate_o(),
     .invalid_reason_o(),
     .epoch_end_o(),
-    .alarm_o()
+    .alarm_o(),
+    .test_force_irq_i(1'b0),
+    .test_force_wake_i(1'b0)
 );
 
 assign host_i2c_scl = 1'b1;

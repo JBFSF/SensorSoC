@@ -42,6 +42,8 @@ module chip_core #(
     // bidir[5]      : I2C SCL input
     // bidir[6]      : I2C SDA open drain
     // bidir[42:7]   : 36-bit debug bus for test mode outputs
+    // bidir[43]     : force Pico IRQ input, only used by test mode = 1000
+    // bidir[44]     : force wake source input, only used by test mode = 1001
     // bidir[45]     : external test clock, only for test mode = 0011
 
     logic [3:0] test_mode_w;
@@ -76,6 +78,22 @@ module chip_core #(
     logic epoch_end_w;
     logic alarm_w;
 
+    logic        pico_trap_w;
+    logic        pico_cpu_clk_en_w;
+    logic        pico_mem_valid_w;
+    logic        pico_mem_instr_w;
+    logic        pico_mem_ready_w;
+    logic [3:0]  pico_mem_wstrb_w;
+    logic [31:0] pico_mem_addr_w;
+    logic [31:0] pico_mem_wdata_w;
+    logic [31:0] pico_irq_w;
+    logic        pico_sleeping_w;
+    logic        test_force_irq_w;
+    logic        test_force_wake_w;
+    logic        host_i2c_irq_event_w;
+    logic        ml_irq_w;
+    logic        timer_event_w;
+
     assign input_pu = '0;
     assign input_pd = '0;
 
@@ -88,6 +106,8 @@ module chip_core #(
     assign bidir_pd = '0;
 
     assign test_mode_w = input_in[3:0];
+    assign test_force_irq_w = bidir_in[43];
+    assign test_force_wake_w = bidir_in[44];
 
     //muxing to use external clock if we want, may need clock mux????   
     assign core_clk_w = (test_mode_w == 4'b0011) ? bidir_in[45] : clk;
@@ -118,6 +138,32 @@ module chip_core #(
             4'b0100: begin 
                 // view ML update gating
                 debug_bus_w = {ml_update_gate_w, epoch_end_w, 2'b00, 24'b0, invalid_reason_w};
+            end
+            4'b0101: begin
+                // observe pico state (ie fetch, read, write, stalled, trapped)
+                debug_bus_w = {pico_trap_w, pico_cpu_clk_en_w, pico_mem_valid_w,
+                pico_mem_instr_w, pico_mem_ready_w, pico_mem_wstrb_w, pico_mem_addr_w[26:0]};
+            end
+
+            4'b0110: begin
+                // observe pico MMIO writes 
+                debug_bus_w = {pico_mem_valid_w && (pico_mem_wstrb_w != 4'b0000), pico_trap_w, |pico_mem_wstrb_w, 
+                pico_mem_wstrb_w == 4'hF, pico_mem_addr_w[15:0], pico_mem_wdata_w[15:0]};
+            end
+
+            4'b0111: begin
+                // observe pico sleep/irq
+                debug_bus_w = {pico_trap_w, pico_sleeping_w, pico_cpu_clk_en_w, |pico_irq_w, pico_irq_w};
+            end
+
+            4'b1000: begin 
+                // force pico IRQ
+                debug_bus_w = {bidir_in[43], pico_trap_w, pico_cpu_clk_en_w, pico_mem_instr_w, pico_mem_valid_w,
+                                pico_mem_ready_w, pico_mem_addr_w[29:0]};
+            end
+            4'b1001: begin 
+                // force pico wake
+                debug_bus_w = {32'b0, test_force_wake_w, host_i2c_irq_event_w, ml_irq_w, timer_event_w};
             end
             // plenty of space to add more of these, just need to expose signals in top
             default: begin
@@ -184,7 +230,24 @@ module chip_core #(
         .spi_cs_n_o            (spi_cs_n_w),
 
         .epoch_end_o           (epoch_end_w),
-        .alarm_o               (alarm_w)
+        .alarm_o               (alarm_w),
+        
+        .test_force_irq_i      (test_force_irq_w),
+        .test_force_wake_i     (test_force_wake_w),
+        .pico_trap_o           (pico_trap_w),
+        .pico_cpu_clk_en_o     (pico_cpu_clk_en_w),
+        .pico_mem_valid_o      (pico_mem_valid_w),
+        .pico_mem_instr_o      (pico_mem_instr_w),
+        .pico_mem_ready_o      (pico_mem_ready_w),
+        .pico_mem_wstrb_o      (pico_mem_wstrb_w),
+        .pico_mem_addr_o       (pico_mem_addr_w),
+        .pico_mem_wdata_o      (pico_mem_wdata_w),
+        .pico_irq_o            (pico_irq_w),
+        .pico_sleeping_o       (pico_sleeping_w),
+        .host_i2c_irq_event_o  (host_i2c_irq_event_w),
+        .ml_irq_o              (ml_irq_w),
+        .timer_event_o         (timer_event_w)
+
     );
 
     //analog pads unused

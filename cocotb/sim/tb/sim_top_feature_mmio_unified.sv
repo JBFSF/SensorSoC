@@ -121,7 +121,9 @@ module sim_top_feature_mmio_unified;
     .ml_update_gate_o(ml_update_gate),
     .invalid_reason_o(invalid_reason),
     .epoch_end_o(epoch_end),
-    .alarm_o(alarm)
+    .alarm_o(alarm),
+    .test_force_irq_i(1'b0),
+    .test_force_wake_i(1'b0)
   );
 
   assign host_i2c_scl = 1'b1;
