@@ -27,6 +27,9 @@
 #   # Standalone SV testbench
 #   make sim-reset-ctrl
 #   make sim-globaltimer
+#
+#   # Cocotb unit tests (simple_sram_tb.py wrapper)
+#   make test-simple-sram
 #   make sim-logit-confidence
 #
 #   # Cleanup
@@ -150,7 +153,7 @@ export PYGPI_PYTHON_BIN := $(shell $(PYTHON) -c "import sys; print(sys.executabl
 export PYTHONPATH := $(abspath $(TB_DIR))
 
 define RUN_COCOTB_ICARUS
-	$(VVP) -M "$(COCOTB_LIBDIR)" -m libcocotbvpi_icarus $1
+	GPI_USERS=cocotb LD_LIBRARY_PATH="$(COCOTB_LIBDIR):$$LD_LIBRARY_PATH" $(VVP) -M "$(COCOTB_LIBDIR)" -m libcocotbvpi_icarus $1
 endef
 
 # ----------------------------
@@ -658,6 +661,33 @@ sim-reset-ctrl: $(RESET_CTRL_VVP)
 .PHONY: clean-reset-ctrl
 clean-reset-ctrl:
 	rm -f $(RESET_CTRL_VVP) $(RESET_CTRL_VCD)
+
+# ============================================================
+# SIMPLE SRAM COCOTB TEST (tb_simple_sram + simple_sram_tb.py)
+# ============================================================
+
+SIMPLE_SRAM_TOP     := tb_simple_sram
+SIMPLE_SRAM_VVP     := $(BUILD_DIR)/$(SIMPLE_SRAM_TOP).vvp
+SIMPLE_SRAM_PYMOD   := simple_sram_tb
+SIMPLE_SRAM_SOURCES := $(TB_DIR)/tb_simple_sram.sv \
+                       $(RTL_DIR)/simple_sram.v \
+                       $(MAKEFILE_DIR)/../ip/gf180mcu_fd_ip_sram__sram512x8m8wm1.v
+
+$(SIMPLE_SRAM_VVP): $(SIMPLE_SRAM_SOURCES) | $(BUILD_DIR)
+	@echo "[COCOTB] Building $@"
+	$(IVERILOG) -g2012 -o $@ $^
+
+.PHONY: test-simple-sram
+test-simple-sram: $(SIMPLE_SRAM_VVP)
+	@echo "[COCOTB] Running $(SIMPLE_SRAM_PYMOD) on $(SIMPLE_SRAM_TOP)"
+	@export COCOTB_TOPLEVEL=$(SIMPLE_SRAM_TOP); \
+	export COCOTB_TEST_MODULES=$(SIMPLE_SRAM_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(SIMPLE_SRAM_VVP))
+
+.PHONY: clean-simple-sram
+clean-simple-sram:
+	rm -f $(SIMPLE_SRAM_VVP)
+
 # ============================================================
 # MOTION PREPROCESS
 # ============================================================
