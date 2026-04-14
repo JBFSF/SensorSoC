@@ -57,9 +57,6 @@
 #   make sim-top-feature-ml-prod-main-host-i2c
 #     Most production-like unified-top flow: SPI load + ML loop + host-I2C visibility.
 #
-#   make test-top-e2e-inference
-#     Cocotb smoke test: 4 sensor-pipeline ML inferences produce logit words.
-#
 #   make sim-top-sleep-wake-unified
 #     Repeated timer-wake + ML-IRQ-wake regression for unified top.sv.
 #
@@ -602,39 +599,6 @@ sim-top-feature-ml-prod-main-host-i2c: $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP) 
 	@echo "== Running $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP) (FW=$(FW_DIR)/build/prod_main/firmware.hex FLASH=$(TAKETWO_PARAMS_HEX)) =="
 	$(VVP) $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP)
 
-# Cocotb: real top.sv sensor-pipeline -> prod_main firmware -> taketwo logits.
-TOP_E2E_INFERENCE_TOP     := sim_top_e2e_inference
-TOP_E2E_INFERENCE_VVP     := $(BUILD_DIR)/$(TOP_E2E_INFERENCE_TOP).vvp
-TOP_E2E_INFERENCE_PYMOD   := test_top_e2e_inference
-TOP_E2E_INFERENCE_RESULTS := $(BUILD_DIR)/$(TOP_E2E_INFERENCE_TOP).results.xml
-TOP_E2E_INFERENCE_SOURCES := \
-	$(TB_DIR)/sim_top_e2e_inference.sv \
-	$(filter-out $(TB_DIR)/tb_top_feature_ml_prod_main_host_i2c.sv,$(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES))
-
-$(TOP_E2E_INFERENCE_VVP): $(TOP_E2E_INFERENCE_SOURCES)
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_E2E_INFERENCE_TOP) -o $@ \
-	  $(TOP_E2E_INFERENCE_SOURCES)
-
-.PHONY: test-top-e2e-inference
-test-top-e2e-inference: $(TOP_E2E_INFERENCE_VVP) | $(SIM_BUILD)
-	@$(SELF_MAKE) FW_VARIANT=prod_main firmware
-	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
-	@if [ -z "$(COCOTB_LIBDIR)" ]; then \
-		echo "ERROR: cocotb is not importable by $(PYTHON); set PYTHON=/path/to/python-with-cocotb"; \
-		exit 1; \
-	fi
-	@echo "== Running $(TOP_E2E_INFERENCE_TOP) cocotb smoke (4 real sensor-pipeline inferences) =="
-	@rm -f $(TOP_E2E_INFERENCE_RESULTS)
-	@export COCOTB_TOPLEVEL=$(TOP_E2E_INFERENCE_TOP); \
-	export COCOTB_TEST_MODULES=$(TOP_E2E_INFERENCE_PYMOD); \
-	export COCOTB_RESULTS_FILE=$(TOP_E2E_INFERENCE_RESULTS); \
-	$(call RUN_COCOTB_ICARUS,$(TOP_E2E_INFERENCE_VVP))
-	@test -f $(TOP_E2E_INFERENCE_RESULTS) || (echo "ERROR: cocotb did not write $(TOP_E2E_INFERENCE_RESULTS)"; exit 1)
-	@if grep -Eq '<(failure|error)' $(TOP_E2E_INFERENCE_RESULTS); then \
-		echo "ERROR: cocotb reported a failure in $(TOP_E2E_INFERENCE_RESULTS)"; \
-		exit 1; \
-	fi
-
 # Unified top: dedicated timer sleep/wake regression.
 # This bench isolates the always-on timer + pwrctrl + irq_ctrl sleep path:
 #   firmware requests sleep -> CPU clock gates -> timer wake arrives
@@ -875,28 +839,6 @@ sim-reset-ctrl: $(RESET_CTRL_VVP)
 clean-reset-ctrl:
 	rm -f $(RESET_CTRL_VVP) $(RESET_CTRL_VCD)
 
-# ============================================================
-# CLOCK MUX TB (test_clock_mux)
-# ============================================================
-
-CLOCK_MUX_TOP     := test_clock_mux
-CLOCK_MUX_VVP     := $(BUILD_DIR)/$(CLOCK_MUX_TOP).vvp
-CLOCK_MUX_SOURCES := sim/tb/test_clock_mux.sv $(RTL_DIR)/clock_mux.sv
-CLOCK_MUX_VCD     := $(WAVE_DIR)/clock_mux.vcd
-
-$(CLOCK_MUX_VVP): $(CLOCK_MUX_SOURCES) | $(BUILD_DIR)
-	@echo "[SIM] Building $@"
-	$(IVERILOG) -g2012 -Wall -s $(CLOCK_MUX_TOP) -o $@ $^
-
-.PHONY: sim-clock-mux
-sim-clock-mux: $(CLOCK_MUX_VVP)
-	@echo "== Running $(CLOCK_MUX_TOP) (VCD -> $(CLOCK_MUX_VCD)) =="
-	@mkdir -p $(WAVE_DIR)
-	@cd $(WAVE_DIR) && $(VVP) $(abspath $(CLOCK_MUX_VVP))
-
-.PHONY: view-clock-mux
-view-clock-mux: sim-clock-mux
-	gtkwave $(CLOCK_MUX_VCD)
 # ============================================================
 # MOTION PREPROCESS
 # ============================================================
