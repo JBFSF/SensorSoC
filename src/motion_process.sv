@@ -11,7 +11,6 @@ module motion_process #(
 
     // Sample capture
     input  logic                     sample_valid_i,
-    input  logic                     sample_ok_i,
     input  logic signed [AX_W-1:0]    ax_i,
     input  logic signed [AX_W-1:0]    ay_i,
     input  logic signed [AX_W-1:0]    az_i,
@@ -52,7 +51,7 @@ module motion_process #(
     logic [ENERGY_W-1:0] motion_energy_accum_r;
     logic [ENERGY_W-1:0] epoch_energy_w;
 
-    assign sample_fire = sample_valid_i && sample_ok_i;
+    assign sample_fire = sample_valid_i;
     assign ax_s = sample_fire ? ax_i : {AX_W{1'b0}};
     assign ay_s = sample_fire ? ay_i : {AX_W{1'b0}};
     assign az_s = sample_fire ? az_i : {AX_W{1'b0}};

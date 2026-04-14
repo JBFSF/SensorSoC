@@ -83,24 +83,9 @@ module top #(
     // Epoch pulse for TB orchestration
     output logic                      epoch_end_o,      // epoch boundary pulse (from globaltimer)
 
-    output logic                      alarm_o,          // placeholder alarm output (unused in current RTL)
+    output logic                      alarm_o           // placeholder alarm output (unused in current RTL)
 
-    // Signals used for test modes.
-    input  logic        test_force_irq_i,
-    input  logic        test_force_wake_i,
-    output logic        pico_trap_o,
-    output logic        pico_cpu_clk_en_o,
-    output logic        pico_mem_valid_o,
-    output logic        pico_mem_instr_o,
-    output logic        pico_mem_ready_o,
-    output logic [3:0]  pico_mem_wstrb_o,
-    output logic [31:0] pico_mem_addr_o,
-    output logic [31:0] pico_mem_wdata_o,
-    output logic [31:0] pico_irq_o,
-    output logic        pico_sleeping_o,
-    output logic        host_i2c_irq_event_o,
-    output logic        ml_irq_o,
-    output logic        timer_event_o
+
 );
 
     localparam logic [11:0] CFG_LP_BETA_Q10      = 12'd128;
@@ -204,7 +189,6 @@ module top #(
     wire [31:0] mem_rdata;
     wire        trap;
     wire [31:0] irq;
-    wire [31:0] pico_irq;
 
     localparam logic [31:0] STACKADDR      = 4 * MEM_WORDS;
     localparam logic [31:0] PROGADDR_RESET = 32'h0000_0000;
@@ -412,7 +396,7 @@ module top #(
         .mem_wdata (mem_wdata),
         .mem_wstrb (mem_wstrb),
         .mem_rdata (mem_rdata),
-        .irq       (pico_irq),
+        .irq       (irq),
         .trap      (trap)
     );
 
@@ -548,7 +532,6 @@ module top #(
         .rst_i(reset_i),
         .sample_valid_i(accel_valid_w),     // drive motion accumulation with each valid accel sample
         // accel_valid_o already indicates a completed good read.
-              // treat all valid samples as OK (no separate quality bit)
         .ax_i(ax_w),                        // accel X input for motion energy
         .ay_i(ay_w),                        // accel Y input for motion energy
         .az_i(az_w),                        // accel Z input for motion energy
@@ -964,9 +947,8 @@ module top #(
         .irqc_rdata_i         (host_i2c_irqc_rdata)
     );
 
-    assign irq_sources = {28'b0, test_force_wake_i, host_i2c_irq_event, ml_irq, timer_event};
+    assign irq_sources = {29'b0, host_i2c_irq_event, ml_irq, timer_event};
     assign wake_sources = irq_sources;
-    assign pico_irq = irq | {31'b0, test_force_irq_i};
 
     // Minimal interrupt controller used for CPU-visible pending bits and wake.
     irq_ctrl_mmio #(.BASE_ADDR(IRQC_BASE)) u_irqc (
@@ -1098,20 +1080,6 @@ module top #(
         end
     end
     
-    assign pico_trap_o       = trap;
-    assign pico_cpu_clk_en_o = cpu_clk_en_lat;
-    assign pico_mem_valid_o  = mem_valid;
-    assign pico_mem_instr_o  = mem_instr;
-    assign pico_mem_ready_o  = mem_ready;
-    assign pico_mem_wstrb_o  = mem_wstrb;
-    assign pico_mem_addr_o   = mem_addr;
-    assign pico_mem_wdata_o  = mem_wdata;
-    assign pico_irq_o        = pico_irq;
-    assign pico_sleeping_o   = sleeping_r;
-    assign host_i2c_irq_event_o = host_i2c_irq_event;
-    assign ml_irq_o          = ml_irq;
-    assign timer_event_o     = timer_event;
-
     assign epoch_end_o = epoch_end_w;
     assign alarm_o = 1'b0;
 

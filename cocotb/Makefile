@@ -31,6 +31,7 @@
 #   make sim-top-feature-ml-cpu
 #   make sim-top-feature-ml-cpu-spi-flash
 #   make sim-top-spi-init-unified
+#   make sim-top-ml-control-unified
 #   make sim-top-feature-ml-prod-main-host-i2c
 #   make sim-top-sleep-wake-unified
 #
@@ -49,6 +50,9 @@
 #
 #   make sim-top-spi-init-unified
 #     Short SPI-only boot-copy proof for unified top.sv.
+#
+#   make sim-top-ml-control-unified
+#     Short ML-control-only proof for unified top.sv.
 #
 #   make sim-top-feature-ml-prod-main-host-i2c
 #     Most production-like unified-top flow: SPI load + ML loop + host-I2C visibility.
@@ -206,6 +210,7 @@ FW_C_test_ml_cpu_wake_i2c   := $(FW_TESTS)/test_ml_cpu_wake_i2c.c
 FW_C_test_top_feature_ml_cpu:= $(FW_TESTS)/test_top_feature_ml_cpu.c
 FW_C_test_top_feature_ml_cpu_spi_flash:= $(FW_TESTS)/test_top_feature_ml_cpu_spi_flash.c
 FW_C_test_top_spi_init_unified := $(FW_TESTS)/test_top_spi_init_unified.c
+FW_C_test_top_ml_control_unified := $(FW_TESTS)/test_top_ml_control_unified.c
 FW_C_test_top_sleep_wake_unified := $(FW_TESTS)/test_top_sleep_wake_unified.c
 
 # Select the C source based on FW_VARIANT
@@ -222,6 +227,7 @@ FW_ARCH_prod_main := rv32im
 FW_ARCH_test_top_feature_ml_cpu := rv32im
 FW_ARCH_test_top_feature_ml_cpu_spi_flash := rv32im
 FW_ARCH_test_top_spi_init_unified := rv32im
+FW_ARCH_test_top_ml_control_unified := rv32im
 FW_ARCH_test_top_sleep_wake_unified := rv32im
 FW_ARCH := $(if $(FW_ARCH_$(FW_VARIANT)),$(FW_ARCH_$(FW_VARIANT)),$(FW_ARCH_DEFAULT))
 FW_OPT_DEFAULT := -O2
@@ -504,6 +510,53 @@ sim-top-spi-init-unified: $(TOP_SPI_INIT_UNIFIED_VVP) | $(SIM_BUILD)
 	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
 	@echo "== Running $(TOP_SPI_INIT_UNIFIED_TOP) (FW=$(FW_DIR)/build/test_top_spi_init_unified/firmware.hex FLASH=$(TAKETWO_PARAMS_HEX)) =="
 	$(VVP) $(TOP_SPI_INIT_UNIFIED_VVP)
+
+# Unified top: short ML-control-only regression. This isolates the CPU-owned
+# taketwo control path from the feature and SPI flows:
+#   WRAM input writes -> ML base-register programming -> START/BUSY/IRQ
+#   -> output mutation in shared WRAM.
+TOP_ML_CONTROL_UNIFIED_TOP     := tb_top_ml_control_unified
+TOP_ML_CONTROL_UNIFIED_VVP     := $(BUILD_DIR)/$(TOP_ML_CONTROL_UNIFIED_TOP).vvp
+TOP_ML_CONTROL_UNIFIED_SOURCES := \
+	$(TB_DIR)/tb_top_ml_control_unified.sv \
+	$(RTL_DIR)/top.sv \
+	$(RTL_DIR)/host_i2c_target.v \
+	$(RTL_DIR)/host_i2c_bridge_regs.v \
+	$(RTL_DIR)/i2c_master.sv \
+	$(RTL_DIR)/accel_reader.sv \
+	$(RTL_DIR)/motion_process.sv \
+	$(RTL_DIR)/ppg_fifo_reader.sv \
+	$(RTL_DIR)/ppg_process.sv \
+	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/signal_quality.sv \
+	$(RTL_DIR)/feature_engine.sv \
+	$(RTL_DIR)/cos_lut_timer.sv \
+	$(RTL_DIR)/globaltimer.sv \
+	$(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_master_mmio.v \
+	$(MAKEFILE_DIR)/../ip/picorv32.v \
+	$(RTL_DIR)/test_mmio.v \
+	$(RTL_DIR)/timer_mmio.v \
+	$(RTL_DIR)/ml_axil_bridge_mmio.v \
+	$(RTL_DIR)/weight_ram_axi.v \
+	$(RTL_DIR)/irq_ctrl_mmio.v \
+	$(RTL_DIR)/taketwo_wrap.v \
+	$(RTL_DIR)/taketwo.v \
+	$(RTL_DIR)/pwrctrl_mmio.v \
+	$(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v \
+	sensors/i2c_slave_lis2dw12.sv \
+	sensors/i2c_slave_adpd144ri.sv
+
+$(TOP_ML_CONTROL_UNIFIED_VVP): $(TOP_ML_CONTROL_UNIFIED_SOURCES)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_ML_CONTROL_UNIFIED_TOP) -o $@ \
+	  $(TOP_ML_CONTROL_UNIFIED_SOURCES)
+
+.PHONY: sim-top-ml-control-unified
+sim-top-ml-control-unified: $(TOP_ML_CONTROL_UNIFIED_VVP) | $(SIM_BUILD)
+	@$(SELF_MAKE) FW_VARIANT=test_top_ml_control_unified firmware
+	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
+	@echo "== Running $(TOP_ML_CONTROL_UNIFIED_TOP) (FW=$(FW_DIR)/build/test_top_ml_control_unified/firmware.hex WEIGHTS=$(TAKETWO_PARAMS_HEX)) =="
+	$(VVP) $(TOP_ML_CONTROL_UNIFIED_VVP)
 
 TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP     := tb_top_feature_ml_prod_main_host_i2c
 TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP     := $(BUILD_DIR)/$(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP).vvp

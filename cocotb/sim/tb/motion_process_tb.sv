@@ -30,7 +30,6 @@ module motion_process_tb;
     .rst_i(rst_i),
 
     .sample_valid_i(sample_valid),
-    .sample_ok_i(sample_ok),
     .ax_i(ax),
     .ay_i(ay),
     .az_i(az),
