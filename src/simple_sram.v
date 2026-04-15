@@ -22,7 +22,7 @@ module simple_sram #(
     //8 RAM banks: for 1024 words, each word 32bits, so 4 rams for 512 32bit words, times 2 for 1024 words
     //1 is bottom, 2, 3, 4 is top
     //can CEN be pulsed with the valid signal? maybe for GWEN check for valid too, can do it with the addr[11] bit too maybe?
-    
+ `ifdef SYNTHESIS
     supply1 vdd;
     supply0 vss;
     wire [7:0] gwen;
@@ -151,4 +151,43 @@ module simple_sram #(
             end
         end
     end
+`else
+    reg [31:0] mem [0:WORDS-1];
+
+    // optional init
+    integer i;
+    initial begin
+        if (INIT_HEX != "") begin
+            $display("simple_sram: loading INIT_HEX=%s", INIT_HEX);
+            $readmemh(INIT_HEX, mem);
+            $display("SRAM[0]=%08x SRAM[1]=%08x SRAM[2]=%08x SRAM[3]=%08x",
+        mem[0], mem[1], mem[2], mem[3]);
+
+        end else begin
+            // default clear (optional)
+            for (i = 0; i < WORDS; i = i + 1)
+                mem[i] = 32'h0000_0000;
+        end
+    end
+
+    wire [31:0] word_index = addr >> 2;
+
+    always @(posedge clk) begin
+        if (!resetn) begin
+            ready <= 1'b0;
+            rdata <= 32'h0;
+        end else begin
+            ready <= 1'b0;
+            if (valid) begin
+                ready <= 1'b1;
+                rdata <= mem[word_index];
+
+                if (wstrb[0]) mem[word_index][ 7: 0] <= wdata[ 7: 0];
+                if (wstrb[1]) mem[word_index][15: 8] <= wdata[15: 8];
+                if (wstrb[2]) mem[word_index][23:16] <= wdata[23:16];
+                if (wstrb[3]) mem[word_index][31:24] <= wdata[31:24];
+            end
+        end
+    end
+`endif
 endmodule
