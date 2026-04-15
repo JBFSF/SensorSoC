@@ -28,4 +28,8 @@ module tb_simple_sram;
     .rdata (rdata)
   );
 
+  initial begin
+      $dumpfile("sim/waves/tb_simple_sram.vcd");
+      $dumpvars(0, tb_simple_sram);
+  end
 endmodule

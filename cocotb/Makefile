@@ -57,11 +57,8 @@ PYTHON   ?= python3
 # Derived paths
 # ------------------------------------------------------------
 
-# Cocotb VPI library
-COCOTB_LIBDIR := $(shell $(PYTHON) -c "import cocotb, os; print(os.path.join(os.path.dirname(cocotb.__file__), 'libs'))" 2>/dev/null)
-
-# Python interpreter for cocotb
-PYGPI_PYTHON_BIN := $(shell $(PYTHON) -c "import sys; print(sys.executable)")
+# Cocotb VPI library (resolved again below after PYTHON is set; this is a placeholder)
+COCOTB_LIBDIR :=
 
 # Build directory
 BUILD_DIR := $(MAKEFILE_DIR)/sim/build
@@ -74,7 +71,7 @@ WAVE_DIR := $(MAKEFILE_DIR)/sim/waves
 # ------------------------------------------------------------
 # Common cocotb environment (v2 naming)
 # ------------------------------------------------------------
-export PYGPI_PYTHON_BIN := $(PYGPI_PYTHON_BIN)
+# PYGPI_PYTHON_BIN and COCOTB_LIBDIR are set below via cocotb-config after PYTHON is defined
 export PYTHONPATH       := $(MAKEFILE_DIR)/sim/tb
 export COCOTB_LOG_LEVEL ?= INFO
 
@@ -141,19 +138,22 @@ IRQ_TB_SRCS  := $(TB_DIR)/tb_irq.sv
 IRQ_VVP      := sim_irq.vvp
 
 # ----------------------------
-# Cocotb configuration helper
+# Cocotb configuration helper (cocotb 2.x via oss-cad-suite)
 # ----------------------------
 # cocotb's Icarus VPI shared library directory:
-COCOTB_LIBDIR := $(shell $(PYTHON) -c "import cocotb, os; print(os.path.join(os.path.dirname(cocotb.__file__), 'libs'))")
+COCOTB_LIBDIR := $(shell cocotb-config --lib-dir 2>/dev/null)
+
+# Absolute path + entry point needed by cocotb 2.x GPI loader:
+COCOTB_PYGPI  := $(shell cocotb-config --pygpi-entry-point 2>/dev/null)
 
 # Use the same python interpreter cocotb will embed
-export PYGPI_PYTHON_BIN := $(shell $(PYTHON) -c "import sys; print(sys.executable)")
+export PYGPI_PYTHON_BIN := $(shell cocotb-config --python-bin 2>/dev/null)
 
 # Make sure cocotb can import your tests
 export PYTHONPATH := $(abspath $(TB_DIR))
 
 define RUN_COCOTB_ICARUS
-	GPI_USERS=cocotb LD_LIBRARY_PATH="$(COCOTB_LIBDIR):$$LD_LIBRARY_PATH" $(VVP) -M "$(COCOTB_LIBDIR)" -m libcocotbvpi_icarus $1
+	GPI_USERS="$(COCOTB_PYGPI)" LD_LIBRARY_PATH="$(COCOTB_LIBDIR):$$LD_LIBRARY_PATH" $(VVP) -M "$(COCOTB_LIBDIR)" -m libcocotbvpi_icarus $1
 endef
 
 # ----------------------------

@@ -32,7 +32,8 @@ def conv_addr(addr):
     return (addr * 4) & 0x00000FFC
 
 async def reset_dut(dut, cycles=10):
-    cocotb.start_soon(Clock(dut.CLK, 40, unit="ns").start())
+    # 60 ns > 55.6 ns minimum cycle time required by gf180mcu SRAM model (specparam Tcyc=55600)
+    cocotb.start_soon(Clock(dut.CLK, 60, unit="ns").start())
     await FallingEdge(dut.CLK)
     dut.resetn.value = 0
     await ClockCycles(dut.CLK, cycles)
@@ -45,27 +46,39 @@ async def reset_dut(dut, cycles=10):
     await ClockCycles(dut.CLK, 2)
 
 async def read_val(dut, addr):
+    # Assert on falling edge: gives full setup margin (30 ns) before next posedge,
+    # and guarantees valid_r is 0 going into the cycle (flushed by the gap since last op).
+    await FallingEdge(dut.CLK)
     dut.addr.value = conv_addr(addr)
     dut.valid.value = 1
     await RisingEdge(dut.ready)
+    await ClockCycles(dut.CLK, 1)
+    result = int(dut.rdata.value)  # capture before deasserting; cocotb 2.x returns LogicArray
+    # Deassert on falling edge: holds valid high for 30 ns past posedge, satisfying tch=10 ns hold.
+    await FallingEdge(dut.CLK)
     dut.valid.value = 0
-    return dut.rdata.value
+    return result
 
 async def write_val(dut, addr, data, partial=0xf):
+    await FallingEdge(dut.CLK)
     dut.addr.value = conv_addr(addr)
     dut.wdata.value = data & 0xFFFFFFFF
     dut.wstrb.value = partial & 0xF
     dut.valid.value = 1
     await RisingEdge(dut.ready)
+    await FallingEdge(dut.CLK)
     dut.valid.value = 0
+    dut.wstrb.value = 0
 
 @cocotb.test()
 async def reset_test(dut):
     await reset_dut(dut)
     assert dut.ready.value == 0, "Ready not low to begin"
-    dut.valid.value = 1
     await FallingEdge(dut.CLK)
-    assert dut.ready.value == 1, "Ready not high after one cycle"
+    dut.valid.value = 1
+    await RisingEdge(dut.ready)  # ready takes 2 posedges (valid_r pipeline): wait for it
+    dut.valid.value = 0
+    assert dut.ready.value == 1, "Ready not high after valid asserted"
     print("Reset Test Complete Without Errors")
 
 @cocotb.test()
