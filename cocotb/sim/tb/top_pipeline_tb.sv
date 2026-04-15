@@ -90,6 +90,8 @@ module top_pipeline_tb;
     .reset_i(reset),
     .i2c_scl_i(host_i2c_scl),
     .i2c_sda_io(host_i2c_sda),
+    .i2c_sda_i(host_i2c_sda),
+    .i2c_sda_drive_low_o(),
     .sim_req_o(sim_req),
     .sim_addr_o(sim_addr),
     .sim_reg_o(sim_reg),
@@ -113,7 +115,9 @@ module top_pipeline_tb;
     .ml_update_gate_o(ml_update_gate),
     .invalid_reason_o(invalid_reason),
     .epoch_end_o(epoch_end),
-    .alarm_o(alarm)
+    .alarm_o(alarm),
+    .test_force_irq_i(1'b0),
+    .test_force_wake_i(1'b0)
   );
 
   assign host_i2c_scl = 1'b1;

@@ -14,23 +14,27 @@ wire [7:0] rd_addr;
 wire [7:0] rd_data;
 wire       proto_err;
 wire       event_o;
+wire       target_sda_drive_low;
 
 integer failures;
 integer event_count;
 
 assign sda_line = sda_drv_low ? 1'b0 : 1'bz;
+assign sda_line = target_sda_drive_low ? 1'b0 : 1'bz;
 
 host_i2c_target #(.SLAVE_ADDR(7'h42)) dut_target (
-    .clk         (clk),
-    .resetn      (resetn),
-    .i2c_scl_i   (scl_drv),
-    .i2c_sda_io  (sda_line),
-    .wr_en_o     (wr_en),
-    .wr_addr_o   (wr_addr),
-    .wr_data_o   (wr_data),
-    .rd_addr_o   (rd_addr),
-    .rd_data_i   (rd_data),
-    .proto_err_o (proto_err)
+    .clk                  (clk),
+    .resetn               (resetn),
+    .i2c_scl_i            (scl_drv),
+    .i2c_sda_io           (),
+    .i2c_sda_i            (sda_line),
+    .i2c_sda_drive_low_o  (target_sda_drive_low),
+    .wr_en_o              (wr_en),
+    .wr_addr_o            (wr_addr),
+    .wr_data_o            (wr_data),
+    .rd_addr_o            (rd_addr),
+    .rd_data_i            (rd_data),
+    .proto_err_o          (proto_err)
 );
 
 host_i2c_bridge_regs dut_regs (

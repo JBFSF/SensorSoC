@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-module motion_preprocess_tb;
+module motion_process_tb;
 
   localparam int AX_W = 14;
 
@@ -25,7 +25,7 @@ module motion_preprocess_tb;
     else if (epoch_done) epoch_done_seen <= 1'b1;
   end
 
-  motion_preprocess dut (
+  motion_process dut (
     .clk(clk),
     .rst_i(rst_i),
 
@@ -121,8 +121,8 @@ module motion_preprocess_tb;
   end
 
   initial begin
-    $dumpfile("motion_preprocess_tb.vcd");
-    $dumpvars(0, motion_preprocess_tb);
+    $dumpfile("motion_process_tb.vcd");
+    $dumpvars(0, motion_process_tb);
   end
 
 endmodule

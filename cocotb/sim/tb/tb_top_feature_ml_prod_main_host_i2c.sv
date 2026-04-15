@@ -241,6 +241,8 @@ top #(
     .reset_i(reset),
     .i2c_scl_i(scl_drv),
     .i2c_sda_io(host_i2c_sda),
+    .i2c_sda_i(host_i2c_sda),
+    .i2c_sda_drive_low_o(),
     .sim_req_o(sim_req),
     .sim_addr_o(sim_addr),
     .sim_reg_o(sim_reg),
@@ -264,7 +266,9 @@ top #(
     .spi_miso_i(spi_miso),
     .spi_cs_n_o(spi_cs_n),
     .epoch_end_o(),
-    .alarm_o()
+    .alarm_o(),
+    .test_force_irq_i(1'b0),
+    .test_force_wake_i(1'b0)
 );
 
 i2c_slave_lis2dw12 #(

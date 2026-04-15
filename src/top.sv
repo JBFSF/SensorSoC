@@ -48,7 +48,8 @@ module top #(
     input  logic reset_i,
     input  logic i2c_scl_i,
     inout  wire  i2c_sda_io,
-
+    input  logic i2c_sda_i,
+    output logic i2c_sda_drive_low_o,
     // Functional simulation bus to sensor models (through i2c_master).
     output logic        sim_req_o,     // request strobe from i2c_master into simulated sensor bus
     output logic [6:0]  sim_addr_o,    // 7-bit I2C address for the active simulated sensor transaction
@@ -82,7 +83,24 @@ module top #(
     // Epoch pulse for TB orchestration
     output logic                      epoch_end_o,      // epoch boundary pulse (from globaltimer)
 
-    output logic                      alarm_o           // placeholder alarm output (unused in current RTL)
+    output logic                      alarm_o,          // placeholder alarm output (unused in current RTL)
+
+    // Signals used for test modes.
+    input  logic        test_force_irq_i,
+    input  logic        test_force_wake_i,
+    output logic        pico_trap_o,
+    output logic        pico_cpu_clk_en_o,
+    output logic        pico_mem_valid_o,
+    output logic        pico_mem_instr_o,
+    output logic        pico_mem_ready_o,
+    output logic [3:0]  pico_mem_wstrb_o,
+    output logic [31:0] pico_mem_addr_o,
+    output logic [31:0] pico_mem_wdata_o,
+    output logic [31:0] pico_irq_o,
+    output logic        pico_sleeping_o,
+    output logic        host_i2c_irq_event_o,
+    output logic        ml_irq_o,
+    output logic        timer_event_o
 );
 
     localparam logic [11:0] CFG_LP_BETA_Q10      = 12'd128;
@@ -111,7 +129,7 @@ module top #(
     logic accel_error_w;                 // sticky flag: accel_reader saw an I2C error
     logic [15:0] motion_inst_mag_w;      // per-sample motion magnitude proxy (|ax|+|ay|+|az|) for signal quality
 
-    logic motion_epoch_w;                // strobe: motion_preprocess completed an epoch accumulation
+    logic motion_epoch_w;                // strobe: motion_process completed an epoch accumulation
     logic [47:0] motion_energy_w;        // per-epoch motion energy accumulator output
 
     logic [15:0] ppg_sample_w;           // raw PPG sample from FIFO reader
@@ -186,6 +204,7 @@ module top #(
     wire [31:0] mem_rdata;
     wire        trap;
     wire [31:0] irq;
+    wire [31:0] pico_irq;
 
     localparam logic [31:0] STACKADDR      = 4 * MEM_WORDS;
     localparam logic [31:0] PROGADDR_RESET = 32'h0000_0000;
@@ -393,7 +412,7 @@ module top #(
         .mem_wdata (mem_wdata),
         .mem_wstrb (mem_wstrb),
         .mem_rdata (mem_rdata),
-        .irq       (irq),
+        .irq       (pico_irq),
         .trap      (trap)
     );
 
@@ -522,14 +541,13 @@ module top #(
         .nack_seen_o()                           // unused: NACK-seen flag
     );
 
-    motion_preprocess #(
+    motion_process #(
         .AX_W(16)
-    ) u_motion_preprocess (
+    ) u_motion_process (
         .clk(clk_i),
         .rst_i(reset_i),
         .sample_valid_i(accel_valid_w),     // drive motion accumulation with each valid accel sample
         // accel_valid_o already indicates a completed good read.
-        .sample_ok_i(1'b1),                 // treat all valid samples as OK (no separate quality bit)
         .ax_i(ax_w),                        // accel X input for motion energy
         .ay_i(ay_w),                        // accel Y input for motion energy
         .az_i(az_w),                        // accel Z input for motion energy
@@ -572,7 +590,7 @@ module top #(
         .i2c_error_flag(ppg_i2c_err_w)          // sticky I2C error flag on PPG path
     );
 
-    ppg_beat_detect_rr_calc u_beat_detect (
+    ppg_process u_beat_detect (
         .clk_i(clk_i),
         .rst_i(reset_i),
         .ppg_sample_i(ppg_sample_w),            // raw PPG sample stream input
@@ -590,7 +608,6 @@ module top #(
         .cfg_refrac_ticks_i(CFG_REFRACT_MS),    // refractory time between beats (ms)
         .cfg_rr_min_ticks_i(CFG_RR_MIN_MS),     // minimum plausible RR interval (ms)
         .cfg_rr_max_ticks_i(CFG_RR_MAX_MS),     // maximum plausible RR interval (ms)
-        .cfg_peak_mode_i(1'b0),                 // detection mode select (0=local max)
         .cfg_q_amp_w_i(CFG_Q_AMP_W),            // beat-quality amplitude weight
         .cfg_q_slope_w_i(CFG_Q_SLOPE_W),        // beat-quality slope weight
         .cfg_q_refrac_penalty_i(CFG_Q_REFRAC_PENALTY), // penalty weight for refractory violations
@@ -611,11 +628,11 @@ module top #(
     ) u_rmssd (
         .clk_i(clk_i),
         .rst_i(reset_i),
-        .rr_interval_i(rr_interval_w),  // RR interval input for HRV calculation
+        .rr_interval_i(rr_interval_w[15:0]),  // RR interval input for HRV calculation
         .rr_valid_i(rr_valid_w),        // strobe: RR interval input valid
         .rr_accepted_i(rr_accepted_w),  // only include accepted RR intervals
         .epoch_end_i(epoch_end_w),      // epoch boundary: finalize RMSSD and reset accumulators
-        .rmssd_epoch_o(rmssd_w),        // RMSSD result for epoch
+        .rmssd_epoch_o(rmssd_w[15:0]),        // RMSSD result for epoch
         .rmssd_valid_o(rmssd_valid_w),  // strobe: RMSSD output valid
         .rr_diff_count_o()              // unused: number of RR diffs included
     );
@@ -701,7 +718,7 @@ module top #(
     //   +0x08 motion feature
     //   +0x0C delta-HR feature
     //   +0x10 RMSSD feature
-    always_comb begin
+    always @(*) begin
         case (feat_off)
             32'h00: feat_mmio_rdata = {14'd0, feat_gate_latched_r, 8'd0, feat_invalid_reason_latched_r, feat_latched_valid_r};
             32'h04: feat_mmio_rdata = {{16{feat_time_latched_r[15]}}, feat_time_latched_r};
@@ -906,16 +923,18 @@ module top #(
     host_i2c_target #(
         .SLAVE_ADDR(7'h42)
     ) u_host_i2c_target (
-        .clk        (clk_i),
-        .resetn     (~reset_i),
-        .i2c_scl_i  (i2c_scl_i),
-        .i2c_sda_io (i2c_sda_io),
-        .wr_en_o    (host_i2c_wr_en),
-        .wr_addr_o  (host_i2c_wr_addr),
-        .wr_data_o  (host_i2c_wr_data),
-        .rd_addr_o  (host_i2c_rd_addr),
-        .rd_data_i  (host_i2c_rd_data),
-        .proto_err_o(host_i2c_proto_err)
+        .clk                (clk_i),
+        .resetn             (~reset_i),
+        .i2c_scl_i          (i2c_scl_i),
+        .i2c_sda_io         (i2c_sda_io),
+        .i2c_sda_i          (i2c_sda_i),
+        .i2c_sda_drive_low_o(i2c_sda_drive_low_o),
+        .wr_en_o            (host_i2c_wr_en),
+        .wr_addr_o          (host_i2c_wr_addr),
+        .wr_data_o          (host_i2c_wr_data),
+        .rd_addr_o          (host_i2c_rd_addr),
+        .rd_data_i          (host_i2c_rd_data),
+        .proto_err_o        (host_i2c_proto_err)
     );
 
     host_i2c_bridge_regs u_host_i2c_bridge_regs (
@@ -944,8 +963,9 @@ module top #(
         .irqc_rdata_i         (host_i2c_irqc_rdata)
     );
 
-    assign irq_sources = {29'b0, host_i2c_irq_event, ml_irq, timer_event};
+    assign irq_sources = {28'b0, test_force_wake_i, host_i2c_irq_event, ml_irq, timer_event};
     assign wake_sources = irq_sources;
+    assign pico_irq = irq | {31'b0, test_force_irq_i};
 
     // Minimal interrupt controller used for CPU-visible pending bits and wake.
     irq_ctrl_mmio #(.BASE_ADDR(IRQC_BASE)) u_irqc (
@@ -1076,268 +1096,20 @@ module top #(
             end
         end
     end
-
-    // ---------------------------------------------------------------------
-    // Legacy local bridge path kept commented out temporarily during merge.
-    // ---------------------------------------------------------------------
-    /*
-    // axi wires 
-    logic [31:0] axi_x_addr_w;       // destination address for feature writes (placeholder)
-    logic        axi_done_w;         // one-cycle pulse when writes complete
-    logic        axi_busy_w;         // high while writes are in progress
-
-    logic [31:0] maxi_awaddr_w;
-    logic [7:0]  maxi_awlen_w;
-    logic [2:0]  maxi_awsize_w;
-    logic [1:0]  maxi_awburst_w;
-    logic        maxi_awlock_w;
-    logic [3:0]  maxi_awcache_w;
-    logic [2:0]  maxi_awprot_w;
-    logic [3:0]  maxi_awqos_w;
-    logic [1:0]  maxi_awuser_w;
-    logic        maxi_awvalid_w;
-    logic        maxi_awready_w;
-
-    logic [31:0] maxi_wdata_w;
-    logic [3:0]  maxi_wstrb_w;
-    logic        maxi_wlast_w;
-    logic        maxi_wvalid_w;
-    logic        maxi_wready_w;
-
-    logic [1:0]  maxi_bresp_w;
-    logic        maxi_bvalid_w;
-    logic        maxi_bready_w;
-
-    logic        taketwo_irq_w;
-    logic [31:0] tk_maxi_awaddr_w;
-    logic [7:0]  tk_maxi_awlen_w;
-    logic [2:0]  tk_maxi_awsize_w;
-    logic [1:0]  tk_maxi_awburst_w;
-    logic        tk_maxi_awlock_w;
-    logic [3:0]  tk_maxi_awcache_w;
-    logic [2:0]  tk_maxi_awprot_w;
-    logic [3:0]  tk_maxi_awqos_w;
-    logic [1:0]  tk_maxi_awuser_w;
-    logic        tk_maxi_awvalid_w;
-    logic        tk_maxi_awready_w;
-
-    logic [31:0] tk_maxi_wdata_w;
-    logic [3:0]  tk_maxi_wstrb_w;
-    logic        tk_maxi_wlast_w;
-    logic        tk_maxi_wvalid_w;
-    logic        tk_maxi_wready_w;
-
-    logic [1:0]  tk_maxi_bresp_w;
-    logic        tk_maxi_bvalid_w;
-    logic        tk_maxi_bready_w;
-
-    logic [31:0] tk_maxi_araddr_w;
-    logic [7:0]  tk_maxi_arlen_w;
-    logic [2:0]  tk_maxi_arsize_w;
-    logic [1:0]  tk_maxi_arburst_w;
-    logic        tk_maxi_arlock_w;
-    logic [3:0]  tk_maxi_arcache_w;
-    logic [2:0]  tk_maxi_arprot_w;
-    logic [3:0]  tk_maxi_arqos_w;
-    logic [1:0]  tk_maxi_aruser_w;
-    logic        tk_maxi_arvalid_w;
-    logic        tk_maxi_arready_w;
-    logic [31:0] tk_maxi_rdata_w;
-    logic [1:0]  tk_maxi_rresp_w;
-    logic        tk_maxi_rlast_w;
-    logic        tk_maxi_rvalid_w;
-    logic        tk_maxi_rready_w;
-
-    logic [31:0] tk_saxi_awaddr_w;
-    logic [3:0]  tk_saxi_awcache_w;
-    logic [2:0]  tk_saxi_awprot_w;
-    logic        tk_saxi_awvalid_w;
-    wire         tk_saxi_awready_w;
-    logic [31:0] tk_saxi_wdata_w;
-    logic [3:0]  tk_saxi_wstrb_w;
-    logic        tk_saxi_wvalid_w;
-    wire         tk_saxi_wready_w;
-    wire [1:0]   tk_saxi_bresp_w;
-    wire         tk_saxi_bvalid_w;
-    logic        tk_saxi_bready_w;
-    logic [31:0] tk_saxi_araddr_w;
-    logic [3:0]  tk_saxi_arcache_w;
-    logic [2:0]  tk_saxi_arprot_w;
-    logic        tk_saxi_arvalid_w;
-    wire         tk_saxi_arready_w;
-    wire [31:0]  tk_saxi_rdata_w;
-    wire [1:0]   tk_saxi_rresp_w;
-    wire         tk_saxi_rvalid_w;
-    logic        tk_saxi_rready_w;
-
-    logic [31:0] tk_shared_mem [16:17];
-    taketwo_feature_bridge u_taketwo_feature_bridge (
-        .clk_i            (clk_i),
-        .reset_i          (reset_i),
-        .axi_x_addr_o     (axi_x_addr_w),
-        .maxi_awready_o   (maxi_awready_w),
-        .maxi_wready_o    (maxi_wready_w),
-        .maxi_bresp_o     (maxi_bresp_w),
-        .maxi_bvalid_o    (maxi_bvalid_w),
-        .maxi_awvalid_i   (maxi_awvalid_w),
-        .maxi_awaddr_i    (maxi_awaddr_w),
-        .maxi_wvalid_i    (maxi_wvalid_w),
-        .maxi_wdata_i     (maxi_wdata_w),
-        .maxi_wstrb_i     (maxi_wstrb_w),
-        .maxi_bready_i    (maxi_bready_w),
-        .tk_maxi_awready_o(tk_maxi_awready_w),
-        .tk_maxi_wready_o (tk_maxi_wready_w),
-        .tk_maxi_bresp_o  (tk_maxi_bresp_w),
-        .tk_maxi_bvalid_o (tk_maxi_bvalid_w),
-        .tk_maxi_awvalid_i(tk_maxi_awvalid_w),
-        .tk_maxi_awaddr_i (tk_maxi_awaddr_w),
-        .tk_maxi_awlen_i  (tk_maxi_awlen_w),
-        .tk_maxi_awsize_i (tk_maxi_awsize_w),
-        .tk_maxi_awburst_i(tk_maxi_awburst_w),
-        .tk_maxi_wvalid_i (tk_maxi_wvalid_w),
-        .tk_maxi_wdata_i  (tk_maxi_wdata_w),
-        .tk_maxi_wstrb_i  (tk_maxi_wstrb_w),
-        .tk_maxi_wlast_i  (tk_maxi_wlast_w),
-        .tk_maxi_bready_i (tk_maxi_bready_w),
-        .tk_maxi_arready_o(tk_maxi_arready_w),
-        .tk_maxi_rdata_o  (tk_maxi_rdata_w),
-        .tk_maxi_rresp_o  (tk_maxi_rresp_w),
-        .tk_maxi_rlast_o  (tk_maxi_rlast_w),
-        .tk_maxi_rvalid_o (tk_maxi_rvalid_w),
-        .tk_maxi_arvalid_i(tk_maxi_arvalid_w),
-        .tk_maxi_araddr_i (tk_maxi_araddr_w),
-        .tk_maxi_arlen_i  (tk_maxi_arlen_w),
-        .tk_maxi_arsize_i (tk_maxi_arsize_w),
-        .tk_maxi_arburst_i(tk_maxi_arburst_w),
-        .tk_maxi_rready_i (tk_maxi_rready_w),
-        .tk_saxi_awcache_o(tk_saxi_awcache_w),
-        .tk_saxi_awprot_o (tk_saxi_awprot_w),
-        .tk_saxi_awvalid_o(tk_saxi_awvalid_w),
-        .tk_saxi_awready_i(tk_saxi_awready_w),
-        .tk_saxi_awaddr_o (tk_saxi_awaddr_w),
-        .tk_saxi_wdata_o  (tk_saxi_wdata_w),
-        .tk_saxi_wstrb_o  (tk_saxi_wstrb_w),
-        .tk_saxi_wvalid_o (tk_saxi_wvalid_w),
-        .tk_saxi_wready_i (tk_saxi_wready_w),
-        .tk_saxi_bresp_i  (tk_saxi_bresp_w),
-        .tk_saxi_bvalid_i (tk_saxi_bvalid_w),
-        .tk_saxi_bready_o (tk_saxi_bready_w),
-        .tk_saxi_arcache_o(tk_saxi_arcache_w),
-        .tk_saxi_arprot_o (tk_saxi_arprot_w),
-        .tk_saxi_arvalid_o(tk_saxi_arvalid_w),
-        .tk_saxi_araddr_o (tk_saxi_araddr_w),
-        .tk_saxi_arready_i(tk_saxi_arready_w),
-        .tk_saxi_rdata_i  (tk_saxi_rdata_w),
-        .tk_saxi_rresp_i  (tk_saxi_rresp_w),
-        .tk_saxi_rvalid_i (tk_saxi_rvalid_w),
-        .tk_saxi_rready_o (tk_saxi_rready_w),
-        .axi_done_i       (axi_done_w),
-        .feature_word0_o  (tk_shared_mem[16]),
-        .feature_word1_o  (tk_shared_mem[17])
-    );
-
-    axi_interface u_axi_interface (
-        .CLK         (clk_i),
-        .RESETN      (~reset_i),
-
-        .start       (feat_valid_o),
-        .x_addr      (axi_x_addr_w),
-
-        .x0          (motion_feat_o),       // movement
-        .x1          (time_feat_o),         // cosine time feature
-        .x2          (delta_hr_feat_o),     // delta HR
-        .x3          (rmssd_feat_o),        // RMSSD
-
-        .done        (axi_done_w),
-        .busy        (axi_busy_w),
-
-        .maxi_awaddr (maxi_awaddr_w),
-        .maxi_awlen  (maxi_awlen_w),
-        .maxi_awsize (maxi_awsize_w),
-        .maxi_awburst(maxi_awburst_w),
-        .maxi_awlock (maxi_awlock_w),
-        .maxi_awcache(maxi_awcache_w),
-        .maxi_awprot (maxi_awprot_w),
-        .maxi_awqos  (maxi_awqos_w),
-        .maxi_awuser (maxi_awuser_w),
-        .maxi_awvalid(maxi_awvalid_w),
-        .maxi_awready(maxi_awready_w),
-
-        // AXI4 write data channel.
-        .maxi_wdata  (maxi_wdata_w),
-        .maxi_wstrb  (maxi_wstrb_w),
-        .maxi_wlast  (maxi_wlast_w),
-        .maxi_wvalid (maxi_wvalid_w),
-        .maxi_wready (maxi_wready_w),
-
-        // AXI4 write response channel.
-        .maxi_bresp  (maxi_bresp_w),
-        .maxi_bvalid (maxi_bvalid_w),
-        .maxi_bready (maxi_bready_w)
-    );
-
-    taketwo u_taketwo (
-        .CLK         (clk_i),
-        .RESETN      (~reset_i),
-        .irq         (taketwo_irq_w),
-        .maxi_awaddr (tk_maxi_awaddr_w),
-        .maxi_awlen  (tk_maxi_awlen_w),
-        .maxi_awsize (tk_maxi_awsize_w),
-        .maxi_awburst(tk_maxi_awburst_w),
-        .maxi_awlock (tk_maxi_awlock_w),
-        .maxi_awcache(tk_maxi_awcache_w),
-        .maxi_awprot (tk_maxi_awprot_w),
-        .maxi_awqos  (tk_maxi_awqos_w),
-        .maxi_awuser (tk_maxi_awuser_w),
-        .maxi_awvalid(tk_maxi_awvalid_w),
-        .maxi_awready(tk_maxi_awready_w),
-        .maxi_wdata  (tk_maxi_wdata_w),
-        .maxi_wstrb  (tk_maxi_wstrb_w),
-        .maxi_wlast  (tk_maxi_wlast_w),
-        .maxi_wvalid (tk_maxi_wvalid_w),
-        .maxi_wready (tk_maxi_wready_w),
-        .maxi_bresp  (tk_maxi_bresp_w),
-        .maxi_bvalid (tk_maxi_bvalid_w),
-        .maxi_bready (tk_maxi_bready_w),
-        .maxi_araddr (tk_maxi_araddr_w),
-        .maxi_arlen  (tk_maxi_arlen_w),
-        .maxi_arsize (tk_maxi_arsize_w),
-        .maxi_arburst(tk_maxi_arburst_w),
-        .maxi_arlock (tk_maxi_arlock_w),
-        .maxi_arcache(tk_maxi_arcache_w),
-        .maxi_arprot (tk_maxi_arprot_w),
-        .maxi_arqos  (tk_maxi_arqos_w),
-        .maxi_aruser (tk_maxi_aruser_w),
-        .maxi_arvalid(tk_maxi_arvalid_w),
-        .maxi_arready(tk_maxi_arready_w),
-        .maxi_rdata  (tk_maxi_rdata_w),
-        .maxi_rresp  (tk_maxi_rresp_w),
-        .maxi_rlast  (tk_maxi_rlast_w),
-        .maxi_rvalid (tk_maxi_rvalid_w),
-        .maxi_rready (tk_maxi_rready_w),
-        .saxi_awaddr (tk_saxi_awaddr_w),
-        .saxi_awcache(tk_saxi_awcache_w),
-        .saxi_awprot (tk_saxi_awprot_w),
-        .saxi_awvalid(tk_saxi_awvalid_w),
-        .saxi_awready(tk_saxi_awready_w),
-        .saxi_wdata  (tk_saxi_wdata_w),
-        .saxi_wstrb  (tk_saxi_wstrb_w),
-        .saxi_wvalid (tk_saxi_wvalid_w),
-        .saxi_wready (tk_saxi_wready_w),
-        .saxi_bresp  (tk_saxi_bresp_w),
-        .saxi_bvalid (tk_saxi_bvalid_w),
-        .saxi_bready (tk_saxi_bready_w),
-        .saxi_araddr (tk_saxi_araddr_w),
-        .saxi_arcache(tk_saxi_arcache_w),
-        .saxi_arprot (tk_saxi_arprot_w),
-        .saxi_arvalid(tk_saxi_arvalid_w),
-        .saxi_arready(tk_saxi_arready_w),
-        .saxi_rdata  (tk_saxi_rdata_w),
-        .saxi_rresp  (tk_saxi_rresp_w),
-        .saxi_rvalid (tk_saxi_rvalid_w),
-        .saxi_rready (tk_saxi_rready_w)
-    );
-    */
+    
+    assign pico_trap_o       = trap;
+    assign pico_cpu_clk_en_o = cpu_clk_en_lat;
+    assign pico_mem_valid_o  = mem_valid;
+    assign pico_mem_instr_o  = mem_instr;
+    assign pico_mem_ready_o  = mem_ready;
+    assign pico_mem_wstrb_o  = mem_wstrb;
+    assign pico_mem_addr_o   = mem_addr;
+    assign pico_mem_wdata_o  = mem_wdata;
+    assign pico_irq_o        = pico_irq;
+    assign pico_sleeping_o   = sleeping_r;
+    assign host_i2c_irq_event_o = host_i2c_irq_event;
+    assign ml_irq_o          = ml_irq;
+    assign timer_event_o     = timer_event;
 
     assign epoch_end_o = epoch_end_w;
     assign alarm_o = 1'b0;

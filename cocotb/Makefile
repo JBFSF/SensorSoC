@@ -31,9 +31,37 @@
 #   # Cocotb unit tests (simple_sram_tb.py wrapper)
 #   make test-simple-sram
 #   make sim-logit-confidence
+#   make sim-top-feature-ml-cpu
+#   make sim-top-feature-ml-cpu-spi-flash
+#   make sim-top-spi-init-unified
+#   make sim-top-ml-control-unified
+#   make sim-top-feature-ml-prod-main-host-i2c
+#   make sim-top-sleep-wake-unified
 #
 #   # Cleanup
 #   make clean
+#
+# Unified top command guide:
+#   make test-top-feature-mmio-unified
+#     Sensor pipeline -> feature MMIO latch proof for unified top.sv.
+#
+#   make sim-top-feature-ml-cpu
+#     CPU reads feature MMIO, writes weight_ram_axi, and starts ML.
+#
+#   make sim-top-feature-ml-cpu-spi-flash
+#     Same CPU-owned ML path, but with weights streamed from simulated SPI flash.
+#
+#   make sim-top-spi-init-unified
+#     Short SPI-only boot-copy proof for unified top.sv.
+#
+#   make sim-top-ml-control-unified
+#     Short ML-control-only proof for unified top.sv.
+#
+#   make sim-top-feature-ml-prod-main-host-i2c
+#     Most production-like unified-top flow: SPI load + ML loop + host-I2C visibility.
+#
+#   make sim-top-sleep-wake-unified
+#     Repeated timer-wake + ML-IRQ-wake regression for unified top.sv.
 #
 # NOTE:
 #   This Makefile expects a small helper script at:
@@ -52,13 +80,23 @@ SELF_MAKE := $(MAKE) -f $(THIS_MAKEFILE)
 IVERILOG ?= iverilog
 VVP      ?= vvp
 PYTHON   ?= python3
+COCOTB_PYENV_PYTHON := $(HOME)/.pyenv/versions/cocotb-env/bin/python
+COCOTB_PYENV_CONFIG := $(HOME)/.pyenv/versions/cocotb-env/bin/cocotb-config
+ifeq ($(wildcard $(COCOTB_PYENV_PYTHON)), $(COCOTB_PYENV_PYTHON))
+PYTHON := $(COCOTB_PYENV_PYTHON)
+endif
+COCOTB_CONFIG ?= $(if $(wildcard $(COCOTB_PYENV_CONFIG)),$(COCOTB_PYENV_CONFIG),cocotb-config)
 
 # ------------------------------------------------------------
 # Derived paths
 # ------------------------------------------------------------
 
-# Cocotb VPI library (resolved again below after PYTHON is set; this is a placeholder)
-COCOTB_LIBDIR :=
+# Cocotb VPI library
+COCOTB_LIBDIR := $(shell $(COCOTB_CONFIG) --lib-dir 2>/dev/null)
+
+# Python interpreter for cocotb
+PYGPI_PYTHON_BIN := $(shell $(PYTHON) -c "import sys; print(sys.executable)")
+LIBPYTHON_LOC := $(shell $(PYTHON) -m cocotb_tools.config --libpython 2>/dev/null)
 
 # Build directory
 BUILD_DIR := $(MAKEFILE_DIR)/sim/build
@@ -71,7 +109,8 @@ WAVE_DIR := $(MAKEFILE_DIR)/sim/waves
 # ------------------------------------------------------------
 # Common cocotb environment (v2 naming)
 # ------------------------------------------------------------
-# PYGPI_PYTHON_BIN and COCOTB_LIBDIR are set below via cocotb-config after PYTHON is defined
+export PYGPI_PYTHON_BIN := $(PYGPI_PYTHON_BIN)
+export LIBPYTHON_LOC    := $(LIBPYTHON_LOC)
 export PYTHONPATH       := $(MAKEFILE_DIR)/sim/tb
 export COCOTB_LOG_LEVEL ?= INFO
 
@@ -128,9 +167,37 @@ SOC_RTL_SRCS := \
   $(RTL_DIR)/irq_ctrl_mmio.v \
   $(RTL_DIR)/taketwo_wrap.v \
   $(RTL_DIR)/taketwo.v \
+  $(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v \
   $(RTL_DIR)/pwrctrl_mmio.v \
   $(RTL_DIR)/host_i2c_target.v \
   $(RTL_DIR)/host_i2c_bridge_regs.v
+
+UNIFIED_TOP_RTL_SRCS := \
+  $(RTL_DIR)/top.sv \
+  $(RTL_DIR)/host_i2c_target.v \
+  $(RTL_DIR)/host_i2c_bridge_regs.v \
+  $(RTL_DIR)/spi_master_mmio.v \
+  $(RTL_DIR)/i2c_master.sv \
+  $(RTL_DIR)/accel_reader.sv \
+  $(RTL_DIR)/motion_process.sv \
+  $(RTL_DIR)/ppg_fifo_reader.sv \
+  $(RTL_DIR)/ppg_process.sv \
+  $(RTL_DIR)/rmssd_engine.sv \
+  $(RTL_DIR)/signal_quality.sv \
+  $(RTL_DIR)/feature_engine.sv \
+  $(RTL_DIR)/cos_lut_timer.sv \
+  $(RTL_DIR)/globaltimer.sv \
+  $(RTL_DIR)/simple_sram.v \
+  $(MAKEFILE_DIR)/../ip/picorv32.v \
+  $(RTL_DIR)/test_mmio.v \
+  $(RTL_DIR)/timer_mmio.v \
+  $(RTL_DIR)/ml_axil_bridge_mmio.v \
+  $(RTL_DIR)/weight_ram_axi.v \
+  $(RTL_DIR)/irq_ctrl_mmio.v \
+  $(RTL_DIR)/taketwo_wrap.v \
+  $(RTL_DIR)/taketwo.v \
+  $(RTL_DIR)/pwrctrl_mmio.v \
+  $(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v
 
 SOC_TB_SRCS  := $(TB_DIR)/tb_soc.sv
 SOC_VVP      := sim_soc.vvp
@@ -180,6 +247,9 @@ FW_C_test_ml_weights        := $(FW_TESTS)/test_ml_weights.c
 FW_C_test_ml_cpu_wake_i2c   := $(FW_TESTS)/test_ml_cpu_wake_i2c.c
 FW_C_test_top_feature_ml_cpu:= $(FW_TESTS)/test_top_feature_ml_cpu.c
 FW_C_test_top_feature_ml_cpu_spi_flash:= $(FW_TESTS)/test_top_feature_ml_cpu_spi_flash.c
+FW_C_test_top_spi_init_unified := $(FW_TESTS)/test_top_spi_init_unified.c
+FW_C_test_top_ml_control_unified := $(FW_TESTS)/test_top_ml_control_unified.c
+FW_C_test_top_sleep_wake_unified := $(FW_TESTS)/test_top_sleep_wake_unified.c
 
 # Select the C source based on FW_VARIANT
 FW_SRC = $(FW_C_$(FW_VARIANT))
@@ -194,6 +264,9 @@ FW_ARCH_test_ml_cpu_wake_i2c := rv32im
 FW_ARCH_prod_main := rv32im
 FW_ARCH_test_top_feature_ml_cpu := rv32im
 FW_ARCH_test_top_feature_ml_cpu_spi_flash := rv32im
+FW_ARCH_test_top_spi_init_unified := rv32im
+FW_ARCH_test_top_ml_control_unified := rv32im
+FW_ARCH_test_top_sleep_wake_unified := rv32im
 FW_ARCH := $(if $(FW_ARCH_$(FW_VARIANT)),$(FW_ARCH_$(FW_VARIANT)),$(FW_ARCH_DEFAULT))
 FW_OPT_DEFAULT := -O2
 FW_OPT_test_ml_cpu_wake_i2c := -O0
@@ -262,6 +335,9 @@ firmware-top-feature-ml-cpu:
 
 firmware-top-feature-ml-cpu-spi-flash:
 	@$(SELF_MAKE) FW_VARIANT=test_top_feature_ml_cpu_spi_flash firmware
+
+firmware-top-sleep-wake-unified:
+	@$(SELF_MAKE) FW_VARIANT=test_top_sleep_wake_unified firmware
 
 
 
@@ -348,9 +424,9 @@ TOP_FEATURE_ML_CPU_SOURCES := \
 	$(RTL_DIR)/host_i2c_bridge_regs.v \
 	$(RTL_DIR)/i2c_master.sv \
 	$(RTL_DIR)/accel_reader.sv \
-	$(RTL_DIR)/motion_preprocess.sv \
+	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
-	$(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
+	$(RTL_DIR)/ppg_process.sv \
 	$(RTL_DIR)/rmssd_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
@@ -392,9 +468,9 @@ TOP_FEATURE_ML_CPU_SPI_FLASH_SOURCES := \
 	$(RTL_DIR)/host_i2c_bridge_regs.v \
 	$(RTL_DIR)/i2c_master.sv \
 	$(RTL_DIR)/accel_reader.sv \
-	$(RTL_DIR)/motion_preprocess.sv \
+	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
-	$(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
+	$(RTL_DIR)/ppg_process.sv \
 	$(RTL_DIR)/rmssd_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
@@ -426,6 +502,100 @@ sim-top-feature-ml-cpu-spi-flash: $(TOP_FEATURE_ML_CPU_SPI_FLASH_VVP) | $(SIM_BU
 	@echo "== Running $(TOP_FEATURE_ML_CPU_SPI_FLASH_TOP) (FW=$(FW_DIR)/build/test_top_feature_ml_cpu_spi_flash/firmware.hex FLASH=$(TAKETWO_PARAMS_HEX)) =="
 	$(VVP) $(TOP_FEATURE_ML_CPU_SPI_FLASH_VVP)
 
+# Unified top: short SPI-only regression. This isolates the boot-copy plumbing:
+#   CPU firmware -> spi_master_mmio -> spi_flash_model -> weight_ram_axi
+# without waiting on features, ML, or host policy behavior.
+TOP_SPI_INIT_UNIFIED_TOP     := tb_top_spi_init_unified
+TOP_SPI_INIT_UNIFIED_VVP     := $(BUILD_DIR)/$(TOP_SPI_INIT_UNIFIED_TOP).vvp
+TOP_SPI_INIT_UNIFIED_SOURCES := \
+	$(TB_DIR)/tb_top_spi_init_unified.sv \
+	$(TB_DIR)/spi_flash_model.v \
+	$(RTL_DIR)/top.sv \
+	$(RTL_DIR)/host_i2c_target.v \
+	$(RTL_DIR)/host_i2c_bridge_regs.v \
+	$(RTL_DIR)/i2c_master.sv \
+	$(RTL_DIR)/accel_reader.sv \
+	$(RTL_DIR)/motion_process.sv \
+	$(RTL_DIR)/ppg_fifo_reader.sv \
+	$(RTL_DIR)/ppg_process.sv \
+	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/signal_quality.sv \
+	$(RTL_DIR)/feature_engine.sv \
+	$(RTL_DIR)/cos_lut_timer.sv \
+	$(RTL_DIR)/globaltimer.sv \
+	$(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_master_mmio.v \
+	$(MAKEFILE_DIR)/../ip/picorv32.v \
+	$(RTL_DIR)/test_mmio.v \
+	$(RTL_DIR)/timer_mmio.v \
+	$(RTL_DIR)/ml_axil_bridge_mmio.v \
+	$(RTL_DIR)/weight_ram_axi.v \
+	$(RTL_DIR)/irq_ctrl_mmio.v \
+	$(RTL_DIR)/taketwo_wrap.v \
+	$(RTL_DIR)/taketwo.v \
+	$(RTL_DIR)/pwrctrl_mmio.v \
+	$(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v \
+	sensors/i2c_slave_lis2dw12.sv \
+	sensors/i2c_slave_adpd144ri.sv
+
+$(TOP_SPI_INIT_UNIFIED_VVP): $(TOP_SPI_INIT_UNIFIED_SOURCES)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_SPI_INIT_UNIFIED_TOP) -o $@ \
+	  $(TOP_SPI_INIT_UNIFIED_SOURCES)
+
+.PHONY: sim-top-spi-init-unified
+sim-top-spi-init-unified: $(TOP_SPI_INIT_UNIFIED_VVP) | $(SIM_BUILD)
+	@$(SELF_MAKE) FW_VARIANT=test_top_spi_init_unified firmware
+	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
+	@echo "== Running $(TOP_SPI_INIT_UNIFIED_TOP) (FW=$(FW_DIR)/build/test_top_spi_init_unified/firmware.hex FLASH=$(TAKETWO_PARAMS_HEX)) =="
+	$(VVP) $(TOP_SPI_INIT_UNIFIED_VVP)
+
+# Unified top: short ML-control-only regression. This isolates the CPU-owned
+# taketwo control path from the feature and SPI flows:
+#   WRAM input writes -> ML base-register programming -> START/BUSY/IRQ
+#   -> output mutation in shared WRAM.
+TOP_ML_CONTROL_UNIFIED_TOP     := tb_top_ml_control_unified
+TOP_ML_CONTROL_UNIFIED_VVP     := $(BUILD_DIR)/$(TOP_ML_CONTROL_UNIFIED_TOP).vvp
+TOP_ML_CONTROL_UNIFIED_SOURCES := \
+	$(TB_DIR)/tb_top_ml_control_unified.sv \
+	$(RTL_DIR)/top.sv \
+	$(RTL_DIR)/host_i2c_target.v \
+	$(RTL_DIR)/host_i2c_bridge_regs.v \
+	$(RTL_DIR)/i2c_master.sv \
+	$(RTL_DIR)/accel_reader.sv \
+	$(RTL_DIR)/motion_process.sv \
+	$(RTL_DIR)/ppg_fifo_reader.sv \
+	$(RTL_DIR)/ppg_process.sv \
+	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/signal_quality.sv \
+	$(RTL_DIR)/feature_engine.sv \
+	$(RTL_DIR)/cos_lut_timer.sv \
+	$(RTL_DIR)/globaltimer.sv \
+	$(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_master_mmio.v \
+	$(MAKEFILE_DIR)/../ip/picorv32.v \
+	$(RTL_DIR)/test_mmio.v \
+	$(RTL_DIR)/timer_mmio.v \
+	$(RTL_DIR)/ml_axil_bridge_mmio.v \
+	$(RTL_DIR)/weight_ram_axi.v \
+	$(RTL_DIR)/irq_ctrl_mmio.v \
+	$(RTL_DIR)/taketwo_wrap.v \
+	$(RTL_DIR)/taketwo.v \
+	$(RTL_DIR)/pwrctrl_mmio.v \
+	$(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v \
+	sensors/i2c_slave_lis2dw12.sv \
+	sensors/i2c_slave_adpd144ri.sv
+
+$(TOP_ML_CONTROL_UNIFIED_VVP): $(TOP_ML_CONTROL_UNIFIED_SOURCES)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_ML_CONTROL_UNIFIED_TOP) -o $@ \
+	  $(TOP_ML_CONTROL_UNIFIED_SOURCES)
+
+.PHONY: sim-top-ml-control-unified
+sim-top-ml-control-unified: $(TOP_ML_CONTROL_UNIFIED_VVP) | $(SIM_BUILD)
+	@$(SELF_MAKE) FW_VARIANT=test_top_ml_control_unified firmware
+	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
+	@echo "== Running $(TOP_ML_CONTROL_UNIFIED_TOP) (FW=$(FW_DIR)/build/test_top_ml_control_unified/firmware.hex WEIGHTS=$(TAKETWO_PARAMS_HEX)) =="
+	$(VVP) $(TOP_ML_CONTROL_UNIFIED_VVP)
+
 TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP     := tb_top_feature_ml_prod_main_host_i2c
 TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP     := $(BUILD_DIR)/$(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP).vvp
 TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES := \
@@ -436,9 +606,9 @@ TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES := \
 	$(RTL_DIR)/host_i2c_bridge_regs.v \
 	$(RTL_DIR)/i2c_master.sv \
 	$(RTL_DIR)/accel_reader.sv \
-	$(RTL_DIR)/motion_preprocess.sv \
+	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
-	$(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
+	$(RTL_DIR)/ppg_process.sv \
 	$(RTL_DIR)/rmssd_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
@@ -469,6 +639,53 @@ sim-top-feature-ml-prod-main-host-i2c: $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP) 
 	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
 	@echo "== Running $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP) (FW=$(FW_DIR)/build/prod_main/firmware.hex FLASH=$(TAKETWO_PARAMS_HEX)) =="
 	$(VVP) $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP)
+
+# Unified top: dedicated timer sleep/wake regression.
+# This bench isolates the always-on timer + pwrctrl + irq_ctrl sleep path:
+#   firmware requests sleep -> CPU clock gates -> timer wake arrives
+#   -> wake bookkeeping latches -> firmware clears sticky state.
+TOP_SLEEP_WAKE_UNIFIED_TOP     := tb_top_sleep_wake_unified
+TOP_SLEEP_WAKE_UNIFIED_VVP     := $(BUILD_DIR)/$(TOP_SLEEP_WAKE_UNIFIED_TOP).vvp
+TOP_SLEEP_WAKE_UNIFIED_SOURCES := \
+	$(TB_DIR)/tb_top_sleep_wake_unified.sv \
+	$(RTL_DIR)/top.sv \
+	$(RTL_DIR)/host_i2c_target.v \
+	$(RTL_DIR)/host_i2c_bridge_regs.v \
+	$(RTL_DIR)/i2c_master.sv \
+	$(RTL_DIR)/accel_reader.sv \
+	$(RTL_DIR)/motion_process.sv \
+	$(RTL_DIR)/ppg_fifo_reader.sv \
+	$(RTL_DIR)/ppg_process.sv \
+	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/signal_quality.sv \
+	$(RTL_DIR)/feature_engine.sv \
+	$(RTL_DIR)/cos_lut_timer.sv \
+	$(RTL_DIR)/globaltimer.sv \
+	$(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_master_mmio.v \
+	$(MAKEFILE_DIR)/../ip/picorv32.v \
+	$(RTL_DIR)/test_mmio.v \
+	$(RTL_DIR)/timer_mmio.v \
+	$(RTL_DIR)/ml_axil_bridge_mmio.v \
+	$(RTL_DIR)/weight_ram_axi.v \
+	$(RTL_DIR)/irq_ctrl_mmio.v \
+	$(RTL_DIR)/taketwo_wrap.v \
+	$(RTL_DIR)/taketwo.v \
+	$(RTL_DIR)/pwrctrl_mmio.v \
+	$(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v \
+	sensors/i2c_slave_lis2dw12.sv \
+	sensors/i2c_slave_adpd144ri.sv
+
+$(TOP_SLEEP_WAKE_UNIFIED_VVP): $(TOP_SLEEP_WAKE_UNIFIED_SOURCES)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_SLEEP_WAKE_UNIFIED_TOP) -o $@ \
+	  $(TOP_SLEEP_WAKE_UNIFIED_SOURCES)
+
+.PHONY: sim-top-sleep-wake-unified
+sim-top-sleep-wake-unified: $(TOP_SLEEP_WAKE_UNIFIED_VVP) | $(SIM_BUILD)
+	@$(SELF_MAKE) FW_VARIANT=test_top_sleep_wake_unified firmware
+	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
+	@echo "== Running $(TOP_SLEEP_WAKE_UNIFIED_TOP) (FW=$(FW_DIR)/build/test_top_sleep_wake_unified/firmware.hex) =="
+	$(VVP) $(TOP_SLEEP_WAKE_UNIFIED_VVP)
 
 .PHONY: test-cpu-ml-pipeline
 test-cpu-ml-pipeline:
@@ -563,7 +780,8 @@ CPU_ML_RTL_SRCS := \
   $(RTL_DIR)/cpu_to_ml.v \
   $(RTL_DIR)/ml_axil_bridge_mmio.v \
   $(RTL_DIR)/taketwo_wrap.v \
-  $(RTL_DIR)/taketwo.v
+  $(RTL_DIR)/taketwo.v \
+  $(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v
 
 $(CPU_ML_VVP): $(CPU_ML_TOP_V) $(CPU_ML_RTL_SRCS)
 	@echo "[COCOTB] Building $@"
@@ -692,19 +910,19 @@ clean-simple-sram:
 # MOTION PREPROCESS
 # ============================================================
 
-MOTION_PREPROCESS_TOP     := motion_preprocess_tb
-MOTION_PREPROCESS_VVP     := $(BUILD_DIR)/$(MOTION_PREPROCESS_TOP).vvp
-MOTION_PREPROCESS_SOURCES := sim/tb/motion_preprocess_tb.sv $(RTL_DIR)/motion_preprocess.sv
-MOTION_PREPROCESS_VCD     := $(WAVE_DIR)/motion_preprocess_tb.vcd
+motion_process_TOP     := motion_process_tb
+motion_process_VVP     := $(BUILD_DIR)/$(motion_process_TOP).vvp
+motion_process_SOURCES := sim/tb/motion_process_tb.sv $(RTL_DIR)/motion_process.sv
+motion_process_VCD     := $(WAVE_DIR)/motion_process_tb.vcd
 
-$(MOTION_PREPROCESS_VVP): $(MOTION_PREPROCESS_SOURCES)
+$(motion_process_VVP): $(motion_process_SOURCES)
 	$(IVERILOG) -g2012 -o $@ $^
 
 .PHONY: sim-motion-preprocess
-sim-motion-preprocess: $(MOTION_PREPROCESS_VVP)
-	@echo "== Running $(MOTION_PREPROCESS_TOP) (VCD -> $(MOTION_PREPROCESS_VCD)) =="
+sim-motion-preprocess: $(motion_process_VVP)
+	@echo "== Running $(motion_process_TOP) (VCD -> $(motion_process_VCD)) =="
 	@mkdir -p $(WAVE_DIR)
-	@cd $(WAVE_DIR) && $(VVP) $(abspath $(MOTION_PREPROCESS_VVP))
+	@cd $(WAVE_DIR) && $(VVP) $(abspath $(motion_process_VVP))
 
 # ============================================================
 # PPG FIFO READER
@@ -728,10 +946,10 @@ sim-ppg-fifo-reader: $(PPG_FIFO_READER_VVP)
 # PPG BEAT DETECT + RR CALC
 # ============================================================
 
-PPG_BEAT_RR_TOP     := ppg_beat_detect_rr_calc_tb
+PPG_BEAT_RR_TOP     := ppg_process_tb
 PPG_BEAT_RR_VVP     := $(BUILD_DIR)/$(PPG_BEAT_RR_TOP).vvp
-PPG_BEAT_RR_SOURCES := sim/tb/ppg_beat_detect_rr_calc_tb.sv $(RTL_DIR)/ppg_beat_detect_rr_calc.sv $(RTL_DIR)/ewma_baseline.sv
-PPG_BEAT_RR_VCD     := $(WAVE_DIR)/ppg_beat_detect_rr_calc_tb.vcd
+PPG_BEAT_RR_SOURCES := sim/tb/ppg_process_tb.sv $(RTL_DIR)/ppg_process.sv $(RTL_DIR)/ewma_baseline.sv
+PPG_BEAT_RR_VCD     := $(WAVE_DIR)/ppg_process_tb.vcd
 
 $(PPG_BEAT_RR_VVP): $(PPG_BEAT_RR_SOURCES)
 	$(IVERILOG) -g2012 -o $@ $^
@@ -821,31 +1039,19 @@ sim-cos-lut-timer: $(COS_LUT_TIMER_VVP)
 TOP_PIPELINE_TOP     := top_pipeline_tb
 TOP_PIPELINE_VVP     := $(BUILD_DIR)/$(TOP_PIPELINE_TOP).vvp
 TOP_PIPELINE_SOURCES := sim/tb/top_pipeline_tb.sv \
-                        $(RTL_DIR)/top.sv \
-                        $(RTL_DIR)/host_i2c_target.v \
-                        $(RTL_DIR)/host_i2c_bridge_regs.v \
-                        $(RTL_DIR)/i2c_master.sv \
-                        $(RTL_DIR)/accel_reader.sv \
-                        $(RTL_DIR)/motion_preprocess.sv \
-                        $(RTL_DIR)/ppg_fifo_reader.sv \
-                        $(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
-                        $(RTL_DIR)/rmssd_engine.sv \
-                        $(RTL_DIR)/signal_quality.sv \
-                        $(RTL_DIR)/feature_engine.sv \
-                        $(RTL_DIR)/cos_lut_timer.sv \
-                        $(RTL_DIR)/globaltimer.sv \
+                        $(UNIFIED_TOP_RTL_SRCS) \
                         sensors/i2c_slave_lis2dw12.sv \
                         sensors/i2c_slave_adpd144ri.sv
 TOP_PIPELINE_VCD     := $(WAVE_DIR)/top_pipeline_tb.vcd
 
 $(TOP_PIPELINE_VVP): $(TOP_PIPELINE_SOURCES)
-	$(IVERILOG) -g2012 -o $@ $^
+	$(IVERILOG) -g2012 -grelative-include -I $(RTL_DIR) -s $(TOP_PIPELINE_TOP) -o $@ $^
 
 .PHONY: sim-top-pipeline
 sim-top-pipeline: $(TOP_PIPELINE_VVP)
 	@echo "== Running $(TOP_PIPELINE_TOP) (VCD -> $(TOP_PIPELINE_VCD)) =="
 	@mkdir -p $(WAVE_DIR)
-	@cd $(WAVE_DIR) && $(VVP) $(abspath $(TOP_PIPELINE_VVP))
+	@cd $(WAVE_DIR) && $(VVP) $(abspath $(TOP_PIPELINE_VVP)) +DATA_DIR=$(abspath $(MAKEFILE_DIR)/sim/data)
 
 # ============================================================
 # Cocotb: top -> taketwo feature load check
@@ -857,21 +1063,7 @@ TOP_MLP_FEATURES_VVP    := sim_top_mlp_features.vvp
 TOP_MLP_FEATURES_PYMOD  := test_top_mlp_features
 TOP_MLP_FEATURES_SRCS   := \
   $(TOP_MLP_FEATURES_TOP_V) \
-  $(TB_DIR)/taketwo_core_only.v \
-  $(RTL_DIR)/top.sv \
-  $(RTL_DIR)/host_i2c_target.v \
-  $(RTL_DIR)/host_i2c_bridge_regs.v \
-  $(RTL_DIR)/axi_interface.sv \
-  $(RTL_DIR)/i2c_master.sv \
-  $(RTL_DIR)/accel_reader.sv \
-  $(RTL_DIR)/motion_preprocess.sv \
-  $(RTL_DIR)/ppg_fifo_reader.sv \
-  $(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
-  $(RTL_DIR)/rmssd_engine.sv \
-  $(RTL_DIR)/signal_quality.sv \
-  $(RTL_DIR)/feature_engine.sv \
-  $(RTL_DIR)/cos_lut_timer.sv \
-  $(RTL_DIR)/globaltimer.sv \
+  $(UNIFIED_TOP_RTL_SRCS) \
   sensors/i2c_slave_lis2dw12.sv \
   sensors/i2c_slave_adpd144ri.sv
 
@@ -881,6 +1073,8 @@ $(TOP_MLP_FEATURES_VVP): $(TOP_MLP_FEATURES_SRCS)
 
 .PHONY: test-top-mlp-features
 test-top-mlp-features: $(TOP_MLP_FEATURES_VVP)
+	@$(SELF_MAKE) FW_VARIANT=test_top_feature_ml_cpu firmware
+	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
 	@echo "[COCOTB] Running $(TOP_MLP_FEATURES_PYMOD) on $(TOP_MLP_FEATURES_TOP)"
 	@export COCOTB_TOPLEVEL=$(TOP_MLP_FEATURES_TOP); \
 	export COCOTB_TEST_MODULES=$(TOP_MLP_FEATURES_PYMOD); \
@@ -896,30 +1090,7 @@ TOP_FEATURE_MMIO_VVP    := sim_top_feature_mmio_unified.vvp
 TOP_FEATURE_MMIO_PYMOD  := test_top_feature_mmio_unified
 TOP_FEATURE_MMIO_SRCS   := \
   $(TOP_FEATURE_MMIO_TOP_V) \
-  $(RTL_DIR)/top.sv \
-  $(RTL_DIR)/host_i2c_target.v \
-  $(RTL_DIR)/host_i2c_bridge_regs.v \
-  $(RTL_DIR)/i2c_master.sv \
-  $(RTL_DIR)/accel_reader.sv \
-  $(RTL_DIR)/motion_preprocess.sv \
-  $(RTL_DIR)/ppg_fifo_reader.sv \
-  $(RTL_DIR)/ppg_beat_detect_rr_calc.sv \
-  $(RTL_DIR)/rmssd_engine.sv \
-  $(RTL_DIR)/signal_quality.sv \
-  $(RTL_DIR)/feature_engine.sv \
-  $(RTL_DIR)/cos_lut_timer.sv \
-  $(RTL_DIR)/globaltimer.sv \
-  $(RTL_DIR)/simple_sram.v \
-  $(MAKEFILE_DIR)/../ip/picorv32.v \
-  $(RTL_DIR)/test_mmio.v \
-  $(RTL_DIR)/timer_mmio.v \
-  $(RTL_DIR)/ml_axil_bridge_mmio.v \
-  $(RTL_DIR)/weight_ram_axi.v \
-  $(RTL_DIR)/irq_ctrl_mmio.v \
-  $(RTL_DIR)/taketwo_wrap.v \
-  $(RTL_DIR)/taketwo.v \
-  $(RTL_DIR)/pwrctrl_mmio.v \
-  $(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v \
+  $(UNIFIED_TOP_RTL_SRCS) \
   sensors/i2c_slave_lis2dw12.sv \
   sensors/i2c_slave_adpd144ri.sv
 
@@ -933,6 +1104,107 @@ test-top-feature-mmio-unified: $(TOP_FEATURE_MMIO_VVP)
 	@export COCOTB_TOPLEVEL=$(TOP_FEATURE_MMIO_TOP); \
 	export COCOTB_TEST_MODULES=$(TOP_FEATURE_MMIO_PYMOD); \
 	$(call RUN_COCOTB_ICARUS,$(TOP_FEATURE_MMIO_VVP))
+
+# ============================================================
+# Cocotb: top sensor pipeline stage-by-stage reference scoreboard
+# ============================================================
+
+TOP_SENSOR_PIPELINE_TOP    := sim_top_sensor_pipeline
+TOP_SENSOR_PIPELINE_TOP_V  := $(TB_DIR)/sim_top_sensor_pipeline.sv
+TOP_SENSOR_PIPELINE_VVP    := $(BUILD_DIR)/$(TOP_SENSOR_PIPELINE_TOP).vvp
+TOP_SENSOR_PIPELINE_PYMOD  := test_top_sensor_pipeline
+TOP_SENSOR_PIPELINE_SRCS   := \
+  $(TOP_SENSOR_PIPELINE_TOP_V) \
+  $(UNIFIED_TOP_RTL_SRCS) \
+  sensors/i2c_slave_lis2dw12.sv \
+  sensors/i2c_slave_adpd144ri.sv
+
+$(TOP_SENSOR_PIPELINE_VVP): $(TOP_SENSOR_PIPELINE_SRCS)
+	@echo "[COCOTB] Building $@"
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_SENSOR_PIPELINE_TOP) -o $@ $(TOP_SENSOR_PIPELINE_SRCS)
+
+.PHONY: test-top-sensor-pipeline
+test-top-sensor-pipeline: $(TOP_SENSOR_PIPELINE_VVP)
+	@echo "[COCOTB] Running $(TOP_SENSOR_PIPELINE_PYMOD) on $(TOP_SENSOR_PIPELINE_TOP)"
+	@export COCOTB_TOPLEVEL=$(TOP_SENSOR_PIPELINE_TOP); \
+	export COCOTB_TEST_MODULES=$(TOP_SENSOR_PIPELINE_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(TOP_SENSOR_PIPELINE_VVP))
+
+.PHONY: test-top-pipeline-scoreboard
+test-top-pipeline-scoreboard: test-top-sensor-pipeline
+	@true
+
+.PHONY: test-top-e2e-inference
+test-top-e2e-inference: test-top-sensor-pipeline
+	@true
+
+# ============================================================
+# Cocotb: module scoreboards against Python references
+# ============================================================
+
+MOTION_REF_TOP     := sim_motion_process_ref
+MOTION_REF_TOP_V   := $(TB_DIR)/sim_motion_process_ref.sv
+MOTION_REF_VVP     := $(BUILD_DIR)/$(MOTION_REF_TOP).vvp
+MOTION_REF_PYMOD   := test_motion_process_ref
+MOTION_REF_SRCS    := $(MOTION_REF_TOP_V) $(RTL_DIR)/motion_process.sv
+
+$(MOTION_REF_VVP): $(MOTION_REF_SRCS)
+	@echo "[COCOTB] Building $@"
+	$(IVERILOG) -g2012 -s $(MOTION_REF_TOP) -o $@ $(MOTION_REF_SRCS)
+
+.PHONY: test-motion-process-ref
+test-motion-process-ref: $(MOTION_REF_VVP)
+	@export COCOTB_TOPLEVEL=$(MOTION_REF_TOP); \
+	export COCOTB_TEST_MODULES=$(MOTION_REF_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(MOTION_REF_VVP))
+
+PPG_REF_TOP      := sim_ppg_process_ref
+PPG_REF_TOP_V    := $(TB_DIR)/sim_ppg_process_ref.sv
+PPG_REF_VVP      := $(BUILD_DIR)/$(PPG_REF_TOP).vvp
+PPG_REF_PYMOD    := test_ppg_process_ref
+PPG_REF_SRCS     := $(PPG_REF_TOP_V) $(RTL_DIR)/ppg_process.sv
+
+$(PPG_REF_VVP): $(PPG_REF_SRCS)
+	@echo "[COCOTB] Building $@"
+	$(IVERILOG) -g2012 -s $(PPG_REF_TOP) -o $@ $(PPG_REF_SRCS)
+
+.PHONY: test-ppg-process-ref
+test-ppg-process-ref: $(PPG_REF_VVP)
+	@export COCOTB_TOPLEVEL=$(PPG_REF_TOP); \
+	export COCOTB_TEST_MODULES=$(PPG_REF_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(PPG_REF_VVP))
+
+RMSSD_REF_TOP      := sim_rmssd_engine_ref
+RMSSD_REF_TOP_V    := $(TB_DIR)/sim_rmssd_engine_ref.sv
+RMSSD_REF_VVP      := $(BUILD_DIR)/$(RMSSD_REF_TOP).vvp
+RMSSD_REF_PYMOD    := test_rmssd_engine_ref
+RMSSD_REF_SRCS     := $(RMSSD_REF_TOP_V) $(RTL_DIR)/rmssd_engine.sv
+
+$(RMSSD_REF_VVP): $(RMSSD_REF_SRCS)
+	@echo "[COCOTB] Building $@"
+	$(IVERILOG) -g2012 -s $(RMSSD_REF_TOP) -o $@ $(RMSSD_REF_SRCS)
+
+.PHONY: test-rmssd-engine-ref
+test-rmssd-engine-ref: $(RMSSD_REF_VVP)
+	@export COCOTB_TOPLEVEL=$(RMSSD_REF_TOP); \
+	export COCOTB_TEST_MODULES=$(RMSSD_REF_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(RMSSD_REF_VVP))
+
+SIGNAL_QUALITY_REF_TOP      := sim_signal_quality_ref
+SIGNAL_QUALITY_REF_TOP_V    := $(TB_DIR)/sim_signal_quality_ref.sv
+SIGNAL_QUALITY_REF_VVP      := $(BUILD_DIR)/$(SIGNAL_QUALITY_REF_TOP).vvp
+SIGNAL_QUALITY_REF_PYMOD    := test_signal_quality_ref
+SIGNAL_QUALITY_REF_SRCS     := $(SIGNAL_QUALITY_REF_TOP_V) $(RTL_DIR)/signal_quality.sv
+
+$(SIGNAL_QUALITY_REF_VVP): $(SIGNAL_QUALITY_REF_SRCS)
+	@echo "[COCOTB] Building $@"
+	$(IVERILOG) -g2012 -s $(SIGNAL_QUALITY_REF_TOP) -o $@ $(SIGNAL_QUALITY_REF_SRCS)
+
+.PHONY: test-signal-quality-ref
+test-signal-quality-ref: $(SIGNAL_QUALITY_REF_VVP)
+	@export COCOTB_TOPLEVEL=$(SIGNAL_QUALITY_REF_TOP); \
+	export COCOTB_TEST_MODULES=$(SIGNAL_QUALITY_REF_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(SIGNAL_QUALITY_REF_VVP))
 
 
 # ============================================================
@@ -1067,7 +1339,7 @@ SENSOR_PIPELINE_SOURCES := sim/tb/tb_sensor_pipeline.sv \
                            $(RTL_DIR)/i2c_master.sv \
                            $(RTL_DIR)/accel_reader.sv \
                            $(RTL_DIR)/ppg_fifo_reader.sv \
-                           $(RTL_DIR)/motion_preprocess.sv \
+                           $(RTL_DIR)/motion_process.sv \
                            $(RTL_DIR)/globaltimer.sv \
                            sensors/i2c_slave_lis2dw12.sv \
                            sensors/i2c_slave_adpd144ri.sv
@@ -1080,20 +1352,6 @@ $(SENSOR_PIPELINE_VVP): $(SENSOR_PIPELINE_SOURCES) | $(BUILD_DIR)
 sim-sensor-pipeline: $(SENSOR_PIPELINE_VVP)
 	$(VVP) $(SENSOR_PIPELINE_VVP)
 	
-# ============================================================
-# Cleanup
-# ============================================================
-
-.PHONY: clean
-clean:
-	rm -f sim/build/*.vvp
-	rm -f *.vcd
-	rm -f sim/waves/*.vcd
-	@echo "[COCOTB] Running $(TIMER_PYMOD) on $(TIMER_TOP)"
-	@export COCOTB_TOPLEVEL=$(TIMER_TOP); \
-	export COCOTB_TEST_MODULES=$(TIMER_PYMOD); \
-	$(call RUN_COCOTB_ICARUS,$(TIMER_VVP))
-
 # ----------------------------
 # Convenience
 # ----------------------------
@@ -1116,5 +1374,6 @@ show-tree:
 .PHONY: clean
 clean:
 	rm -f *.vvp *.vcd results.xml
-	rm -rf $(SIM_BUILD)/*.vcd $(SIM_BUILD)/*.fst $(SIM_BUILD)/*.gtkw
+	rm -f $(SIM_BUILD)/*.vvp $(SIM_BUILD)/*.vcd $(SIM_BUILD)/*.fst $(SIM_BUILD)/*.gtkw
+	rm -f $(WAVE_DIR)/*.vcd
 	rm -f $(FW_BUILD)/firmware.elf $(FW_BUILD)/firmware.bin $(FW_BUILD)/firmware.hex

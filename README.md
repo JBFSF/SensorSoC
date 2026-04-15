@@ -98,3 +98,38 @@ Run the [gf180mcu-precheck](https://github.com/wafer-space/gf180mcu-precheck) wi
 ML training data sourced from PhysioNet:
 
 Walch, Olivia. "Motion and heart rate from a wrist-worn wearable and labeled sleep from polysomnography" (version 1.0.0). PhysioNet (2019). https://doi.org/10.13026/hmhs-py35
+
+## Pinout
+### Normal Mode
+Standard chip behavior when
+
+`input_in[3:0] = 4'b0000;`
+
+#### Input Pins (4)
+
+* `input_in[3:0]` — test mode selector
+
+#### Bidirectional IO Pins (46)
+
+* `bidir[0]` — alarm output
+* `bidir[1]` — SPI flash clock output
+* `bidir[2]` — SPI flash MOSI output
+* `bidir[3]` — SPI flash CS_n output
+* `bidir[4]` — SPI flash MISO input
+* `bidir[5]` — I2C SCL input
+* `bidir[6]` — I2C SDA open drain in/out
+* `bidir[42:7]` — debug bus outputs in test modes
+* `bidir[45]` — external test clock input used in test mode `4'b0011`
+
+#### Analog Pins (4)
+
+* `analog[3:0]` — unused
+
+### Test Modes
+
+* `4'b0000` — normal mode; debug bus is disabled.
+* `4'b0001` — drives `{feat_valid, 3'b000, rmssd_feat[15:0], delta_hr_feat[15:0]}` onto `bidir[42:7]`.
+* `4'b0010` — drives `{feat_valid, 3'b000, time_feat[15:0], motion_feat[15:0]}` onto `bidir[42:7]`.
+* `4'b0011` — uses `bidir[45]` as an external test clock.
+* `4'b0100` — drives `{ml_update_gate, epoch_end, 2'b00, 24'b0, invalid_reason[7:0]}` onto `bidir[42:7]`.
+
