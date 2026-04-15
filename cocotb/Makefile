@@ -27,6 +27,9 @@
 #   # Standalone SV testbench
 #   make sim-reset-ctrl
 #   make sim-globaltimer
+#
+#   # Cocotb unit tests (simple_sram_tb.py wrapper)
+#   make test-simple-sram
 #   make sim-logit-confidence
 #   make sim-top-feature-ml-cpu
 #   make sim-top-feature-ml-cpu-spi-flash
@@ -202,19 +205,22 @@ IRQ_TB_SRCS  := $(TB_DIR)/tb_irq.sv
 IRQ_VVP      := sim_irq.vvp
 
 # ----------------------------
-# Cocotb configuration helper
+# Cocotb configuration helper (cocotb 2.x via oss-cad-suite)
 # ----------------------------
 # cocotb's Icarus VPI shared library directory:
-COCOTB_LIBDIR := $(shell $(PYTHON) -c "import cocotb, os; f=getattr(cocotb, '__file__', None); print(os.path.join(os.path.dirname(f), 'libs') if f else '')" 2>/dev/null)
+COCOTB_LIBDIR := $(shell cocotb-config --lib-dir 2>/dev/null)
+
+# Absolute path + entry point needed by cocotb 2.x GPI loader:
+COCOTB_PYGPI  := $(shell cocotb-config --pygpi-entry-point 2>/dev/null)
 
 # Use the same python interpreter cocotb will embed
-export PYGPI_PYTHON_BIN := $(shell $(PYTHON) -c "import sys; print(sys.executable)")
+export PYGPI_PYTHON_BIN := $(shell cocotb-config --python-bin 2>/dev/null)
 
 # Make sure cocotb can import your tests
 export PYTHONPATH := $(abspath $(TB_DIR))
 
 define RUN_COCOTB_ICARUS
-	$(VVP) -M "$(COCOTB_LIBDIR)" -m libcocotbvpi_icarus $1
+	GPI_USERS="$(COCOTB_PYGPI)" LD_LIBRARY_PATH="$(COCOTB_LIBDIR):$$LD_LIBRARY_PATH" $(VVP) -M "$(COCOTB_LIBDIR)" -m libcocotbvpi_icarus $1
 endef
 
 # ----------------------------
@@ -873,6 +879,32 @@ sim-reset-ctrl: $(RESET_CTRL_VVP)
 .PHONY: clean-reset-ctrl
 clean-reset-ctrl:
 	rm -f $(RESET_CTRL_VVP) $(RESET_CTRL_VCD)
+
+# ============================================================
+# SIMPLE SRAM COCOTB TEST (tb_simple_sram + simple_sram_tb.py)
+# ============================================================
+
+SIMPLE_SRAM_TOP     := tb_simple_sram
+SIMPLE_SRAM_VVP     := $(BUILD_DIR)/$(SIMPLE_SRAM_TOP).vvp
+SIMPLE_SRAM_PYMOD   := simple_sram_tb
+SIMPLE_SRAM_SOURCES := $(TB_DIR)/tb_simple_sram.sv \
+                       $(RTL_DIR)/simple_sram.v \
+                       $(MAKEFILE_DIR)/../ip/gf180mcu_fd_ip_sram__sram512x8m8wm1.v
+
+$(SIMPLE_SRAM_VVP): $(SIMPLE_SRAM_SOURCES) | $(BUILD_DIR)
+	@echo "[COCOTB] Building $@"
+	$(IVERILOG) -g2012 -o $@ $^
+
+.PHONY: test-simple-sram
+test-simple-sram: $(SIMPLE_SRAM_VVP)
+	@echo "[COCOTB] Running $(SIMPLE_SRAM_PYMOD) on $(SIMPLE_SRAM_TOP)"
+	@export COCOTB_TOPLEVEL=$(SIMPLE_SRAM_TOP); \
+	export COCOTB_TEST_MODULES=$(SIMPLE_SRAM_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(SIMPLE_SRAM_VVP))
+
+.PHONY: clean-simple-sram
+clean-simple-sram:
+	rm -f $(SIMPLE_SRAM_VVP)
 
 # ============================================================
 # MOTION PREPROCESS
