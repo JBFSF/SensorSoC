@@ -11,7 +11,7 @@ VERILOG_SOURCES := \
     $(IP_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v 
 
 TOPLEVEL := taketwo_wrap
-MODULE := ml_tb
+MODULE ?= ml_tb
 
 COCOTB_LOG_LEVEL = WARNING
 
