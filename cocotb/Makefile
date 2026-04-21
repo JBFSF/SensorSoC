@@ -39,6 +39,11 @@
 #   make sim-top-sleep-wake-unified
 #   make test-ml-single-vector
 #   make sim-top-ml-golden-vector-unified
+#   make test-top-unified-reset-init
+#   make test-top-unified-runtime
+#   make test-top-unified-host-i2c
+#   make test-top-unified-prod-loop
+#   make test-top-unified-forced-wake-irq
 #
 #   # Cleanup
 #   make clean
@@ -64,6 +69,18 @@
 #
 #   make sim-top-ml-golden-vector-unified
 #     Unified-top numerical ML check against the frozen single-vector logits.
+#
+#   make test-top-unified-reset-init
+#     Shared cocotb wrapper smoke test for unified top.sv reset/init state.
+#
+#   make test-top-unified-runtime
+#     Shared cocotb runtime checks for host-I2C, repeated prod loop, and forced wake/IRQ corners.
+#   make test-top-unified-host-i2c
+#     Shared cocotb host-I2C register/score visibility check.
+#   make test-top-unified-prod-loop
+#     Shared cocotb repeated production-loop smoke check.
+#   make test-top-unified-forced-wake-irq
+#     Shared cocotb forced wake/IRQ reset-corner check.
 #
 #   make sim-top-feature-ml-prod-main-host-i2c
 #     Most production-like unified-top flow: SPI load + ML loop + host-I2C visibility.
@@ -1145,6 +1162,62 @@ test-top-mlp-features: $(TOP_MLP_FEATURES_VVP)
 	@export COCOTB_TOPLEVEL=$(TOP_MLP_FEATURES_TOP); \
 	export COCOTB_TEST_MODULES=$(TOP_MLP_FEATURES_PYMOD); \
 	$(call RUN_COCOTB_ICARUS,$(TOP_MLP_FEATURES_VVP))
+
+# ============================================================
+# Cocotb: shared unified-top environment + reset/init smoke test
+# ============================================================
+
+TOP_UNIFIED_ENV_TOP    := sim_top_unified_env
+TOP_UNIFIED_ENV_TOP_V  := $(TB_DIR)/sim_top_unified_env.sv
+TOP_UNIFIED_ENV_VVP    := $(BUILD_DIR)/$(TOP_UNIFIED_ENV_TOP).vvp
+TOP_UNIFIED_ENV_PYMOD  := test_top_unified_reset_init
+TOP_UNIFIED_ENV_SRCS   := \
+  $(TOP_UNIFIED_ENV_TOP_V) \
+  $(UNIFIED_TOP_RTL_SRCS) \
+  $(TB_DIR)/spi_flash_model.v \
+  sensors/i2c_slave_lis2dw12.sv \
+  sensors/i2c_slave_adpd144ri.sv
+
+$(TOP_UNIFIED_ENV_VVP): $(TOP_UNIFIED_ENV_SRCS)
+	@echo "[COCOTB] Building $@"
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_UNIFIED_ENV_TOP) -o $@ $(TOP_UNIFIED_ENV_SRCS)
+
+.PHONY: test-top-unified-reset-init
+test-top-unified-reset-init: $(TOP_UNIFIED_ENV_VVP)
+	@echo "[COCOTB] Running $(TOP_UNIFIED_ENV_PYMOD) on $(TOP_UNIFIED_ENV_TOP)"
+	@export COCOTB_TOPLEVEL=$(TOP_UNIFIED_ENV_TOP); \
+	export COCOTB_TEST_MODULES=$(TOP_UNIFIED_ENV_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(TOP_UNIFIED_ENV_VVP))
+
+TOP_UNIFIED_RUNTIME_PYMOD := test_top_unified_runtime
+
+.PHONY: test-top-unified-host-i2c
+test-top-unified-host-i2c: $(TOP_UNIFIED_ENV_VVP)
+	@echo "[COCOTB] Running host-I2C runtime check on $(TOP_UNIFIED_ENV_TOP)"
+	@export COCOTB_TOPLEVEL=$(TOP_UNIFIED_ENV_TOP); \
+	export COCOTB_TEST_MODULES=$(TOP_UNIFIED_RUNTIME_PYMOD); \
+	export COCOTB_TEST_FILTER=test_host_i2c_registers_and_score_visibility; \
+	$(call RUN_COCOTB_ICARUS,$(TOP_UNIFIED_ENV_VVP))
+
+.PHONY: test-top-unified-prod-loop
+test-top-unified-prod-loop: $(TOP_UNIFIED_ENV_VVP)
+	@echo "[COCOTB] Running repeated production-loop smoke check on $(TOP_UNIFIED_ENV_TOP)"
+	@export COCOTB_TOPLEVEL=$(TOP_UNIFIED_ENV_TOP); \
+	export COCOTB_TEST_MODULES=$(TOP_UNIFIED_RUNTIME_PYMOD); \
+	export COCOTB_TEST_FILTER=test_repeated_production_loop_smoke; \
+	$(call RUN_COCOTB_ICARUS,$(TOP_UNIFIED_ENV_VVP))
+
+.PHONY: test-top-unified-forced-wake-irq
+test-top-unified-forced-wake-irq: $(TOP_UNIFIED_ENV_VVP)
+	@echo "[COCOTB] Running forced wake/IRQ corner check on $(TOP_UNIFIED_ENV_TOP)"
+	@export COCOTB_TOPLEVEL=$(TOP_UNIFIED_ENV_TOP); \
+	export COCOTB_TEST_MODULES=$(TOP_UNIFIED_RUNTIME_PYMOD); \
+	export COCOTB_TEST_FILTER=test_reset_corner_cases_with_forced_wake_and_irq; \
+	$(call RUN_COCOTB_ICARUS,$(TOP_UNIFIED_ENV_VVP))
+
+.PHONY: test-top-unified-runtime
+test-top-unified-runtime: test-top-unified-host-i2c test-top-unified-prod-loop test-top-unified-forced-wake-irq
+	@true
 
 # ============================================================
 # Cocotb: unified top feature latch/MMIO check
