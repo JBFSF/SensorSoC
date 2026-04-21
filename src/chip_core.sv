@@ -41,10 +41,10 @@ module chip_core #(
     // bidir[4]      : SPI flash MISO input
     // bidir[5]      : I2C SCL input
     // bidir[6]      : I2C SDA open drain
-    // bidir[42:7]   : 36-bit debug bus for test mode outputs
-    // bidir[43]     : force Pico IRQ input, only used by test mode = 1000
-    // bidir[44]     : force wake source input, only used by test mode = 1001
-    // bidir[45]     : external test clock, only for test mode = 0011
+    // bidir[22:7]   : 16-bit debug bus for test mode outputs
+    // bidir[43]     : force Pico IRQ input, only used by test mode = 1010
+    // bidir[44]     : force wake source input, only used by test mode = 1011
+    // bidir[45]     : external test clock, only for test mode = 0101
 
     logic [3:0] test_mode_w;
     logic       core_clk_w;
@@ -52,7 +52,7 @@ module chip_core #(
     logic [NUM_BIDIR_PADS-1:0] bidir_out_w;
     logic [NUM_BIDIR_PADS-1:0] bidir_oe_w;
 
-    logic [35:0] debug_bus_w;
+    logic [15:0] debug_bus_w;
 
     logic sim_req_w;
     logic [6:0] sim_addr_w;
@@ -65,7 +65,7 @@ module chip_core #(
     logic signed [15:0] time_feat_w;
     logic signed [15:0] motion_feat_w;
     logic signed [15:0] delta_hr_feat_w;
-    logic signed [15:0] mssd_feat_w;
+    logic signed [15:0] rmssd_feat_w;
 
     logic ml_update_gate_w;
     logic [7:0] invalid_reason_w;
@@ -110,7 +110,11 @@ module chip_core #(
     assign test_force_wake_w = bidir_in[44];
 
     //muxing to use external clock if we want, may need clock mux????   
-    assign core_clk_w = (test_mode_w == 4'b0011) ? bidir_in[45] : clk;
+    assign core_clk_w = (test_mode_w == 4'b0101) ? bidir_in[45] : clk;
+
+//ff, ?
+//area of this thing?
+//other testing options?
 
     always_comb begin
         debug_bus_w = '0;
@@ -120,52 +124,86 @@ module chip_core #(
             end
 
             4'b0001: begin
-                // view processed delta-HR and MSSD, and feature_valid.
-                debug_bus_w = {feat_valid_w, 3'b000, mssd_feat_w[15:0], delta_hr_feat_w[15:0]};
+                // view processed RMSSD
+                //these busses are not cut off, just writing [15:0 to be explicit]
+                debug_bus_w = rmssd_feat_w[15:0];
             end
 
             4'b0010: begin
-                // view processed time and motion, and feature_valid. 
-                debug_bus_w = {feat_valid_w, 3'b000, time_feat_w[15:0], motion_feat_w[15:0]};
+                // view processed deltaHR
+                debug_bus_w = delta_hr_feat_w[15:0];
+
+            end
+            4'b0011: begin
+                // view processed time feature
+                debug_bus_w = time_feat_w[15:0];
             end
 
-            4'b0011: begin
+            4'b0100: begin
+                // view processed motion feature
+                debug_bus_w = motion_feat_w[15:0];
+            end
+            4'b0101: begin
                 // external clock test mode. we do the muxing above,
                 // may want to assign other signals here or put the internal clock as an output?
                 debug_bus_w = '0;
             end
 
-            4'b0100: begin 
+            4'b0110: begin 
                 // view ML update gating
-                debug_bus_w = {ml_update_gate_w, epoch_end_w, 2'b00, 24'b0, invalid_reason_w};
+                debug_bus_w = {ml_update_gate_w, epoch_end_w, invalid_reason_w[7:0], 6'b0};
             end
-            4'b0101: begin
-                // observe pico state (ie fetch, read, write, stalled, trapped)
-                debug_bus_w = {pico_trap_w, pico_cpu_clk_en_w, pico_mem_valid_w,
-                pico_mem_instr_w, pico_mem_ready_w, pico_mem_wstrb_w, pico_mem_addr_w[26:0]};
-            end
-
-            4'b0110: begin
-                // observe pico MMIO writes 
-                debug_bus_w = {pico_mem_valid_w && (pico_mem_wstrb_w != 4'b0000), pico_trap_w, |pico_mem_wstrb_w, 
-                pico_mem_wstrb_w == 4'hF, pico_mem_addr_w[15:0], pico_mem_wdata_w[15:0]};
-            end
-
             4'b0111: begin
-                // observe pico sleep/irq
-                debug_bus_w = {pico_trap_w, pico_sleeping_w, pico_cpu_clk_en_w, |pico_irq_w, pico_irq_w};
+                // observe pico state (ie fetch, read, write, stalled, trapped),
+                // with the low 7 address bits for quick activity checks
+                debug_bus_w = {pico_trap_w, pico_cpu_clk_en_w, pico_mem_valid_w,
+                pico_mem_instr_w, pico_mem_ready_w, pico_mem_wstrb_w, pico_mem_addr_w[6:0]};
             end
 
-            4'b1000: begin 
-                // force pico IRQ
-                debug_bus_w = {bidir_in[43], pico_trap_w, pico_cpu_clk_en_w, pico_mem_instr_w, pico_mem_valid_w,
-                                pico_mem_ready_w, pico_mem_addr_w[29:0]};
+            4'b1000: begin
+                // observe pico MMIO writes with the low byte of the address and
+                // low nibble of write data, plus a few key qualifiers 
+                // had chatgpt do this one, it said it might be useful
+                debug_bus_w = {
+                    pico_mem_valid_w && (pico_mem_wstrb_w != 4'b0000),
+                    pico_trap_w,
+                    |pico_mem_wstrb_w,
+                    pico_mem_wstrb_w == 4'hF,
+                    pico_mem_addr_w[7:0],
+                    pico_mem_wdata_w[3:0]
+                };
             end
-            4'b1001: begin 
-                // force pico wake
-                debug_bus_w = {32'b0, test_force_wake_w, host_i2c_irq_event_w, ml_irq_w, timer_event_w};
+
+            4'b1001: begin
+                // observe pico sleep/irq
+                debug_bus_w = {pico_trap_w, pico_sleeping_w, pico_cpu_clk_en_w, |pico_irq_w, 12'b0};
             end
+
+            4'b1010: begin 
+                // force pico IRQ and watch memory activity
+                debug_bus_w = {
+                    bidir_in[43], pico_trap_w, pico_cpu_clk_en_w, pico_mem_instr_w, pico_mem_valid_w, pico_mem_ready_w, pico_mem_addr_w[9:0]};
+            end
+            4'b1011: begin 
+                // force pico wake and expose the wake/IRQ sources directly
+                debug_bus_w = {test_force_wake_w, host_i2c_irq_event_w, ml_irq_w, timer_event_w, 12'b0};
+            end
+
+
             // plenty of space to add more of these, just need to expose signals in top
+            4'b1100: begin 
+                debug_bus_w = '0;
+            end
+            4'b1101: begin 
+                debug_bus_w = '0;
+            end
+            4'b1110: begin 
+                debug_bus_w = '0;
+            end
+            4'b1111: begin 
+
+                debug_bus_w = '0;
+            end
             default: begin
                 debug_bus_w = '0; 
             end
@@ -189,8 +227,8 @@ module chip_core #(
         bidir_oe_w[6] = i2c_sda_drive_low_w;
 
         if (test_mode_w != 4'b0000) begin
-            bidir_out_w[42:7] = debug_bus_w;
-            bidir_oe_w[42:7] = '1;
+            bidir_out_w[22:7] = debug_bus_w;
+            bidir_oe_w[22:7] = 16'hFFFF;
         end
     end
 
@@ -219,7 +257,7 @@ module chip_core #(
         .time_feat_o           (time_feat_w),
         .motion_feat_o         (motion_feat_w),
         .delta_hr_feat_o       (delta_hr_feat_w),
-        .mssd_feat_o          (mssd_feat_w),
+        .rmssd_feat_o          (rmssd_feat_w),
 
         .ml_update_gate_o      (ml_update_gate_w),
         .invalid_reason_o      (invalid_reason_w),
