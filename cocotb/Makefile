@@ -24,9 +24,9 @@
 #   make test-timer
 #	make test-cpu-ml
 #
-#   # Standalone SV testbench
+#   # Standalone SV testbenches
 #   make sim-reset-ctrl
-#   make sim-globaltimer
+#   make sim-globaltimer              # epoch/timebase generator smoke test
 #
 #   # Cocotb unit tests (simple_sram_tb.py wrapper)
 #   make test-simple-sram
@@ -210,7 +210,6 @@ UNIFIED_TOP_RTL_SRCS := \
   $(RTL_DIR)/MSSD_engine.sv \
   $(RTL_DIR)/signal_quality.sv \
   $(RTL_DIR)/feature_engine.sv \
-  $(RTL_DIR)/cos_lut_timer.sv \
   $(RTL_DIR)/globaltimer.sv \
   $(RTL_DIR)/simple_sram.v \
   $(MAKEFILE_DIR)/../ip/picorv32.v \
@@ -460,7 +459,6 @@ TOP_FEATURE_ML_CPU_SOURCES := \
 	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
-	$(RTL_DIR)/cos_lut_timer.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_master_mmio.v \
@@ -504,7 +502,6 @@ TOP_FEATURE_ML_CPU_SPI_FLASH_SOURCES := \
 	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
-	$(RTL_DIR)/cos_lut_timer.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_master_mmio.v \
@@ -551,7 +548,6 @@ TOP_SPI_INIT_UNIFIED_SOURCES := \
 	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
-	$(RTL_DIR)/cos_lut_timer.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_master_mmio.v \
@@ -598,7 +594,6 @@ TOP_ML_CONTROL_UNIFIED_SOURCES := \
 	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
-	$(RTL_DIR)/cos_lut_timer.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_master_mmio.v \
@@ -647,7 +642,6 @@ TOP_ML_GOLDEN_VECTOR_UNIFIED_SOURCES := \
 	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
-	$(RTL_DIR)/cos_lut_timer.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_master_mmio.v \
@@ -691,7 +685,6 @@ TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES := \
 	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
-	$(RTL_DIR)/cos_lut_timer.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_master_mmio.v \
@@ -738,7 +731,6 @@ TOP_SLEEP_WAKE_UNIFIED_SOURCES := \
 	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
-	$(RTL_DIR)/cos_lut_timer.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_master_mmio.v \
@@ -1098,24 +1090,6 @@ sim-signal-quality: $(SIGNAL_QUALITY_VVP)
 	@cd $(WAVE_DIR) && $(VVP) $(abspath $(SIGNAL_QUALITY_VVP))
 
 # ============================================================
-# COS LUT TIMER
-# ============================================================
-
-COS_LUT_TIMER_TOP     := cos_lut_timer_tb
-COS_LUT_TIMER_VVP     := $(BUILD_DIR)/$(COS_LUT_TIMER_TOP).vvp
-COS_LUT_TIMER_SOURCES := sim/tb/cos_lut_timer_tb.sv $(RTL_DIR)/cos_lut_timer.sv
-COS_LUT_TIMER_VCD     := $(WAVE_DIR)/cos_lut_timer_tb.vcd
-
-$(COS_LUT_TIMER_VVP): $(COS_LUT_TIMER_SOURCES)
-	$(IVERILOG) -g2012 -o $@ $^
-
-.PHONY: sim-cos-lut-timer
-sim-cos-lut-timer: $(COS_LUT_TIMER_VVP)
-	@echo "== Running $(COS_LUT_TIMER_TOP) (VCD -> $(COS_LUT_TIMER_VCD)) =="
-	@mkdir -p $(WAVE_DIR)
-	@cd $(WAVE_DIR) && $(VVP) $(abspath $(COS_LUT_TIMER_VVP))
-
-# ============================================================
 # TOP SENSOR PIPELINE
 # ============================================================
 
@@ -1399,7 +1373,7 @@ sim-host-i2c-irqc-proxy: $(HOST_I2C_IRQC_PROXY_VVP)
 	$(VVP) $(HOST_I2C_IRQC_PROXY_VVP)
 
 # ============================================================
-# GLOBAL TIMER
+# GLOBAL TIMER / EPOCH TIMEBASE
 # ============================================================
 
 GLOBALTIMER_TOP     := globaltimer_tb
