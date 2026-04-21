@@ -37,7 +37,6 @@
 #   make sim-top-ml-control-unified
 #   make sim-top-feature-ml-prod-main-host-i2c
 #   make sim-top-sleep-wake-unified
-#   make test-ml-single-vector
 #   make sim-top-ml-golden-vector-unified
 #   make test-top-unified-reset-init
 #   make test-top-unified-runtime
@@ -63,9 +62,6 @@
 #
 #   make sim-top-ml-control-unified
 #     Short ML-control-only proof for unified top.sv.
-#
-#   make test-ml-single-vector
-#     One-vector taketwo probe aligned with misc/ML/writeverilog.py scaling.
 #
 #   make sim-top-ml-golden-vector-unified
 #     Unified-top numerical ML check against the frozen single-vector logits.
@@ -927,10 +923,6 @@ test-irq-ctrl-races: $(IRQ_CTRL_VVP)
 .PHONY: test-ml
 test-ml:
 	$(MAKE) -C $(MAKEFILE_DIR)/sim/tb/ml
-
-.PHONY: test-ml-single-vector
-test-ml-single-vector:
-	$(MAKE) -C $(MAKEFILE_DIR)/sim/tb/ml MODULE=ml_tb_single_vector
 
 # ============================================================
 # RESET CONTROLLER TB (reset_ctrl_tb)
