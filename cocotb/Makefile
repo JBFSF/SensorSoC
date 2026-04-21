@@ -531,6 +531,52 @@ sim-top-feature-ml-cpu-spi-flash: $(TOP_FEATURE_ML_CPU_SPI_FLASH_VVP) | $(SIM_BU
 	@echo "== Running $(TOP_FEATURE_ML_CPU_SPI_FLASH_TOP) (FW=$(FW_DIR)/build/test_top_feature_ml_cpu_spi_flash/firmware.hex FLASH=$(TAKETWO_PARAMS_HEX)) =="
 	$(VVP) $(TOP_FEATURE_ML_CPU_SPI_FLASH_VVP)
 
+# ============================================================
+# Unified top: SPI boot controller hardware-only regression
+# ============================================================
+
+TOP_SPI_BOOT_TOP     := tb_top_spi_boot
+TOP_SPI_BOOT_VVP     := $(BUILD_DIR)/$(TOP_SPI_BOOT_TOP).vvp
+TOP_SPI_BOOT_SOURCES := \
+	$(TB_DIR)/tb_top_spi_boot.sv \
+	$(TB_DIR)/spi_flash_model.v \
+	$(RTL_DIR)/top.sv \
+	$(RTL_DIR)/host_i2c_target.v \
+	$(RTL_DIR)/host_i2c_bridge_regs.v \
+	$(RTL_DIR)/i2c_master.sv \
+	$(RTL_DIR)/accel_reader.sv \
+	$(RTL_DIR)/motion_process.sv \
+	$(RTL_DIR)/ppg_fifo_reader.sv \
+	$(RTL_DIR)/ppg_process.sv \
+	$(RTL_DIR)/mssd_engine.sv \
+	$(RTL_DIR)/signal_quality.sv \
+	$(RTL_DIR)/feature_engine.sv \
+	$(RTL_DIR)/globaltimer.sv \
+	$(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_boot_ctrl.v \
+	$(RTL_DIR)/spi_master_mmio.v \
+	$(MAKEFILE_DIR)/../ip/picorv32.v \
+	$(RTL_DIR)/test_mmio.v \
+	$(RTL_DIR)/timer_mmio.v \
+	$(RTL_DIR)/ml_axil_bridge_mmio.v \
+	$(RTL_DIR)/weight_ram_axi.v \
+	$(RTL_DIR)/irq_ctrl_mmio.v \
+	$(RTL_DIR)/taketwo_wrap.v \
+	$(RTL_DIR)/taketwo.v \
+	$(RTL_DIR)/pwrctrl_mmio.v \
+	$(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v \
+	sensors/i2c_slave_lis2dw12.sv \
+	sensors/i2c_slave_adpd144ri.sv
+
+$(TOP_SPI_BOOT_VVP): $(TOP_SPI_BOOT_SOURCES)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) \
+	  -s $(TOP_SPI_BOOT_TOP) -o $@ $(TOP_SPI_BOOT_SOURCES)
+
+.PHONY: sim-top-spi-boot
+sim-top-spi-boot: $(TOP_SPI_BOOT_VVP) | $(SIM_BUILD)
+	@echo "== Running $(TOP_SPI_BOOT_TOP) =="
+	$(VVP) $(TOP_SPI_BOOT_VVP)
+
 # Unified top: short SPI-only regression. This isolates the boot-copy plumbing:
 #   CPU firmware -> spi_master_mmio -> spi_flash_model -> weight_ram_axi
 # without waiting on features, ML, or host policy behavior.
