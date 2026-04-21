@@ -105,9 +105,10 @@ Standard chip behavior when
 
 `input_in[3:0] = 4'b0000;`
 
-#### Input Pins (4)
+#### Input Pins (6)
 
 * `input_in[3:0]` — test mode selector
+* `input_in[5:4]` — UNUSED
 
 #### Bidirectional IO Pins (46)
 
@@ -118,8 +119,11 @@ Standard chip behavior when
 * `bidir[4]` — SPI flash MISO input
 * `bidir[5]` — I2C SCL input
 * `bidir[6]` — I2C SDA open drain in/out
-* `bidir[42:7]` — debug bus outputs in test modes
-* `bidir[45]` — external test clock input used in test mode `4'b0011`
+* `bidir[22:7]` — 16-bit debug bus outputs in test modes
+* `bidir[42:23]` — UNUSED
+* `bidir[43]` — force Pico IRQ input used in test mode `4'b1010`
+* `bidir[44]` — force wake source input used in test mode `4'b1011`
+* `bidir[45]` — external test clock input used in test mode `4'b0101`
 
 #### Analog Pins (4)
 
@@ -128,8 +132,15 @@ Standard chip behavior when
 ### Test Modes
 
 * `4'b0000` — normal mode; debug bus is disabled.
-* `4'b0001` — drives `{feat_valid, 3'b000, rmssd_feat[15:0], delta_hr_feat[15:0]}` onto `bidir[42:7]`.
-* `4'b0010` — drives `{feat_valid, 3'b000, time_feat[15:0], motion_feat[15:0]}` onto `bidir[42:7]`.
-* `4'b0011` — uses `bidir[45]` as an external test clock.
-* `4'b0100` — drives `{ml_update_gate, epoch_end, 2'b00, 24'b0, invalid_reason[7:0]}` onto `bidir[42:7]`.
+* `4'b0001` — drives `rmssd_feat[15:0]` onto `bidir[22:7]`.
+* `4'b0010` — drives `delta_hr_feat[15:0]` onto `bidir[22:7]`.
+* `4'b0011` — drives `time_feat[15:0]` onto `bidir[22:7]`.
+* `4'b0100` — drives `motion_feat[15:0]` onto `bidir[22:7]`.
+* `4'b0101` — uses `bidir[45]` as an external test clock.
+* `4'b0110` — drives `{ml_update_gate, epoch_end, invalid_reason[7:0], 6'b0}` onto `bidir[22:7]`.
+* `4'b0111` — drives `{pico_trap, pico_cpu_clk_en, pico_mem_valid, pico_mem_instr, pico_mem_ready, pico_mem_wstrb[3:0], pico_mem_addr[6:0]}` onto `bidir[22:7]`.
+* `4'b1000` — drives `{pico_mem_valid && (pico_mem_wstrb != 4'b0000), pico_trap, |pico_mem_wstrb, pico_mem_wstrb == 4'hF, pico_mem_addr[7:0], pico_mem_wdata[3:0]}` onto `bidir[22:7]`.
+* `4'b1001` — drives `{pico_trap, pico_sleeping, pico_cpu_clk_en, |pico_irq, 12'b0}` onto `bidir[22:7]`.
+* `4'b1010` — uses `bidir[43]` to force Pico IRQ and drives `{bidir[43], pico_trap, pico_cpu_clk_en, pico_mem_instr, pico_mem_valid, pico_mem_ready, pico_mem_addr[9:0]}` onto `bidir[22:7]`.
+* `4'b1011` — uses `bidir[44]` to force wake and drives `{test_force_wake, host_i2c_irq_event, ml_irq, timer_event, 12'b0}` onto `bidir[22:7]`.
 
