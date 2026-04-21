@@ -190,7 +190,7 @@ UNIFIED_TOP_RTL_SRCS := \
   $(RTL_DIR)/motion_process.sv \
   $(RTL_DIR)/ppg_fifo_reader.sv \
   $(RTL_DIR)/ppg_process.sv \
-  $(RTL_DIR)/rmssd_engine.sv \
+  $(RTL_DIR)/MSSD_engine.sv \
   $(RTL_DIR)/signal_quality.sv \
   $(RTL_DIR)/feature_engine.sv \
   $(RTL_DIR)/cos_lut_timer.sv \
@@ -440,7 +440,7 @@ TOP_FEATURE_ML_CPU_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
 	$(RTL_DIR)/cos_lut_timer.sv \
@@ -484,7 +484,7 @@ TOP_FEATURE_ML_CPU_SPI_FLASH_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
 	$(RTL_DIR)/cos_lut_timer.sv \
@@ -531,7 +531,7 @@ TOP_SPI_INIT_UNIFIED_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
 	$(RTL_DIR)/cos_lut_timer.sv \
@@ -578,7 +578,7 @@ TOP_ML_CONTROL_UNIFIED_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
 	$(RTL_DIR)/cos_lut_timer.sv \
@@ -627,7 +627,7 @@ TOP_ML_GOLDEN_VECTOR_UNIFIED_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
 	$(RTL_DIR)/cos_lut_timer.sv \
@@ -671,7 +671,7 @@ TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
 	$(RTL_DIR)/cos_lut_timer.sv \
@@ -718,7 +718,7 @@ TOP_SLEEP_WAKE_UNIFIED_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
 	$(RTL_DIR)/cos_lut_timer.sv \
@@ -1045,22 +1045,22 @@ sim-accel-reader: $(ACCEL_READER_VVP)
 	@cd $(WAVE_DIR) && $(VVP) $(abspath $(ACCEL_READER_VVP))
 
 # ============================================================
-# RMSSD ENGINE
+# MSSD ENGINE
 # ============================================================
 
-RMSSD_ENGINE_TOP     := rmssd_engine_tb
-RMSSD_ENGINE_VVP     := $(BUILD_DIR)/$(RMSSD_ENGINE_TOP).vvp
-RMSSD_ENGINE_SOURCES := sim/tb/rmssd_engine_tb.sv $(RTL_DIR)/rmssd_engine.sv $(RTL_DIR)/ewma_baseline.sv
-RMSSD_ENGINE_VCD     := $(WAVE_DIR)/rmssd_engine_tb.vcd
+MSSD_ENGINE_TOP     := MSSD_engine_tb
+MSSD_ENGINE_VVP     := $(BUILD_DIR)/$(MSSD_ENGINE_TOP).vvp
+MSSD_ENGINE_SOURCES := sim/tb/MSSD_engine_tb.sv $(RTL_DIR)/MSSD_engine.sv $(RTL_DIR)/ewma_baseline.sv
+MSSD_ENGINE_VCD     := $(WAVE_DIR)/MSSD_engine_tb.vcd
 
-$(RMSSD_ENGINE_VVP): $(RMSSD_ENGINE_SOURCES)
+$(MSSD_ENGINE_VVP): $(MSSD_ENGINE_SOURCES)
 	$(IVERILOG) -g2012 -o $@ $^
 
-.PHONY: sim-rmssd-engine
-sim-rmssd-engine: $(RMSSD_ENGINE_VVP)
-	@echo "== Running $(RMSSD_ENGINE_TOP) (VCD -> $(RMSSD_ENGINE_VCD)) =="
+.PHONY: sim-MSSD-engine
+sim-MSSD-engine: $(MSSD_ENGINE_VVP)
+	@echo "== Running $(MSSD_ENGINE_TOP) (VCD -> $(MSSD_ENGINE_VCD)) =="
 	@mkdir -p $(WAVE_DIR)
-	@cd $(WAVE_DIR) && $(VVP) $(abspath $(RMSSD_ENGINE_VVP))
+	@cd $(WAVE_DIR) && $(VVP) $(abspath $(MSSD_ENGINE_VVP))
 
 # ============================================================
 # SIGNAL QUALITY
@@ -1240,21 +1240,21 @@ test-ppg-process-ref: $(PPG_REF_VVP)
 	export COCOTB_TEST_MODULES=$(PPG_REF_PYMOD); \
 	$(call RUN_COCOTB_ICARUS,$(PPG_REF_VVP))
 
-RMSSD_REF_TOP      := sim_rmssd_engine_ref
-RMSSD_REF_TOP_V    := $(TB_DIR)/sim_rmssd_engine_ref.sv
-RMSSD_REF_VVP      := $(BUILD_DIR)/$(RMSSD_REF_TOP).vvp
-RMSSD_REF_PYMOD    := test_rmssd_engine_ref
-RMSSD_REF_SRCS     := $(RMSSD_REF_TOP_V) $(RTL_DIR)/rmssd_engine.sv
+MSSD_REF_TOP      := sim_MSSD_engine_ref
+MSSD_REF_TOP_V    := $(TB_DIR)/sim_MSSD_engine_ref.sv
+MSSD_REF_VVP      := $(BUILD_DIR)/$(MSSD_REF_TOP).vvp
+MSSD_REF_PYMOD    := test_MSSD_engine_ref
+MSSD_REF_SRCS     := $(MSSD_REF_TOP_V) $(RTL_DIR)/MSSD_engine.sv
 
-$(RMSSD_REF_VVP): $(RMSSD_REF_SRCS)
+$(MSSD_REF_VVP): $(MSSD_REF_SRCS)
 	@echo "[COCOTB] Building $@"
-	$(IVERILOG) -g2012 -s $(RMSSD_REF_TOP) -o $@ $(RMSSD_REF_SRCS)
+	$(IVERILOG) -g2012 -s $(MSSD_REF_TOP) -o $@ $(MSSD_REF_SRCS)
 
-.PHONY: test-rmssd-engine-ref
-test-rmssd-engine-ref: $(RMSSD_REF_VVP)
-	@export COCOTB_TOPLEVEL=$(RMSSD_REF_TOP); \
-	export COCOTB_TEST_MODULES=$(RMSSD_REF_PYMOD); \
-	$(call RUN_COCOTB_ICARUS,$(RMSSD_REF_VVP))
+.PHONY: test-MSSD-engine-ref
+test-MSSD-engine-ref: $(MSSD_REF_VVP)
+	@export COCOTB_TOPLEVEL=$(MSSD_REF_TOP); \
+	export COCOTB_TEST_MODULES=$(MSSD_REF_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(MSSD_REF_VVP))
 
 SIGNAL_QUALITY_REF_TOP      := sim_signal_quality_ref
 SIGNAL_QUALITY_REF_TOP_V    := $(TB_DIR)/sim_signal_quality_ref.sv

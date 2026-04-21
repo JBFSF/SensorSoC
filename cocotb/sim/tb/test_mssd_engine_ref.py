@@ -2,7 +2,7 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge, ReadOnly, RisingEdge
 
-from ref_pipeline.rmssd_ref import RmssdEngineRef
+from ref_pipeline.mssd_ref import MssdEngineRef
 from ref_pipeline.test_helpers import sig_u
 
 
@@ -18,15 +18,15 @@ async def drive_and_check(dut, ref, *, rst, rr_interval, rr_valid, rr_accepted, 
     await ReadOnly()
 
     expected = ref.step(rst, rr_valid, rr_accepted, rr_interval, epoch_end)
-    assert int(dut.rmssd_valid.value) == int(expected.rmssd_valid)
-    assert sig_u(dut.rmssd_epoch) == expected.rmssd_epoch
+    assert int(dut.mssd_valid.value) == int(expected.mssd_valid)
+    assert sig_u(dut.mssd_epoch) == expected.mssd_epoch
     assert sig_u(dut.rr_diff_count) == expected.rr_diff_count
 
 
 @cocotb.test()
-async def test_rmssd_engine_matches_reference(dut):
+async def test_mssd_engine_matches_reference(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
-    ref = RmssdEngineRef(min_rr_count=2)
+    ref = MssdEngineRef(min_rr_count=2)
 
     for _ in range(4):
         await drive_and_check(dut, ref, rst=True, rr_interval=0, rr_valid=False, rr_accepted=False, epoch_end=False)
@@ -48,8 +48,8 @@ async def test_rmssd_engine_matches_reference(dut):
             rr_accepted=rr_accepted,
             epoch_end=epoch_end,
         )
-    assert int(dut.rmssd_valid.value) == 1
-    assert sig_u(dut.rmssd_epoch) == 60000
+    assert int(dut.mssd_valid.value) == 1
+    assert sig_u(dut.mssd_epoch) == 60000
 
     seq = [
         (1000, True, True, False),
@@ -68,8 +68,8 @@ async def test_rmssd_engine_matches_reference(dut):
             rr_accepted=rr_accepted,
             epoch_end=epoch_end,
         )
-    assert int(dut.rmssd_valid.value) == 1
-    assert sig_u(dut.rmssd_epoch) == 0xFFFF
+    assert int(dut.mssd_valid.value) == 1
+    assert sig_u(dut.mssd_epoch) == 0xFFFF
 
     for rr_interval, rr_valid, rr_accepted, epoch_end in [
         (1000, True, True, False),
@@ -85,4 +85,4 @@ async def test_rmssd_engine_matches_reference(dut):
             rr_accepted=rr_accepted,
             epoch_end=epoch_end,
         )
-    assert int(dut.rmssd_valid.value) == 0
+    assert int(dut.mssd_valid.value) == 0

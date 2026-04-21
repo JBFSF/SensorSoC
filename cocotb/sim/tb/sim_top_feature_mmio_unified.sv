@@ -21,7 +21,7 @@ module sim_top_feature_mmio_unified;
   wire signed [15:0]        time_feat;
   wire signed [15:0]        motion_feat;
   wire signed [15:0]        delta_hr_feat;
-  wire signed [15:0]        rmssd_feat;
+  wire signed [15:0]        mssd_feat;
   wire                      ml_update_gate;
   wire [7:0]                invalid_reason;
   wire                      epoch_end;
@@ -32,7 +32,7 @@ module sim_top_feature_mmio_unified;
   wire signed [15:0]        feat_latched_time;
   wire signed [15:0]        feat_latched_motion;
   wire signed [15:0]        feat_latched_delta_hr;
-  wire signed [15:0]        feat_latched_rmssd;
+  wire signed [15:0]        feat_latched_mssd;
   wire                      feat_latched_gate;
   wire [7:0]                feat_latched_invalid_reason;
   wire [31:0]               feat_status_mirror;
@@ -87,10 +87,7 @@ module sim_top_feature_mmio_unified;
     .CFG_MAX_MISSED(8'd3),
     .CFG_MOTION_HI_TH(16'hFFFF),
     .CFG_MAX_MOTION_HI(16'hFFFF),
-    .COS_PERIOD_SECONDS(32'd16),
-    .COS_LUT_BITS(3'd6),
-    .COS_SCALE_Q15(16'h7FFF),
-    .RMSSD_MIN_RR_COUNT(1)
+    .MSSD_MIN_RR_COUNT(1)
   ) u_dut (
     .clk_i(clk),
     .reset_i(reset),
@@ -117,7 +114,7 @@ module sim_top_feature_mmio_unified;
     .time_feat_o(time_feat),
     .motion_feat_o(motion_feat),
     .delta_hr_feat_o(delta_hr_feat),
-    .rmssd_feat_o(rmssd_feat),
+    .mssd_feat_o(mssd_feat),
     .ml_update_gate_o(ml_update_gate),
     .invalid_reason_o(invalid_reason),
     .epoch_end_o(epoch_end),
@@ -166,7 +163,7 @@ module sim_top_feature_mmio_unified;
   assign feat_latched_time           = u_dut.feat_time_latched_r;
   assign feat_latched_motion         = u_dut.feat_motion_latched_r;
   assign feat_latched_delta_hr       = u_dut.feat_delta_hr_latched_r;
-  assign feat_latched_rmssd          = u_dut.feat_rmssd_latched_r;
+  assign feat_latched_mssd          = u_dut.feat_mssd_latched_r;
   assign feat_latched_gate           = u_dut.feat_gate_latched_r;
   assign feat_latched_invalid_reason = u_dut.feat_invalid_reason_latched_r;
   assign feat_status_mirror          = {14'd0, u_dut.feat_gate_latched_r, 8'd0,
@@ -175,10 +172,10 @@ module sim_top_feature_mmio_unified;
   initial begin
     $dumpfile("top_feature_mmio_unified.vcd");
     $dumpvars(0, clk, reset);
-    $dumpvars(0, feat_valid, time_feat, motion_feat, delta_hr_feat, rmssd_feat);
+    $dumpvars(0, feat_valid, time_feat, motion_feat, delta_hr_feat, mssd_feat);
     $dumpvars(0, ml_update_gate, invalid_reason, epoch_end, alarm);
     $dumpvars(0, feat_latched_valid, feat_latched_time, feat_latched_motion);
-    $dumpvars(0, feat_latched_delta_hr, feat_latched_rmssd);
+    $dumpvars(0, feat_latched_delta_hr, feat_latched_mssd);
     $dumpvars(0, feat_latched_gate, feat_latched_invalid_reason, feat_status_mirror);
     $dumpvars(0, u_dut);
   end

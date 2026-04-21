@@ -35,13 +35,13 @@ def collect_inputs(dut, rst: bool) -> PipelineStepInputs:
         delta_hr=sig_s(dut.delta_hr_w),
         motion_epoch=bool(int(dut.motion_epoch_w.value)),
         motion_energy=sig_u(dut.motion_energy_w),
-        rmssd_valid=bool(int(dut.rmssd_valid_w.value)),
-        rmssd_epoch=sig_u(dut.rmssd_w),
+        mssd_valid=bool(int(dut.mssd_valid_w.value)),
+        mssd_epoch=sig_u(dut.mssd_w),
         fifo_overflow_event=bool(int(dut.fifo_overflow_event_w.value)),
         ppg_i2c_err_event=bool(int(dut.ppg_i2c_err_event_w.value)),
         epoch_end=bool(int(dut.epoch_end_w.value)),
         epoch_end_d=bool(int(dut.epoch_end_d.value)),
-        cos_time=sig_s(dut.cos_time_w),
+        time_value=sig_u(dut.seconds_w),
         ml_update_gate=bool(int(dut.ml_update_gate_o.value)),
     )
 
@@ -70,7 +70,7 @@ async def test_top_sensor_pipeline_matches_reference_scoreboards(dut):
     feature_count = 0
     rr_count = 0
     beat_count = 0
-    rmssd_count = 0
+    mssd_count = 0
     motion_epoch_count = 0
     max_cycles = 300_000
 
@@ -116,16 +116,16 @@ async def test_top_sensor_pipeline_matches_reference_scoreboards(dut):
         if beat_got != beat_exp:
             raise AssertionError(f"ppg stage mismatch at cycle {cycle}: got={beat_got} exp={beat_exp}")
 
-        rmssd_got = {
-            "rmssd_valid": int(dut.rmssd_valid_w.value),
-            "rmssd_epoch": sig_u(dut.rmssd_w) & 0xFFFF,
+        mssd_got = {
+            "mssd_valid": int(dut.mssd_valid_w.value),
+            "mssd_epoch": sig_u(dut.mssd_w) & 0xFFFF,
         }
-        rmssd_exp = {
-            "rmssd_valid": int(expected.rmssd.rmssd_valid),
-            "rmssd_epoch": expected.rmssd.rmssd_epoch & 0xFFFF,
+        mssd_exp = {
+            "mssd_valid": int(expected.mssd.mssd_valid),
+            "mssd_epoch": expected.mssd.mssd_epoch & 0xFFFF,
         }
-        if rmssd_got != rmssd_exp:
-            raise AssertionError(f"rmssd mismatch at cycle {cycle}: got={rmssd_got} exp={rmssd_exp}")
+        if mssd_got != mssd_exp:
+            raise AssertionError(f"mssd mismatch at cycle {cycle}: got={mssd_got} exp={mssd_exp}")
 
         quality_got = {
             "ml_update_gate": int(dut.ml_update_gate_o.value),
@@ -143,14 +143,14 @@ async def test_top_sensor_pipeline_matches_reference_scoreboards(dut):
             "time_feat": sig_s(dut.time_feat_o),
             "motion_feat": sig_s(dut.motion_feat_o),
             "delta_hr_feat": sig_s(dut.delta_hr_feat_o),
-            "rmssd_feat": sig_s(dut.rmssd_feat_o),
+            "mssd_feat": sig_s(dut.mssd_feat_o),
         }
         feature_exp = {
             "feat_valid": int(expected.feature.feat_valid),
             "time_feat": expected.feature.time_feat,
             "motion_feat": expected.feature.motion_feat,
             "delta_hr_feat": expected.feature.delta_hr_feat,
-            "rmssd_feat": expected.feature.rmssd_feat,
+            "mssd_feat": expected.feature.mssd_feat,
         }
         if feature_got != feature_exp:
             raise AssertionError(f"feature mismatch at cycle {cycle}: got={feature_got} exp={feature_exp}")
@@ -186,13 +186,13 @@ async def test_top_sensor_pipeline_matches_reference_scoreboards(dut):
 
         beat_count += int(dut.beat_pulse_w.value)
         rr_count += int(dut.rr_valid_w.value)
-        rmssd_count += int(dut.rmssd_valid_w.value)
+        mssd_count += int(dut.mssd_valid_w.value)
         motion_epoch_count += int(dut.motion_epoch_w.value)
         feature_count += int(dut.feat_valid_o.value)
 
         prev_inputs = collect_inputs(dut, rst=False)
 
-        if feature_count >= 4 and rr_count > 0 and rmssd_count > 0 and motion_epoch_count > 0:
+        if feature_count >= 4 and rr_count > 0 and mssd_count > 0 and motion_epoch_count > 0:
             break
     else:
         raise AssertionError("top pipeline scoreboard timed out before enough feature events")
@@ -201,5 +201,5 @@ async def test_top_sensor_pipeline_matches_reference_scoreboards(dut):
     assert ppg_index > 0, "no ppg samples observed"
     assert beat_count > 0, "no beats observed"
     assert rr_count > 0, "no RR intervals observed"
-    assert rmssd_count > 0, "no RMSSD epochs observed"
+    assert mssd_count > 0, "no MSSD epochs observed"
     assert feature_count >= 4, f"expected >=4 feature vectors, got {feature_count}"

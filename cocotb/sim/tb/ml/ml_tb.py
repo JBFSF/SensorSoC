@@ -100,11 +100,11 @@ async def load_weights_and_infer_once(dut):
         feats[0] = max(-32768, min(int((float(feats[0])) * SCALE), 32767))    #movement
         feats[1] = max(-32768, min(int((float(feats[1])) * SCALE), 32767))        #cosine
         feats[2] = max(-32768, min(int((float(feats[2])) * SCALE), 32767))    #delta hr
-        feats[3] = max(-32768, min(int((float(feats[3])) * SCALE), 32767))   #rmssd
+        feats[3] = max(-32768, min(int((float(feats[3])) * SCALE), 32767))   #mssd
         # feats[0] = max(-32768, min(int((float(feats[0])/8.0) * SCALE), 32767))    #movement
         # feats[1] = max(-32768, min(int((float(feats[1])) * SCALE), 32767))        #cosine
         # feats[2] = max(-32768, min(int((float(feats[2])/4.0) * SCALE), 32767))    #delta hr
-        # feats[3] = max(-32768, min(int((float(feats[3])*20.0) * SCALE), 32767))   #rmssd
+        # feats[3] = max(-32768, min(int((float(feats[3])*20.0) * SCALE), 32767))   #mssd
         print(feats)
         axi_ram.write(x_addr, u16_4(feats[0:4]))
         # wait for busy to clear

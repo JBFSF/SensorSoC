@@ -6,9 +6,9 @@ module axi_interface (
   input  logic        start,
   input  logic [31:0] x_addr,
   input  logic signed [15:0] x0,     // movement
-  input  logic signed [15:0] x1,     // cosine
+  input  logic signed [15:0] x1,     // time
   input  logic signed [15:0] x2,     // delta_hr
-  input  logic signed [15:0] x3,     // rmssd
+  input  logic signed [15:0] x3,     // mssd
   output logic        done,          // high when writes completed
   output logic        busy,          // high while writing
 

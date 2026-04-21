@@ -34,7 +34,7 @@ async def test_sensor_features_latch_into_soc_visible_mmio_bank(dut):
         time_feat = dut.time_feat.value.to_signed()
         motion_feat = dut.motion_feat.value.to_signed()
         delta_hr_feat = dut.delta_hr_feat.value.to_signed()
-        rmssd_feat = dut.rmssd_feat.value.to_signed()
+        mssd_feat = dut.mssd_feat.value.to_signed()
         gate = int(dut.ml_update_gate.value)
         invalid_reason = dut.invalid_reason.value.to_unsigned()
 
@@ -42,18 +42,18 @@ async def test_sensor_features_latch_into_soc_visible_mmio_bank(dut):
         latched_time = dut.feat_latched_time.value.to_signed()
         latched_motion = dut.feat_latched_motion.value.to_signed()
         latched_delta_hr = dut.feat_latched_delta_hr.value.to_signed()
-        latched_rmssd = dut.feat_latched_rmssd.value.to_signed()
+        latched_mssd = dut.feat_latched_mssd.value.to_signed()
         latched_gate = int(dut.feat_latched_gate.value)
         latched_invalid_reason = dut.feat_latched_invalid_reason.value.to_unsigned()
         status = dut.feat_status_mirror.value.to_unsigned()
 
         dut._log.info(
-            "feature[%d] time=%d motion=%d delta_hr=%d rmssd=%d gate=%d invalid_reason=0x%02x status=0x%08x",
+            "feature[%d] time=%d motion=%d delta_hr=%d mssd=%d gate=%d invalid_reason=0x%02x status=0x%08x",
             feature_checks,
             time_feat,
             motion_feat,
             delta_hr_feat,
-            rmssd_feat,
+            mssd_feat,
             gate,
             invalid_reason,
             status,
@@ -69,8 +69,8 @@ async def test_sensor_features_latch_into_soc_visible_mmio_bank(dut):
         assert latched_delta_hr == delta_hr_feat, (
             f"latched delta_hr mismatch: expected {delta_hr_feat}, got {latched_delta_hr}"
         )
-        assert latched_rmssd == rmssd_feat, (
-            f"latched rmssd mismatch: expected {rmssd_feat}, got {latched_rmssd}"
+        assert latched_mssd == mssd_feat, (
+            f"latched mssd mismatch: expected {mssd_feat}, got {latched_mssd}"
         )
         assert latched_gate == gate, (
             f"latched gate mismatch: expected {gate}, got {latched_gate}"

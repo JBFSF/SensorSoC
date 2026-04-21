@@ -38,11 +38,8 @@ module top #(
     parameter logic [7:0] CFG_MAX_MISSED = 8'd3,
     parameter logic [15:0] CFG_MOTION_HI_TH = 16'd2000,
     parameter logic [15:0] CFG_MAX_MOTION_HI = 16'd3,
-    parameter logic [31:0] COS_PERIOD_SECONDS = 32'd86400,
-    parameter logic [2:0]  COS_LUT_BITS = 3'd6,
-    parameter logic [15:0] COS_SCALE_Q15 = 16'h7FFF,
 
-    parameter int unsigned RMSSD_MIN_RR_COUNT = 1
+    parameter int unsigned MSSD_MIN_RR_COUNT = 1
 ) (
     input  logic clk_i,
     input  logic reset_i,
@@ -65,10 +62,10 @@ module top #(
 
     // Pipeline outputs toward ML
     output logic                      feat_valid_o,     // one-cycle strobe: feature vector is ready for ML consumption
-    output logic signed [15:0]        time_feat_o,      // time-of-night feature (cosine LUT output)
+    output logic signed [15:0]        time_feat_o,      // time-of-night feature (raw seconds)
     output logic signed [15:0]        motion_feat_o,    // motion feature (per-epoch motion energy)
     output logic signed [15:0]        delta_hr_feat_o,  // delta heart-rate feature derived from RR intervals
-    output logic signed [15:0]        rmssd_feat_o,     // HRV feature (RMSSD) for the epoch
+    output logic signed [15:0]        mssd_feat_o,     // HRV feature (MSSD) for the epoch
 
     // Signal quality outputs
     output logic                      ml_update_gate_o,  // gate: only update ML when signal-quality checks pass
@@ -120,7 +117,7 @@ module top #(
 
     logic [15:0] seconds_w;              // time-in-night counter from globaltimer (seconds)
     logic epoch_end_w;                   // raw epoch-end pulse from globaltimer
-    logic signed [15:0] cos_time_w;      // cosine time feature generated from seconds_w
+    logic [15:0] time_value_w;           // raw time feature derived from seconds_w
 
     logic signed [15:0] ax_w;            // accelerometer X axis sample (signed)
     logic signed [15:0] ay_w;            // accelerometer Y axis sample (signed)
@@ -149,8 +146,8 @@ module top #(
     logic missed_beat_w;                 // beat detector flagged a missed-beat condition
     logic ppg_invalid_w;                 // beat detector flagged invalid PPG stream (unused by top currently)
 
-    logic [31:0] rmssd_w;                // RMSSD value computed for the epoch
-    logic rmssd_valid_w;                 // strobe: rmssd_w is valid for this epoch
+    logic [31:0] mssd_w;                // MSSD value computed for the epoch
+    logic mssd_valid_w;                 // strobe: mssd_w is valid for this epoch
 
     logic epoch_end_d;                   // delayed epoch_end_w used to align feature emission timing
     logic fifo_overflow_d;               // previous fifo_overflow_w (for edge detection)
@@ -320,7 +317,7 @@ module top #(
     logic signed [15:0] feat_time_latched_r;
     logic signed [15:0] feat_motion_latched_r;
     logic signed [15:0] feat_delta_hr_latched_r;
-    logic signed [15:0] feat_rmssd_latched_r;
+    logic signed [15:0] feat_mssd_latched_r;
     logic       feat_gate_latched_r;
     logic [7:0] feat_invalid_reason_latched_r;
     logic       feat_valid_d;
@@ -458,17 +455,7 @@ module top #(
         .epoch_index_o()                    // unused: epoch counter/index
     );
 
-    cos_lut_timer u_cos (
-        .clk_i(clk_i),
-        .rst_i(reset_i),
-        .cfg_enable_i(1'b1),                         // enables time feature output (always on in this top)
-        .seconds_in_night_i({16'h0000, seconds_w}),  // seconds input (zero-extended to 32-bit)
-        .seconds_valid_i(1'b1),                      // seconds input is always considered valid here
-        .cfg_period_seconds_i(COS_PERIOD_SECONDS),   // cosine period (seconds) for time-of-night embedding
-        .cfg_lut_bits_i(COS_LUT_BITS),               // LUT resolution control (quantize index)
-        .cfg_scale_q15_i(COS_SCALE_Q15),             // output scaling in Q15
-        .cos_time_feat_o(cos_time_w)                 // signed cosine feature to feature_engine
-    );
+    assign time_value_w = seconds_w;
 
     i2c_master u_i2c_master (
         .clk(clk_i),
@@ -623,17 +610,17 @@ module top #(
         .ppg_invalid_o(ppg_invalid_w)           // invalid PPG indicator output
     );
 
-    rmssd_engine #(
-        .MIN_RR_COUNT(RMSSD_MIN_RR_COUNT)
-    ) u_rmssd (
+    mssd_engine #(
+        .MIN_RR_COUNT(MSSD_MIN_RR_COUNT)
+    ) u_mssd (
         .clk_i(clk_i),
         .rst_i(reset_i),
         .rr_interval_i(rr_interval_w[15:0]),  // RR interval input for HRV calculation
         .rr_valid_i(rr_valid_w),        // strobe: RR interval input valid
         .rr_accepted_i(rr_accepted_w),  // only include accepted RR intervals
-        .epoch_end_i(epoch_end_w),      // epoch boundary: finalize RMSSD and reset accumulators
-        .rmssd_epoch_o(rmssd_w[15:0]),        // RMSSD result for epoch
-        .rmssd_valid_o(rmssd_valid_w),  // strobe: RMSSD output valid
+        .epoch_end_i(epoch_end_w),      // epoch boundary: finalize MSSD and reset accumulators
+        .mssd_epoch_o(mssd_w[15:0]),        // MSSD result for epoch
+        .mssd_valid_o(mssd_valid_w),  // strobe: MSSD output valid
         .rr_diff_count_o()              // unused: number of RR diffs included
     );
 
@@ -664,18 +651,18 @@ module top #(
         .rst_i(reset_i),
         .enable_i(epoch_end_d),                 // epoch strobe (delayed) to emit a consolidated feature vector
         .seconds_valid_i(1'b1),                 // time feature treated as always valid here
-        .cos_time_feat_i(cos_time_w),           // cosine time feature input
+        .time_value_i(time_value_w),            // raw time feature input
         .motion_valid_i(motion_epoch_w),        // strobe: motion epoch energy is ready
         .motion_energy_epoch_i(motion_energy_w[15:0]), // motion energy (truncated to 16-bit feature)
         .delta_hr_valid_i(rr_valid_w),          // strobe: delta HR feature should update
         .delta_hr_i(delta_hr_w[15:0]),          // delta HR (truncated to 16-bit feature)
-        .rmssd_valid_i(rmssd_valid_w),          // strobe: RMSSD feature should update
-        .rmssd_i(rmssd_w[15:0]),                // RMSSD (truncated to 16-bit feature)
+        .mssd_valid_i(mssd_valid_w),          // strobe: MSSD feature should update
+        .mssd_i(mssd_w[15:0]),                // MSSD (truncated to 16-bit feature)
         .feat_valid_o(feat_valid_o),            // output strobe: features are ready
         .time_feat_o(time_feat_o),              // output time feature to ML
         .motion_feat_o(motion_feat_o),          // output motion feature to ML
         .delta_hr_feat_o(delta_hr_feat_o),      // output delta HR feature to ML
-        .rmssd_feat_o(rmssd_feat_o),            // output RMSSD feature to ML
+        .mssd_feat_o(mssd_feat_o),            // output MSSD feature to ML
         .ml_update_gate_i(ml_update_gate_o)     // gate emission/update when signal quality is poor
     );
 
@@ -688,7 +675,7 @@ module top #(
             feat_time_latched_r           <= '0;
             feat_motion_latched_r         <= '0;
             feat_delta_hr_latched_r       <= '0;
-            feat_rmssd_latched_r          <= '0;
+            feat_mssd_latched_r          <= '0;
             feat_gate_latched_r           <= 1'b0;
             feat_invalid_reason_latched_r <= 8'h00;
         end else begin
@@ -702,7 +689,7 @@ module top #(
                 feat_time_latched_r           <= time_feat_o;
                 feat_motion_latched_r         <= motion_feat_o;
                 feat_delta_hr_latched_r       <= delta_hr_feat_o;
-                feat_rmssd_latched_r          <= rmssd_feat_o;
+                feat_mssd_latched_r          <= mssd_feat_o;
                 feat_gate_latched_r           <= ml_update_gate_o;
                 feat_invalid_reason_latched_r <= invalid_reason_o;
             end
@@ -717,14 +704,14 @@ module top #(
     //   +0x04 time feature
     //   +0x08 motion feature
     //   +0x0C delta-HR feature
-    //   +0x10 RMSSD feature
+    //   +0x10 MSSD feature
     always @(*) begin
         case (feat_off)
             32'h00: feat_mmio_rdata = {14'd0, feat_gate_latched_r, 8'd0, feat_invalid_reason_latched_r, feat_latched_valid_r};
             32'h04: feat_mmio_rdata = {{16{feat_time_latched_r[15]}}, feat_time_latched_r};
             32'h08: feat_mmio_rdata = {{16{feat_motion_latched_r[15]}}, feat_motion_latched_r};
             32'h0C: feat_mmio_rdata = {{16{feat_delta_hr_latched_r[15]}}, feat_delta_hr_latched_r};
-            32'h10: feat_mmio_rdata = {{16{feat_rmssd_latched_r[15]}}, feat_rmssd_latched_r};
+            32'h10: feat_mmio_rdata = {{16{feat_mssd_latched_r[15]}}, feat_mssd_latched_r};
             default: feat_mmio_rdata = 32'h0000_0000;
         endcase
     end

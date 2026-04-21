@@ -10,7 +10,6 @@ async def drive_and_check(dut, ref, *, rst, sample_valid, ax, ay, az, epoch_end)
     await FallingEdge(dut.clk)
     dut.rst_i.value = int(rst)
     dut.sample_valid.value = int(sample_valid)
-    dut.sample_ok.value = int(sample_valid)
     dut.ax.value = ax
     dut.ay.value = ay
     dut.az.value = az
@@ -19,7 +18,7 @@ async def drive_and_check(dut, ref, *, rst, sample_valid, ax, ay, az, epoch_end)
     await RisingEdge(dut.clk)
     await ReadOnly()
 
-    expected = ref.step(rst, sample_valid, sample_valid, ax, ay, az, epoch_end)
+    expected = ref.step(rst, sample_valid, ax, ay, az, epoch_end)
     assert int(dut.epoch_done.value) == int(expected.epoch_done)
     assert sig_u(dut.motion_energy_epoch) == expected.motion_energy_epoch
 

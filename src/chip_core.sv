@@ -65,7 +65,7 @@ module chip_core #(
     logic signed [15:0] time_feat_w;
     logic signed [15:0] motion_feat_w;
     logic signed [15:0] delta_hr_feat_w;
-    logic signed [15:0] rmssd_feat_w;
+    logic signed [15:0] mssd_feat_w;
 
     logic ml_update_gate_w;
     logic [7:0] invalid_reason_w;
@@ -120,8 +120,8 @@ module chip_core #(
             end
 
             4'b0001: begin
-                // view processed delta-HR and RMSSD, and feature_valid.
-                debug_bus_w = {feat_valid_w, 3'b000, rmssd_feat_w[15:0], delta_hr_feat_w[15:0]};
+                // view processed delta-HR and MSSD, and feature_valid.
+                debug_bus_w = {feat_valid_w, 3'b000, mssd_feat_w[15:0], delta_hr_feat_w[15:0]};
             end
 
             4'b0010: begin
@@ -219,7 +219,7 @@ module chip_core #(
         .time_feat_o           (time_feat_w),
         .motion_feat_o         (motion_feat_w),
         .delta_hr_feat_o       (delta_hr_feat_w),
-        .rmssd_feat_o          (rmssd_feat_w),
+        .mssd_feat_o          (mssd_feat_w),
 
         .ml_update_gate_o      (ml_update_gate_w),
         .invalid_reason_o      (invalid_reason_w),

@@ -1,24 +1,24 @@
 `timescale 1ns/1ps
 
-module rmssd_engine_tb;
+module mssd_engine_tb;
 
   logic clk = 0;
   logic rst_i = 1;
 
-  logic [31:0] rr_interval;
+  logic [15:0] rr_interval;
   logic        rr_valid;
   logic        rr_accepted;
   logic        epoch_end;
 
-  wire [31:0]  rmssd_epoch;
-  wire         rmssd_valid;
+  wire [15:0]  mssd_epoch;
+  wire         mssd_valid;
   wire [15:0]  rr_diff_count;
 
-  logic rmssd_seen;
-  logic [31:0] cap_rmssd_epoch;
+  logic mssd_seen;
+  logic [15:0] cap_mssd_epoch;
   logic [15:0] cap_rr_diff_count;
 
-  rmssd_engine #(
+  mssd_engine #(
     .MIN_RR_COUNT(2)
   ) dut (
     .clk_i(clk),
@@ -27,8 +27,8 @@ module rmssd_engine_tb;
     .rr_valid_i(rr_valid),
     .rr_accepted_i(rr_accepted),
     .epoch_end_i(epoch_end),
-    .rmssd_epoch_o(rmssd_epoch),
-    .rmssd_valid_o(rmssd_valid),
+    .mssd_epoch_o(mssd_epoch),
+    .mssd_valid_o(mssd_valid),
     .rr_diff_count_o(rr_diff_count)
   );
 
@@ -36,17 +36,17 @@ module rmssd_engine_tb;
 
   always @(posedge clk) begin
     if (rst_i) begin
-      rmssd_seen <= 1'b0;
-      cap_rmssd_epoch <= '0;
+      mssd_seen <= 1'b0;
+      cap_mssd_epoch <= '0;
       cap_rr_diff_count <= '0;
-    end else if (rmssd_valid) begin
-      rmssd_seen <= 1'b1;
-      cap_rmssd_epoch <= rmssd_epoch;
+    end else if (mssd_valid) begin
+      mssd_seen <= 1'b1;
+      cap_mssd_epoch <= mssd_epoch;
       cap_rr_diff_count <= rr_diff_count;
     end
   end
 
-  task automatic send_rr(input [31:0] rr, input bit accepted);
+  task automatic send_rr(input [15:0] rr, input bit accepted);
     begin
       @(negedge clk);
       rr_interval = rr;
@@ -81,45 +81,45 @@ module rmssd_engine_tb;
 
     // Epoch 1: accepted RR = [1000,1100,900,1000]
     // diffs = [100,-200,100] => squares = [10000,40000,10000]
-    // mean = 20000, sqrt ~= 141
-    send_rr(32'd1000, 1'b1);
-    send_rr(32'd1100, 1'b1);
-    send_rr(32'd900, 1'b1);
-    send_rr(32'd1000, 1'b1);
-    rmssd_seen = 1'b0;
+    // RTL outputs the clipped sum-of-squares accumulator => 60000
+    send_rr(16'd1000, 1'b1);
+    send_rr(16'd1100, 1'b1);
+    send_rr(16'd900, 1'b1);
+    send_rr(16'd1000, 1'b1);
+    mssd_seen = 1'b0;
     pulse_epoch_end();
     repeat (2) @(posedge clk);
-    if (!rmssd_seen) $fatal(1, "rmssd_valid not asserted at epoch_end");
-    if ((cap_rmssd_epoch < 32'd140) || (cap_rmssd_epoch > 32'd142)) $fatal(1, "rmssd mismatch: got=%0d exp~141", cap_rmssd_epoch);
+    if (!mssd_seen) $fatal(1, "mssd_valid not asserted at epoch_end");
+    if (cap_mssd_epoch != 16'd60000) $fatal(1, "mssd mismatch: got=%0d exp=60000", cap_mssd_epoch);
     if (cap_rr_diff_count != 16'd3) $fatal(1, "rr_diff_count mismatch got=%0d exp=3", cap_rr_diff_count);
 
-    // Epoch 2: include rejected beat; rmssd must ignore it (gate by rr_accepted)
-    send_rr(32'd1000, 1'b1);
-    send_rr(32'd700, 1'b0);   // rejected, must be ignored
-    send_rr(32'd1200, 1'b1);  // diff from 1000 -> 200
-    send_rr(32'd1000, 1'b1);  // diff -> -200
-    rmssd_seen = 1'b0;
+    // Epoch 2: include rejected beat; mssd must ignore it (gate by rr_accepted)
+    send_rr(16'd1000, 1'b1);
+    send_rr(16'd700, 1'b0);   // rejected, must be ignored
+    send_rr(16'd1200, 1'b1);  // diff from 1000 -> 200
+    send_rr(16'd1000, 1'b1);  // diff -> -200
+    mssd_seen = 1'b0;
     pulse_epoch_end();
     repeat (2) @(posedge clk);
-    if (!rmssd_seen) $fatal(1, "epoch2 rmssd_valid not asserted");
-    if ((cap_rmssd_epoch < 32'd199) || (cap_rmssd_epoch > 32'd201)) $fatal(1, "epoch2 rmssd mismatch got=%0d exp~200", cap_rmssd_epoch);
+    if (!mssd_seen) $fatal(1, "epoch2 mssd_valid not asserted");
+    if (cap_mssd_epoch != 16'hFFFF) $fatal(1, "epoch2 mssd mismatch got=%0d exp=65535", cap_mssd_epoch);
     if (cap_rr_diff_count != 16'd2) $fatal(1, "epoch2 rr_diff_count mismatch got=%0d exp=2", cap_rr_diff_count);
 
-    // Epoch 3: insufficient diffs => rmssd_valid should not assert
-    send_rr(32'd1000, 1'b1);
-    send_rr(32'd1100, 1'b1); // only 1 diff
-    rmssd_seen = 1'b0;
+    // Epoch 3: insufficient diffs => mssd_valid should not assert
+    send_rr(16'd1000, 1'b1);
+    send_rr(16'd1100, 1'b1); // only 1 diff
+    mssd_seen = 1'b0;
     pulse_epoch_end();
     repeat (2) @(posedge clk);
-    if (rmssd_seen) $fatal(1, "epoch3 rmssd_valid asserted with insufficient diffs");
+    if (mssd_seen) $fatal(1, "epoch3 mssd_valid asserted with insufficient diffs");
 
     $display("PASS");
     $finish;
   end
 
   initial begin
-    $dumpfile("rmssd_engine_tb.vcd");
-    $dumpvars(0, rmssd_engine_tb);
+    $dumpfile("mssd_engine_tb.vcd");
+    $dumpvars(0, mssd_engine_tb);
   end
 
 endmodule

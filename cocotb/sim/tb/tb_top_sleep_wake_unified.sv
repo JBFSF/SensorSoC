@@ -85,7 +85,7 @@ wire feat_valid;
 wire signed [15:0] time_feat;
 wire signed [15:0] motion_feat;
 wire signed [15:0] delta_hr_feat;
-wire signed [15:0] rmssd_feat;
+wire signed [15:0] mssd_feat;
 wire ml_update_gate;
 wire [7:0] invalid_reason;
 wire epoch_end;
@@ -158,10 +158,10 @@ top #(
     .CFG_MAX_MISSED(8'd3),
     .CFG_MOTION_HI_TH(16'hFFFF),
     .CFG_MAX_MOTION_HI(16'hFFFF),
-    .COS_PERIOD_SECONDS(32'd16),
-    .COS_LUT_BITS(3'd6),
-    .COS_SCALE_Q15(16'h7FFF),
-    .RMSSD_MIN_RR_COUNT(1)
+    
+    
+    
+    .MSSD_MIN_RR_COUNT(1)
 ) dut (
     .clk_i(clk),
     .reset_i(reset),
@@ -188,7 +188,7 @@ top #(
     .time_feat_o(time_feat),
     .motion_feat_o(motion_feat),
     .delta_hr_feat_o(delta_hr_feat),
-    .rmssd_feat_o(rmssd_feat),
+    .mssd_feat_o(mssd_feat),
     .ml_update_gate_o(ml_update_gate),
     .invalid_reason_o(invalid_reason),
     .epoch_end_o(epoch_end),
