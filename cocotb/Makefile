@@ -24,9 +24,9 @@
 #   make test-timer
 #	make test-cpu-ml
 #
-#   # Standalone SV testbench
+#   # Standalone SV testbenches
 #   make sim-reset-ctrl
-#   make sim-globaltimer
+#   make sim-globaltimer              # epoch/timebase generator smoke test
 #
 #   # Cocotb unit tests (simple_sram_tb.py wrapper)
 #   make test-simple-sram
@@ -39,6 +39,11 @@
 #   make sim-top-sleep-wake-unified
 #   make test-ml-single-vector
 #   make sim-top-ml-golden-vector-unified
+#   make test-top-unified-reset-init
+#   make test-top-unified-runtime
+#   make test-top-unified-host-i2c
+#   make test-top-unified-prod-loop
+#   make test-top-unified-forced-wake-irq
 #
 #   # Cleanup
 #   make clean
@@ -64,6 +69,18 @@
 #
 #   make sim-top-ml-golden-vector-unified
 #     Unified-top numerical ML check against the frozen single-vector logits.
+#
+#   make test-top-unified-reset-init
+#     Shared cocotb wrapper smoke test for unified top.sv reset/init state.
+#
+#   make test-top-unified-runtime
+#     Shared cocotb runtime checks for host-I2C, repeated prod loop, and forced wake/IRQ corners.
+#   make test-top-unified-host-i2c
+#     Shared cocotb host-I2C register/score visibility check.
+#   make test-top-unified-prod-loop
+#     Shared cocotb repeated production-loop smoke check.
+#   make test-top-unified-forced-wake-irq
+#     Shared cocotb forced wake/IRQ reset-corner check.
 #
 #   make sim-top-feature-ml-prod-main-host-i2c
 #     Most production-like unified-top flow: SPI load + ML loop + host-I2C visibility.
@@ -190,10 +207,9 @@ UNIFIED_TOP_RTL_SRCS := \
   $(RTL_DIR)/motion_process.sv \
   $(RTL_DIR)/ppg_fifo_reader.sv \
   $(RTL_DIR)/ppg_process.sv \
-  $(RTL_DIR)/rmssd_engine.sv \
+  $(RTL_DIR)/MSSD_engine.sv \
   $(RTL_DIR)/signal_quality.sv \
   $(RTL_DIR)/feature_engine.sv \
-  $(RTL_DIR)/cos_lut_timer.sv \
   $(RTL_DIR)/globaltimer.sv \
   $(RTL_DIR)/simple_sram.v \
   $(MAKEFILE_DIR)/../ip/picorv32.v \
@@ -440,10 +456,9 @@ TOP_FEATURE_ML_CPU_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
-	$(RTL_DIR)/cos_lut_timer.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_master_mmio.v \
@@ -484,10 +499,9 @@ TOP_FEATURE_ML_CPU_SPI_FLASH_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
-	$(RTL_DIR)/cos_lut_timer.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_master_mmio.v \
@@ -531,10 +545,9 @@ TOP_SPI_INIT_UNIFIED_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
-	$(RTL_DIR)/cos_lut_timer.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_master_mmio.v \
@@ -578,10 +591,9 @@ TOP_ML_CONTROL_UNIFIED_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
-	$(RTL_DIR)/cos_lut_timer.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_master_mmio.v \
@@ -627,10 +639,9 @@ TOP_ML_GOLDEN_VECTOR_UNIFIED_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
-	$(RTL_DIR)/cos_lut_timer.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_master_mmio.v \
@@ -671,10 +682,9 @@ TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
-	$(RTL_DIR)/cos_lut_timer.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_master_mmio.v \
@@ -718,10 +728,9 @@ TOP_SLEEP_WAKE_UNIFIED_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/rmssd_engine.sv \
+	$(RTL_DIR)/MSSD_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
-	$(RTL_DIR)/cos_lut_timer.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_master_mmio.v \
@@ -1045,22 +1054,22 @@ sim-accel-reader: $(ACCEL_READER_VVP)
 	@cd $(WAVE_DIR) && $(VVP) $(abspath $(ACCEL_READER_VVP))
 
 # ============================================================
-# RMSSD ENGINE
+# MSSD ENGINE
 # ============================================================
 
-RMSSD_ENGINE_TOP     := rmssd_engine_tb
-RMSSD_ENGINE_VVP     := $(BUILD_DIR)/$(RMSSD_ENGINE_TOP).vvp
-RMSSD_ENGINE_SOURCES := sim/tb/rmssd_engine_tb.sv $(RTL_DIR)/rmssd_engine.sv $(RTL_DIR)/ewma_baseline.sv
-RMSSD_ENGINE_VCD     := $(WAVE_DIR)/rmssd_engine_tb.vcd
+MSSD_ENGINE_TOP     := MSSD_engine_tb
+MSSD_ENGINE_VVP     := $(BUILD_DIR)/$(MSSD_ENGINE_TOP).vvp
+MSSD_ENGINE_SOURCES := sim/tb/MSSD_engine_tb.sv $(RTL_DIR)/MSSD_engine.sv $(RTL_DIR)/ewma_baseline.sv
+MSSD_ENGINE_VCD     := $(WAVE_DIR)/MSSD_engine_tb.vcd
 
-$(RMSSD_ENGINE_VVP): $(RMSSD_ENGINE_SOURCES)
+$(MSSD_ENGINE_VVP): $(MSSD_ENGINE_SOURCES)
 	$(IVERILOG) -g2012 -o $@ $^
 
-.PHONY: sim-rmssd-engine
-sim-rmssd-engine: $(RMSSD_ENGINE_VVP)
-	@echo "== Running $(RMSSD_ENGINE_TOP) (VCD -> $(RMSSD_ENGINE_VCD)) =="
+.PHONY: sim-MSSD-engine
+sim-MSSD-engine: $(MSSD_ENGINE_VVP)
+	@echo "== Running $(MSSD_ENGINE_TOP) (VCD -> $(MSSD_ENGINE_VCD)) =="
 	@mkdir -p $(WAVE_DIR)
-	@cd $(WAVE_DIR) && $(VVP) $(abspath $(RMSSD_ENGINE_VVP))
+	@cd $(WAVE_DIR) && $(VVP) $(abspath $(MSSD_ENGINE_VVP))
 
 # ============================================================
 # SIGNAL QUALITY
@@ -1079,24 +1088,6 @@ sim-signal-quality: $(SIGNAL_QUALITY_VVP)
 	@echo "== Running $(SIGNAL_QUALITY_TOP) (VCD -> $(SIGNAL_QUALITY_VCD)) =="
 	@mkdir -p $(WAVE_DIR)
 	@cd $(WAVE_DIR) && $(VVP) $(abspath $(SIGNAL_QUALITY_VVP))
-
-# ============================================================
-# COS LUT TIMER
-# ============================================================
-
-COS_LUT_TIMER_TOP     := cos_lut_timer_tb
-COS_LUT_TIMER_VVP     := $(BUILD_DIR)/$(COS_LUT_TIMER_TOP).vvp
-COS_LUT_TIMER_SOURCES := sim/tb/cos_lut_timer_tb.sv $(RTL_DIR)/cos_lut_timer.sv
-COS_LUT_TIMER_VCD     := $(WAVE_DIR)/cos_lut_timer_tb.vcd
-
-$(COS_LUT_TIMER_VVP): $(COS_LUT_TIMER_SOURCES)
-	$(IVERILOG) -g2012 -o $@ $^
-
-.PHONY: sim-cos-lut-timer
-sim-cos-lut-timer: $(COS_LUT_TIMER_VVP)
-	@echo "== Running $(COS_LUT_TIMER_TOP) (VCD -> $(COS_LUT_TIMER_VCD)) =="
-	@mkdir -p $(WAVE_DIR)
-	@cd $(WAVE_DIR) && $(VVP) $(abspath $(COS_LUT_TIMER_VVP))
 
 # ============================================================
 # TOP SENSOR PIPELINE
@@ -1145,6 +1136,62 @@ test-top-mlp-features: $(TOP_MLP_FEATURES_VVP)
 	@export COCOTB_TOPLEVEL=$(TOP_MLP_FEATURES_TOP); \
 	export COCOTB_TEST_MODULES=$(TOP_MLP_FEATURES_PYMOD); \
 	$(call RUN_COCOTB_ICARUS,$(TOP_MLP_FEATURES_VVP))
+
+# ============================================================
+# Cocotb: shared unified-top environment + reset/init smoke test
+# ============================================================
+
+TOP_UNIFIED_ENV_TOP    := sim_top_unified_env
+TOP_UNIFIED_ENV_TOP_V  := $(TB_DIR)/sim_top_unified_env.sv
+TOP_UNIFIED_ENV_VVP    := $(BUILD_DIR)/$(TOP_UNIFIED_ENV_TOP).vvp
+TOP_UNIFIED_ENV_PYMOD  := test_top_unified_reset_init
+TOP_UNIFIED_ENV_SRCS   := \
+  $(TOP_UNIFIED_ENV_TOP_V) \
+  $(UNIFIED_TOP_RTL_SRCS) \
+  $(TB_DIR)/spi_flash_model.v \
+  sensors/i2c_slave_lis2dw12.sv \
+  sensors/i2c_slave_adpd144ri.sv
+
+$(TOP_UNIFIED_ENV_VVP): $(TOP_UNIFIED_ENV_SRCS)
+	@echo "[COCOTB] Building $@"
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_UNIFIED_ENV_TOP) -o $@ $(TOP_UNIFIED_ENV_SRCS)
+
+.PHONY: test-top-unified-reset-init
+test-top-unified-reset-init: $(TOP_UNIFIED_ENV_VVP)
+	@echo "[COCOTB] Running $(TOP_UNIFIED_ENV_PYMOD) on $(TOP_UNIFIED_ENV_TOP)"
+	@export COCOTB_TOPLEVEL=$(TOP_UNIFIED_ENV_TOP); \
+	export COCOTB_TEST_MODULES=$(TOP_UNIFIED_ENV_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(TOP_UNIFIED_ENV_VVP))
+
+TOP_UNIFIED_RUNTIME_PYMOD := test_top_unified_runtime
+
+.PHONY: test-top-unified-host-i2c
+test-top-unified-host-i2c: $(TOP_UNIFIED_ENV_VVP)
+	@echo "[COCOTB] Running host-I2C runtime check on $(TOP_UNIFIED_ENV_TOP)"
+	@export COCOTB_TOPLEVEL=$(TOP_UNIFIED_ENV_TOP); \
+	export COCOTB_TEST_MODULES=$(TOP_UNIFIED_RUNTIME_PYMOD); \
+	export COCOTB_TEST_FILTER=test_host_i2c_registers_and_score_visibility; \
+	$(call RUN_COCOTB_ICARUS,$(TOP_UNIFIED_ENV_VVP))
+
+.PHONY: test-top-unified-prod-loop
+test-top-unified-prod-loop: $(TOP_UNIFIED_ENV_VVP)
+	@echo "[COCOTB] Running repeated production-loop smoke check on $(TOP_UNIFIED_ENV_TOP)"
+	@export COCOTB_TOPLEVEL=$(TOP_UNIFIED_ENV_TOP); \
+	export COCOTB_TEST_MODULES=$(TOP_UNIFIED_RUNTIME_PYMOD); \
+	export COCOTB_TEST_FILTER=test_repeated_production_loop_smoke; \
+	$(call RUN_COCOTB_ICARUS,$(TOP_UNIFIED_ENV_VVP))
+
+.PHONY: test-top-unified-forced-wake-irq
+test-top-unified-forced-wake-irq: $(TOP_UNIFIED_ENV_VVP)
+	@echo "[COCOTB] Running forced wake/IRQ corner check on $(TOP_UNIFIED_ENV_TOP)"
+	@export COCOTB_TOPLEVEL=$(TOP_UNIFIED_ENV_TOP); \
+	export COCOTB_TEST_MODULES=$(TOP_UNIFIED_RUNTIME_PYMOD); \
+	export COCOTB_TEST_FILTER=test_reset_corner_cases_with_forced_wake_and_irq; \
+	$(call RUN_COCOTB_ICARUS,$(TOP_UNIFIED_ENV_VVP))
+
+.PHONY: test-top-unified-runtime
+test-top-unified-runtime: test-top-unified-host-i2c test-top-unified-prod-loop test-top-unified-forced-wake-irq
+	@true
 
 # ============================================================
 # Cocotb: unified top feature latch/MMIO check
@@ -1240,21 +1287,21 @@ test-ppg-process-ref: $(PPG_REF_VVP)
 	export COCOTB_TEST_MODULES=$(PPG_REF_PYMOD); \
 	$(call RUN_COCOTB_ICARUS,$(PPG_REF_VVP))
 
-RMSSD_REF_TOP      := sim_rmssd_engine_ref
-RMSSD_REF_TOP_V    := $(TB_DIR)/sim_rmssd_engine_ref.sv
-RMSSD_REF_VVP      := $(BUILD_DIR)/$(RMSSD_REF_TOP).vvp
-RMSSD_REF_PYMOD    := test_rmssd_engine_ref
-RMSSD_REF_SRCS     := $(RMSSD_REF_TOP_V) $(RTL_DIR)/rmssd_engine.sv
+MSSD_REF_TOP      := sim_MSSD_engine_ref
+MSSD_REF_TOP_V    := $(TB_DIR)/sim_MSSD_engine_ref.sv
+MSSD_REF_VVP      := $(BUILD_DIR)/$(MSSD_REF_TOP).vvp
+MSSD_REF_PYMOD    := test_MSSD_engine_ref
+MSSD_REF_SRCS     := $(MSSD_REF_TOP_V) $(RTL_DIR)/MSSD_engine.sv
 
-$(RMSSD_REF_VVP): $(RMSSD_REF_SRCS)
+$(MSSD_REF_VVP): $(MSSD_REF_SRCS)
 	@echo "[COCOTB] Building $@"
-	$(IVERILOG) -g2012 -s $(RMSSD_REF_TOP) -o $@ $(RMSSD_REF_SRCS)
+	$(IVERILOG) -g2012 -s $(MSSD_REF_TOP) -o $@ $(MSSD_REF_SRCS)
 
-.PHONY: test-rmssd-engine-ref
-test-rmssd-engine-ref: $(RMSSD_REF_VVP)
-	@export COCOTB_TOPLEVEL=$(RMSSD_REF_TOP); \
-	export COCOTB_TEST_MODULES=$(RMSSD_REF_PYMOD); \
-	$(call RUN_COCOTB_ICARUS,$(RMSSD_REF_VVP))
+.PHONY: test-MSSD-engine-ref
+test-MSSD-engine-ref: $(MSSD_REF_VVP)
+	@export COCOTB_TOPLEVEL=$(MSSD_REF_TOP); \
+	export COCOTB_TEST_MODULES=$(MSSD_REF_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(MSSD_REF_VVP))
 
 SIGNAL_QUALITY_REF_TOP      := sim_signal_quality_ref
 SIGNAL_QUALITY_REF_TOP_V    := $(TB_DIR)/sim_signal_quality_ref.sv
@@ -1326,7 +1373,7 @@ sim-host-i2c-irqc-proxy: $(HOST_I2C_IRQC_PROXY_VVP)
 	$(VVP) $(HOST_I2C_IRQC_PROXY_VVP)
 
 # ============================================================
-# GLOBAL TIMER
+# GLOBAL TIMER / EPOCH TIMEBASE
 # ============================================================
 
 GLOBALTIMER_TOP     := globaltimer_tb

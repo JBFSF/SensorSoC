@@ -39,7 +39,7 @@ module sim_top_sensor_pipeline;
   wire signed [15:0]        time_feat_o;
   wire signed [15:0]        motion_feat_o;
   wire signed [15:0]        delta_hr_feat_o;
-  wire signed [15:0]        rmssd_feat_o;
+  wire signed [15:0]        mssd_feat_o;
   wire                      ml_update_gate_o;
   wire [7:0]                invalid_reason_o;
   wire                      epoch_end_o;
@@ -64,12 +64,11 @@ module sim_top_sensor_pipeline;
   wire                      double_beat_w;
   wire                      missed_beat_w;
   wire                      ppg_invalid_w;
-  wire [15:0]               rmssd_w;
-  wire                      rmssd_valid_w;
+  wire [15:0]               mssd_w;
+  wire                      mssd_valid_w;
   wire                      fifo_overflow_event_w;
   wire                      ppg_i2c_err_event_w;
   wire [15:0]               seconds_w;
-  wire signed [15:0]        cos_time_w;
   wire                      epoch_end_w;
   wire                      epoch_end_d;
 
@@ -106,10 +105,7 @@ module sim_top_sensor_pipeline;
     .CFG_MAX_MISSED(8'd3),
     .CFG_MOTION_HI_TH(16'hFFFF),
     .CFG_MAX_MOTION_HI(16'hFFFF),
-    .COS_PERIOD_SECONDS(32'd16),
-    .COS_LUT_BITS(3'd6),
-    .COS_SCALE_Q15(16'h7FFF),
-    .RMSSD_MIN_RR_COUNT(1)
+    .MSSD_MIN_RR_COUNT(1)
   ) u_dut (
     .clk_i(clk),
     .reset_i(reset),
@@ -136,7 +132,7 @@ module sim_top_sensor_pipeline;
     .time_feat_o(time_feat_o),
     .motion_feat_o(motion_feat_o),
     .delta_hr_feat_o(delta_hr_feat_o),
-    .rmssd_feat_o(rmssd_feat_o),
+    .mssd_feat_o(mssd_feat_o),
     .ml_update_gate_o(ml_update_gate_o),
     .invalid_reason_o(invalid_reason_o),
     .epoch_end_o(epoch_end_o),
@@ -198,12 +194,11 @@ module sim_top_sensor_pipeline;
   assign double_beat_w = u_dut.double_beat_w;
   assign missed_beat_w = u_dut.missed_beat_w;
   assign ppg_invalid_w = u_dut.ppg_invalid_w;
-  assign rmssd_w = u_dut.rmssd_w[15:0];
-  assign rmssd_valid_w = u_dut.rmssd_valid_w;
+  assign mssd_w = u_dut.mssd_w[15:0];
+  assign mssd_valid_w = u_dut.mssd_valid_w;
   assign fifo_overflow_event_w = u_dut.fifo_overflow_event_w;
   assign ppg_i2c_err_event_w = u_dut.ppg_i2c_err_event_w;
   assign seconds_w = u_dut.seconds_w;
-  assign cos_time_w = u_dut.cos_time_w;
   assign epoch_end_w = u_dut.epoch_end_w;
   assign epoch_end_d = u_dut.epoch_end_d;
 

@@ -5,7 +5,6 @@ module sim_motion_process_ref;
   logic clk = 1'b0;
   logic rst_i = 1'b0;
   logic sample_valid = 1'b0;
-  logic sample_ok = 1'b0;
   logic signed [15:0] ax = '0;
   logic signed [15:0] ay = '0;
   logic signed [15:0] az = '0;

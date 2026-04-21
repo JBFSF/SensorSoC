@@ -21,14 +21,12 @@ module sim_top_mlp_features;
   wire signed [15:0]        time_feat;
   wire signed [15:0]        motion_feat;
   wire signed [15:0]        delta_hr_feat;
-  wire signed [15:0]        rmssd_feat;
+  wire signed [15:0]        mssd_feat;
   wire                      ml_update_gate;
   wire [7:0]                invalid_reason;
   wire                      epoch_end;
   wire                      alarm;
 
-  wire        axi_done;
-  wire        axi_busy;
   wire [31:0] mlp_word0;
   wire [31:0] mlp_word1;
   wire        tk_ar_fire;
@@ -84,10 +82,7 @@ module sim_top_mlp_features;
     .CFG_MAX_MISSED(8'd3),
     .CFG_MOTION_HI_TH(16'hFFFF),
     .CFG_MAX_MOTION_HI(16'hFFFF),
-    .COS_PERIOD_SECONDS(32'd16),
-    .COS_LUT_BITS(3'd6),
-    .COS_SCALE_Q15(16'h7FFF),
-    .RMSSD_MIN_RR_COUNT(1)
+    .MSSD_MIN_RR_COUNT(1)
   ) u_dut (
     .clk_i(clk),
     .reset_i(reset),
@@ -114,7 +109,7 @@ module sim_top_mlp_features;
     .time_feat_o(time_feat),
     .motion_feat_o(motion_feat),
     .delta_hr_feat_o(delta_hr_feat),
-    .rmssd_feat_o(rmssd_feat),
+    .mssd_feat_o(mssd_feat),
     .ml_update_gate_o(ml_update_gate),
     .invalid_reason_o(invalid_reason),
     .epoch_end_o(epoch_end),
@@ -126,8 +121,7 @@ module sim_top_mlp_features;
   assign host_i2c_scl = 1'b1;
 
   i2c_slave_lis2dw12 #(
-    .I2C_ADDR(ACC_ADDR),
-    .CSV_FILE("sim/data/accel_digital.csv")
+    .I2C_ADDR(ACC_ADDR)
   ) u_accel_slave (
     .clk(clk),
     .resetn(~reset),
@@ -143,8 +137,7 @@ module sim_top_mlp_features;
   );
 
   i2c_slave_adpd144ri #(
-    .I2C_ADDR(PPG_ADDR),
-    .CSV_FILE("sim/data/ppg_digital.csv")
+    .I2C_ADDR(PPG_ADDR)
   ) u_ppg_slave (
     .clk(clk),
     .resetn(~reset),
@@ -161,19 +154,17 @@ module sim_top_mlp_features;
     .sim_err(ppg_sim_err)
   );
 
-  assign axi_done = u_dut.axi_done_w;
-  assign axi_busy = u_dut.axi_busy_w;
-  assign mlp_word0 = u_dut.tk_shared_mem[16];
-  assign mlp_word1 = u_dut.tk_shared_mem[17];
-  assign tk_ar_fire = u_dut.tk_maxi_arvalid_w && u_dut.tk_maxi_arready_w;
-  assign tk_araddr = u_dut.tk_maxi_araddr_w;
+  assign mlp_word0 = u_dut.u_weight_ram.mem[16];
+  assign mlp_word1 = u_dut.u_weight_ram.mem[17];
+  assign tk_ar_fire = u_dut.wram_arvalid && u_dut.wram_arready;
+  assign tk_araddr = u_dut.wram_araddr;
 
   initial begin
     $dumpfile("sim/waves/top_mlp_features.vcd");
     $dumpvars(0, clk, reset);
-    $dumpvars(0, feat_valid, time_feat, motion_feat, delta_hr_feat, rmssd_feat);
+    $dumpvars(0, feat_valid, time_feat, motion_feat, delta_hr_feat, mssd_feat);
     $dumpvars(0, ml_update_gate, invalid_reason, epoch_end, alarm);
-    $dumpvars(0, axi_done, axi_busy, mlp_word0, mlp_word1, tk_ar_fire, tk_araddr);
+    $dumpvars(0, mlp_word0, mlp_word1, tk_ar_fire, tk_araddr);
     $dumpvars(0, u_dut);
   end
 

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from .types import RmssdEpoch
+from .types import MssdEpoch
 from .utils import to_signed, to_unsigned
 
 
-class RmssdEngineRef:
+class MssdEngineRef:
     def __init__(
         self,
         rr_w: int = 16,
@@ -25,8 +25,8 @@ class RmssdEngineRef:
         self.have_prev_rr = False
         self.sum_sq = 0
         self.diff_cnt = 0
-        self.rmssd_epoch = 0
-        self.rmssd_valid = False
+        self.mssd_epoch = 0
+        self.mssd_valid = False
         self.rr_diff_count = 0
 
     def step(
@@ -36,12 +36,12 @@ class RmssdEngineRef:
         rr_accepted: bool,
         rr_interval: int,
         epoch_end: bool,
-    ) -> RmssdEpoch:
+    ) -> MssdEpoch:
         if rst:
             self.reset()
-            return RmssdEpoch(0, False, 0)
+            return MssdEpoch(0, False, 0)
 
-        self.rmssd_valid = False
+        self.mssd_valid = False
         prev_rr = self.prev_rr
         have_prev_rr = self.have_prev_rr
         sum_sq = self.sum_sq
@@ -62,13 +62,13 @@ class RmssdEngineRef:
         if epoch_end:
             self.rr_diff_count = diff_cnt
             if diff_cnt >= self.min_rr_count:
-                self.rmssd_epoch = 0xFFFF if (sum_sq >> 16) else (sum_sq & 0xFFFF)
-                self.rmssd_valid = True
+                self.mssd_epoch = 0xFFFF if (sum_sq >> 16) else (sum_sq & 0xFFFF)
+                self.mssd_valid = True
             else:
-                self.rmssd_epoch = 0
+                self.mssd_epoch = 0
 
             self.sum_sq = 0
             self.diff_cnt = 0
             self.have_prev_rr = False
 
-        return RmssdEpoch(self.rmssd_epoch, self.rmssd_valid, self.rr_diff_count)
+        return MssdEpoch(self.mssd_epoch, self.mssd_valid, self.rr_diff_count)

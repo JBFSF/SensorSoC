@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-module rmssd_engine #(
+module mssd_engine #(
     parameter integer RR_W = 16,
     parameter integer ACC_W = 40,
     parameter integer CNT_W = 16,
@@ -15,8 +15,8 @@ module rmssd_engine #(
     input  logic                         rr_accepted_i,
     input  logic                         epoch_end_i,
 
-    output logic [RR_W-1:0]              rmssd_epoch_o,
-    output logic                         rmssd_valid_o,
+    output logic [RR_W-1:0]              mssd_epoch_o,
+    output logic                         mssd_valid_o,
     output logic [CNT_W-1:0]             rr_diff_count_o
 );
 
@@ -36,11 +36,11 @@ module rmssd_engine #(
             sum_sq_r        <= {ACC_W{1'b0}};
             diff_cnt_r      <= {CNT_W{1'b0}};
 
-            rmssd_epoch_o   <= {RR_W{1'b0}};
-            rmssd_valid_o   <= 1'b0;
+            mssd_epoch_o   <= {RR_W{1'b0}};
+            mssd_valid_o   <= 1'b0;
             rr_diff_count_o <= {CNT_W{1'b0}};
         end else begin
-            rmssd_valid_o <= 1'b0;
+            mssd_valid_o <= 1'b0;
 
             if (rr_valid_i && rr_accepted_i) begin
                 if (have_prev_rr_r) begin
@@ -65,10 +65,10 @@ module rmssd_engine #(
                     else
                         sum_sq_clip_v = sum_sq_r[15:0];
 
-                    rmssd_epoch_o <= sum_sq_clip_v;
-                    rmssd_valid_o <= 1'b1;
+                    mssd_epoch_o <= sum_sq_clip_v;
+                    mssd_valid_o <= 1'b1;
                 end else begin
-                    rmssd_epoch_o <= {RR_W{1'b0}};
+                    mssd_epoch_o <= {RR_W{1'b0}};
                 end
 
                 sum_sq_r       <= {ACC_W{1'b0}};

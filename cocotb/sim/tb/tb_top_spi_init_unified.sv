@@ -110,10 +110,10 @@ top #(
     .CFG_MAX_MISSED(8'd3),
     .CFG_MOTION_HI_TH(16'hFFFF),
     .CFG_MAX_MOTION_HI(16'hFFFF),
-    .COS_PERIOD_SECONDS(32'd16),
-    .COS_LUT_BITS(3'd6),
-    .COS_SCALE_Q15(16'h7FFF),
-    .RMSSD_MIN_RR_COUNT(1)
+    
+    
+    
+    .MSSD_MIN_RR_COUNT(1)
 ) dut (
     .clk_i(clk),
     .reset_i(reset),
@@ -140,7 +140,7 @@ top #(
     .time_feat_o(),
     .motion_feat_o(),
     .delta_hr_feat_o(),
-    .rmssd_feat_o(),
+    .mssd_feat_o(),
     .ml_update_gate_o(),
     .invalid_reason_o(),
     .epoch_end_o(),

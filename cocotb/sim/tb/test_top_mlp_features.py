@@ -1,6 +1,6 @@
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, ClockCycles, with_timeout
+from cocotb.triggers import RisingEdge, Timer, with_timeout
 
 
 def pack_feature_word(upper_16: int, lower_16: int) -> int:
@@ -28,24 +28,32 @@ async def test_sensor_features_are_loaded_into_taketwo_buffer(dut):
         time_feat = dut.time_feat.value.to_signed()
         motion_feat = dut.motion_feat.value.to_signed()
         delta_hr_feat = dut.delta_hr_feat.value.to_signed()
-        rmssd_feat = dut.rmssd_feat.value.to_signed()
+        mssd_feat = dut.mssd_feat.value.to_signed()
 
         expected_w0 = pack_feature_word(time_feat, motion_feat)
-        expected_w1 = pack_feature_word(rmssd_feat, delta_hr_feat)
+        expected_w1 = pack_feature_word(mssd_feat, delta_hr_feat)
 
-        await with_timeout(RisingEdge(dut.axi_done), 2, "ms")
-        await RisingEdge(dut.clk)
-
-        got_w0 = dut.mlp_word0.value.to_unsigned()
-        got_w1 = dut.mlp_word1.value.to_unsigned()
+        for _ in range(2000):
+            got_w0 = dut.mlp_word0.value.to_unsigned()
+            got_w1 = dut.mlp_word1.value.to_unsigned()
+            if got_w0 == expected_w0 and got_w1 == expected_w1:
+                break
+            await Timer(10, unit="us")
+        else:
+            raise AssertionError(
+                f"timed out waiting for weight RAM feature words: "
+                f"expected word0=0x{expected_w0:08x} word1=0x{expected_w1:08x}, "
+                f"got word0=0x{dut.mlp_word0.value.to_unsigned():08x} "
+                f"word1=0x{dut.mlp_word1.value.to_unsigned():08x}"
+            )
 
         dut._log.info(
-            "feature[%d] time=%d motion=%d delta_hr=%d rmssd=%d buffer_word0=0x%08x buffer_word1=0x%08x",
+            "feature[%d] time=%d motion=%d delta_hr=%d mssd=%d buffer_word0=0x%08x buffer_word1=0x%08x",
             feature_checks,
             time_feat,
             motion_feat,
             delta_hr_feat,
-            rmssd_feat,
+            mssd_feat,
             got_w0,
             got_w1,
         )

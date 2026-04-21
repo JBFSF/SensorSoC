@@ -16,7 +16,7 @@ localparam [31:0] FEAT_STATUS  = FEATURE_BASE + 32'h00;
 localparam [31:0] FEAT_TIME    = FEATURE_BASE + 32'h04;
 localparam [31:0] FEAT_MOTION  = FEATURE_BASE + 32'h08;
 localparam [31:0] FEAT_DHR     = FEATURE_BASE + 32'h0C;
-localparam [31:0] FEAT_RMSSD   = FEATURE_BASE + 32'h10;
+localparam [31:0] FEAT_MSSD   = FEATURE_BASE + 32'h10;
 
 localparam int unsigned FLASH_WORDS = 208;
 localparam int unsigned TB_TIMEOUT_CYCLES = 10_000_000;
@@ -66,7 +66,7 @@ integer feature_status_reads;
 integer feature_time_reads;
 integer feature_motion_reads;
 integer feature_dhr_reads;
-integer feature_rmssd_reads;
+integer feature_mssd_reads;
 integer feature_clear_writes;
 integer weight_feature_writes;
 integer busy_reads;
@@ -82,7 +82,7 @@ reg saw_feature_latch;
 reg signed [15:0] first_time_feat;
 reg signed [15:0] first_motion_feat;
 reg signed [15:0] first_delta_hr_feat;
-reg signed [15:0] first_rmssd_feat;
+reg signed [15:0] first_mssd_feat;
 reg saw_global_base_write;
 reg saw_start_write;
 reg saw_busy_read;
@@ -138,10 +138,10 @@ top #(
     .CFG_MAX_MISSED(8'd3),
     .CFG_MOTION_HI_TH(16'hFFFF),
     .CFG_MAX_MOTION_HI(16'hFFFF),
-    .COS_PERIOD_SECONDS(32'd16),
-    .COS_LUT_BITS(3'd6),
-    .COS_SCALE_Q15(16'h7FFF),
-    .RMSSD_MIN_RR_COUNT(1)
+    
+    
+    
+    .MSSD_MIN_RR_COUNT(1)
 ) dut (
     .clk_i(clk),
     .reset_i(reset),
@@ -164,7 +164,7 @@ top #(
     .time_feat_o(),
     .motion_feat_o(),
     .delta_hr_feat_o(),
-    .rmssd_feat_o(),
+    .mssd_feat_o(),
     .ml_update_gate_o(),
     .invalid_reason_o(),
     .spi_clk_o(spi_clk),
@@ -231,7 +231,7 @@ always @(posedge clk) begin
         feature_time_reads <= 0;
         feature_motion_reads <= 0;
         feature_dhr_reads <= 0;
-        feature_rmssd_reads <= 0;
+        feature_mssd_reads <= 0;
         feature_clear_writes <= 0;
         weight_feature_writes <= 0;
         busy_reads <= 0;
@@ -247,7 +247,7 @@ always @(posedge clk) begin
         first_time_feat <= '0;
         first_motion_feat <= '0;
         first_delta_hr_feat <= '0;
-        first_rmssd_feat <= '0;
+        first_mssd_feat <= '0;
         saw_global_base_write <= 1'b0;
         saw_start_write <= 1'b0;
         saw_busy_read <= 1'b0;
@@ -281,7 +281,7 @@ always @(posedge clk) begin
             first_time_feat <= dut.feat_time_latched_r;
             first_motion_feat <= dut.feat_motion_latched_r;
             first_delta_hr_feat <= dut.feat_delta_hr_latched_r;
-            first_rmssd_feat <= dut.feat_rmssd_latched_r;
+            first_mssd_feat <= dut.feat_mssd_latched_r;
         end
 
         if (dut.mmio_sel && dut.mem_valid && (dut.mem_wstrb == 4'b0)) begin
@@ -290,7 +290,7 @@ always @(posedge clk) begin
                 FEAT_TIME:   feature_time_reads   <= feature_time_reads + 1;
                 FEAT_MOTION: feature_motion_reads <= feature_motion_reads + 1;
                 FEAT_DHR:    feature_dhr_reads    <= feature_dhr_reads + 1;
-                FEAT_RMSSD:  feature_rmssd_reads  <= feature_rmssd_reads + 1;
+                FEAT_MSSD:  feature_mssd_reads  <= feature_mssd_reads + 1;
                 REG_BUSY: begin
                     busy_reads <= busy_reads + 1;
                     saw_busy_read <= 1'b1;
@@ -363,7 +363,7 @@ initial begin
             $display("[cyc %0d] status=0x%08x code=0x%08x score=0x%08x feature_reads=%0d/%0d/%0d/%0d/%0d spi_cs=%0d spi_bits=%0d axi=%0d/%0d/%0d/%0d/%0d",
                      cycles, dut.test_status, dut.test_code, dut.ml_score_hw,
                      feature_status_reads, feature_time_reads, feature_motion_reads,
-                     feature_dhr_reads, feature_rmssd_reads,
+                     feature_dhr_reads, feature_mssd_reads,
                      spi_cs_asserts, spi_bit_count,
                      axi_ar_hs, axi_r_hs, axi_aw_hs, axi_w_hs, axi_b_hs);
         end
@@ -399,7 +399,7 @@ initial begin
                 failures = failures + 1;
             end
             if (feature_status_reads == 0 || feature_time_reads == 0 || feature_motion_reads == 0 ||
-                feature_dhr_reads == 0 || feature_rmssd_reads == 0) begin
+                feature_dhr_reads == 0 || feature_mssd_reads == 0) begin
                 $display("FAIL: CPU did not read full feature MMIO bank");
                 failures = failures + 1;
             end
@@ -416,9 +416,9 @@ initial begin
                          first_time_feat[15:0], first_motion_feat[15:0], feature_word0_snap);
                 failures = failures + 1;
             end
-            if (!saw_feature_word1_snap || (feature_word1_snap !== {first_rmssd_feat[15:0], first_delta_hr_feat[15:0]})) begin
-                $display("FAIL: weight RAM word1 mismatch expected={rmssd,dhr}=0x%04x_%04x got=0x%08x",
-                         first_rmssd_feat[15:0], first_delta_hr_feat[15:0], feature_word1_snap);
+            if (!saw_feature_word1_snap || (feature_word1_snap !== {first_mssd_feat[15:0], first_delta_hr_feat[15:0]})) begin
+                $display("FAIL: weight RAM word1 mismatch expected={mssd,dhr}=0x%04x_%04x got=0x%08x",
+                         first_mssd_feat[15:0], first_delta_hr_feat[15:0], feature_word1_snap);
                 failures = failures + 1;
             end
             if (spi_cs_asserts == 0) begin

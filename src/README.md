@@ -9,14 +9,12 @@ This directory contains the main SystemVerilog RTL for `SensorSoC`, including th
   * Detects beats from the PPG stream and computes RR intervals and beat-quality signals.
 * motion_process.sv
   * Preprocesses accelerometer samples into a per-epoch motion-energy feature.
-* cos_lut_timer.sv
-  * Generates a cosine time feature from the seconds counter using a small LUT (configurable period/scale).
 * accel_reader.sv
   * Polls/configures the accelerometer over I2C and outputs X/Y/Z samples with a valid strobe.
-* rmssd_engine.sv
-  * Computes epoch RMSSD from accepted RR intervals.
+* mssd_engine.sv
+  * Computes epoch MSSD from accepted RR intervals.
 * feature_engine.sv
-  * Latches per-epoch features (time, motion, delta-HR, RMSSD) and outputs a single `feat_valid_o` strobe.
+  * Latches per-epoch features (time, motion, delta-HR, MSSD) and outputs a single `feat_valid_o` strobe.
 * signal_quality.sv
   * Aggregates beat quality, motion intensity, and FIFO/I2C faults to gate ML updates (`ml_update_gate_o`).
 * cpu_to_ml.v

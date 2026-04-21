@@ -52,10 +52,10 @@ class BeatEvent(_Record):
         self.ppg_invalid = ppg_invalid
 
 
-class RmssdEpoch(_Record):
-    def __init__(self, rmssd_epoch: int, rmssd_valid: bool, rr_diff_count: int) -> None:
-        self.rmssd_epoch = rmssd_epoch
-        self.rmssd_valid = rmssd_valid
+class MssdEpoch(_Record):
+    def __init__(self, mssd_epoch: int, mssd_valid: bool, rr_diff_count: int) -> None:
+        self.mssd_epoch = mssd_epoch
+        self.mssd_valid = mssd_valid
         self.rr_diff_count = rr_diff_count
 
 
@@ -72,10 +72,10 @@ class FeatureVector(_Record):
         time_feat: int,
         motion_feat: int,
         delta_hr_feat: int,
-        rmssd_feat: int,
+        mssd_feat: int,
     ) -> None:
         self.feat_valid = feat_valid
         self.time_feat = time_feat
         self.motion_feat = motion_feat
         self.delta_hr_feat = delta_hr_feat
-        self.rmssd_feat = rmssd_feat
+        self.mssd_feat = mssd_feat

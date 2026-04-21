@@ -9,7 +9,6 @@ module motion_process_tb;
 
   // sample interface
   logic sample_valid;
-  logic sample_ok;
   logic signed [AX_W-1:0] ax, ay, az;
 
   // epoch control
@@ -30,7 +29,6 @@ module motion_process_tb;
     .rst_i(rst_i),
 
     .sample_valid_i(sample_valid),
-    .sample_ok_i(sample_ok),
     .ax_i(ax),
     .ay_i(ay),
     .az_i(az),
@@ -43,18 +41,16 @@ module motion_process_tb;
   // 50 MHz
   always #10 clk = ~clk;
 
-  task automatic send_sample(input int sax, input int say, input int saz, input bit ok);
+  task automatic send_sample(input int sax, input int say, input int saz);
     begin
       @(negedge clk);
       ax = sax;
       ay = say;
       az = saz;
-      sample_ok = ok;
       sample_valid = 1'b1;
       @(posedge clk);
       @(negedge clk);
       sample_valid = 1'b0;
-      sample_ok = 1'b0;
     end
   endtask
 
@@ -79,17 +75,15 @@ module motion_process_tb;
 
   initial begin
     sample_valid = 0;
-    sample_ok    = 0;
     ax = '0; ay = '0; az = '0;
     epoch_end = 1'b0;
 
     do_reset();
 
-    // test 1: accumulation with sample_ok gating
+    // test 1: accumulation with sample_valid gating
     epoch_done_seen = 1'b0;
-    send_sample(3, -4, 5, 1'b1);  // mag=12
-    send_sample(1, 2, 3, 1'b1);   // mag=6
-    send_sample(10, 0, 0, 1'b0);  // ignored
+    send_sample(3, -4, 5);  // mag=12
+    send_sample(1, 2, 3);   // mag=6
     pulse_epoch_end();
     repeat (2) @(posedge clk);
     if (!epoch_done_seen) $fatal(1, "epoch_done not asserted");
@@ -98,8 +92,8 @@ module motion_process_tb;
     // test 2: second accumulation window
     do_reset();
     epoch_done_seen = 1'b0;
-    send_sample(2, 0, 0, 1'b1);   // mag=2
-    send_sample(3, 0, 0, 1'b1);   // mag=3
+    send_sample(2, 0, 0);   // mag=2
+    send_sample(3, 0, 0);   // mag=3
     pulse_epoch_end();
     repeat (2) @(posedge clk);
     if (!epoch_done_seen) $fatal(1, "epoch_done not asserted");
@@ -107,7 +101,7 @@ module motion_process_tb;
 
     // test 3: epoch_done is a clean strobe
     do_reset();
-    send_sample(1, 0, 0, 1'b1);
+    send_sample(1, 0, 0);
     if (epoch_done) $fatal(1, "epoch_done asserted without pulse");
     epoch_done_seen = 1'b0;
     pulse_epoch_end();

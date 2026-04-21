@@ -20,7 +20,6 @@ class MotionProcessRef:
         self,
         rst: bool,
         sample_valid: bool,
-        sample_ok: bool,
         ax: int,
         ay: int,
         az: int,
@@ -31,7 +30,7 @@ class MotionProcessRef:
             return MotionEpoch(False, 0)
 
         self.epoch_done = False
-        sample_fire = bool(sample_valid and sample_ok)
+        sample_fire = bool(sample_valid)
 
         ax_s = to_signed(ax, self.ax_w) if sample_fire else 0
         ay_s = to_signed(ay, self.ax_w) if sample_fire else 0

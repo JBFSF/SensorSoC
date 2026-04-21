@@ -3,9 +3,9 @@ from __future__ import annotations
 from .feature_ref import FeatureEngineRef
 from .motion_ref import MotionProcessRef
 from .ppg_ref import PpgConfig, PpgProcessRef
-from .rmssd_ref import RmssdEngineRef
+from .mssd_ref import MssdEngineRef
 from .signal_quality_ref import SignalQualityConfig, SignalQualityRef
-from .types import BeatEvent, FeatureVector, MotionEpoch, QualityEpoch, RmssdEpoch
+from .types import BeatEvent, FeatureVector, MotionEpoch, QualityEpoch, MssdEpoch
 from .utils import to_signed
 
 
@@ -30,13 +30,13 @@ class PipelineStepInputs:
         delta_hr: int = 0,
         motion_epoch: bool = False,
         motion_energy: int = 0,
-        rmssd_valid: bool = False,
-        rmssd_epoch: int = 0,
+        mssd_valid: bool = False,
+        mssd_epoch: int = 0,
         fifo_overflow_event: bool = False,
         ppg_i2c_err_event: bool = False,
         epoch_end: bool = False,
         epoch_end_d: bool = False,
-        cos_time: int = 0,
+        time_value: int = 0,
         ml_update_gate: bool = False,
     ) -> None:
         self.rst = rst
@@ -57,13 +57,13 @@ class PipelineStepInputs:
         self.delta_hr = delta_hr
         self.motion_epoch = motion_epoch
         self.motion_energy = motion_energy
-        self.rmssd_valid = rmssd_valid
-        self.rmssd_epoch = rmssd_epoch
+        self.mssd_valid = mssd_valid
+        self.mssd_epoch = mssd_epoch
         self.fifo_overflow_event = fifo_overflow_event
         self.ppg_i2c_err_event = ppg_i2c_err_event
         self.epoch_end = epoch_end
         self.epoch_end_d = epoch_end_d
-        self.cos_time = cos_time
+        self.time_value = time_value
         self.ml_update_gate = ml_update_gate
 
 
@@ -72,7 +72,7 @@ class TopPipelineConfig:
         self,
         ppg: PpgConfig | None = None,
         signal_quality: SignalQualityConfig | None = None,
-        rmssd_min_rr_count: int = 1,
+        mssd_min_rr_count: int = 1,
     ) -> None:
         self.ppg = ppg if ppg is not None else PpgConfig(q_min_accept=0)
         self.signal_quality = (
@@ -87,7 +87,7 @@ class TopPipelineConfig:
                 max_motion_hi=0xFFFF,
             )
         )
-        self.rmssd_min_rr_count = rmssd_min_rr_count
+        self.mssd_min_rr_count = mssd_min_rr_count
 
 
 class PipelineStepOutputs:
@@ -95,13 +95,13 @@ class PipelineStepOutputs:
         self,
         motion: MotionEpoch,
         beat: BeatEvent,
-        rmssd: RmssdEpoch,
+        mssd: MssdEpoch,
         quality: QualityEpoch,
         feature: FeatureVector,
     ) -> None:
         self.motion = motion
         self.beat = beat
-        self.rmssd = rmssd
+        self.mssd = mssd
         self.quality = quality
         self.feature = feature
 
@@ -111,7 +111,7 @@ class PipelineReference:
         self.config = config if config is not None else TopPipelineConfig()
         self.motion = MotionProcessRef(ax_w=16)
         self.ppg = PpgProcessRef()
-        self.rmssd = RmssdEngineRef(min_rr_count=self.config.rmssd_min_rr_count)
+        self.mssd = MssdEngineRef(min_rr_count=self.config.mssd_min_rr_count)
         self.quality = SignalQualityRef()
         self.feature = FeatureEngineRef()
 
@@ -119,7 +119,6 @@ class PipelineReference:
         motion_out = self.motion.step(
             rst=inputs.rst,
             sample_valid=inputs.accel_valid,
-            sample_ok=True,
             ax=inputs.ax,
             ay=inputs.ay,
             az=inputs.az,
@@ -132,7 +131,7 @@ class PipelineReference:
             ppg_sample_time=inputs.ppg_sample_time,
             cfg=self.config.ppg,
         )
-        rmssd_out = self.rmssd.step(
+        mssd_out = self.mssd.step(
             rst=inputs.rst,
             rr_valid=inputs.rr_valid,
             rr_accepted=inputs.rr_accepted,
@@ -157,19 +156,19 @@ class PipelineReference:
             rst=inputs.rst,
             enable=inputs.epoch_end_d,
             seconds_valid=True,
-            cos_time_feat=inputs.cos_time,
+            time_value=inputs.time_value,
             motion_valid=inputs.motion_epoch,
             motion_energy_epoch=inputs.motion_energy,
             delta_hr_valid=inputs.rr_valid,
             delta_hr=inputs.delta_hr,
-            rmssd_valid=inputs.rmssd_valid,
-            rmssd=inputs.rmssd_epoch,
+            mssd_valid=inputs.mssd_valid,
+            mssd=inputs.mssd_epoch,
             ml_update_gate=inputs.ml_update_gate,
         )
         return PipelineStepOutputs(
             motion=motion_out,
             beat=beat_out,
-            rmssd=rmssd_out,
+            mssd=mssd_out,
             quality=quality_out,
             feature=feature_out,
         )
