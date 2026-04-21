@@ -136,6 +136,10 @@ top #(
     .spi_mosi_o(spi_mosi),
     .spi_miso_i(spi_miso),
     .spi_cs_n_o(spi_cs_n),
+    .boot_spi_clk_o(),
+    .boot_spi_mosi_o(),
+    .boot_spi_miso_i(1'b1),
+    .boot_spi_cs_n_o(),
     .feat_valid_o(),
     .time_feat_o(),
     .motion_feat_o(),
@@ -146,7 +150,10 @@ top #(
     .epoch_end_o(),
     .alarm_o(),
     .test_force_irq_i(1'b0),
-    .test_force_wake_i(1'b0)
+    .test_force_wake_i(1'b0),
+    .test_irq_src_i(3'b000),
+    .irq_eoi_o(),
+    .boot_done_o()
 );
 
 assign host_i2c_scl = 1'b1;

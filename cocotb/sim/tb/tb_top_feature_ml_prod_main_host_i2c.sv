@@ -80,6 +80,10 @@ wire        spi_clk;
 wire        spi_mosi;
 wire        spi_miso;
 wire        spi_cs_n;
+wire        boot_spi_clk;
+wire        boot_spi_mosi;
+wire        boot_spi_miso;
+wire        boot_spi_cs_n;
 
 localparam [6:0] ACC_ADDR = 7'h19;
 localparam [6:0] PPG_ADDR = 7'h64;
@@ -212,6 +216,7 @@ assign sim_err    = boot_done ? ((sim_addr == ACC_ADDR) ? accel_sim_err    :
 
 top #(
     .MEM_WORDS(8192),
+    .BOOT_WORDS(512),
     .FIRMWARE_HEX("firmware/build/prod_main/firmware.hex"),
     .WEIGHT_INIT_HEX(""),
     .CLK_HZ(1000),
@@ -265,10 +270,17 @@ top #(
     .spi_mosi_o(spi_mosi),
     .spi_miso_i(spi_miso),
     .spi_cs_n_o(spi_cs_n),
+    .boot_spi_clk_o(boot_spi_clk),
+    .boot_spi_mosi_o(boot_spi_mosi),
+    .boot_spi_miso_i(boot_spi_miso),
+    .boot_spi_cs_n_o(boot_spi_cs_n),
     .epoch_end_o(),
     .alarm_o(),
     .test_force_irq_i(1'b0),
-    .test_force_wake_i(1'b0)
+    .test_force_wake_i(1'b0),
+    .test_irq_src_i(3'b000),
+    .irq_eoi_o(),
+    .boot_done_o()
 );
 
 i2c_slave_lis2dw12 #(
@@ -313,6 +325,16 @@ spi_flash_model #(
     .spi_cs_n(spi_cs_n),
     .spi_mosi(spi_mosi),
     .spi_miso(spi_miso)
+);
+
+spi_flash_model #(
+    .FLASH_WORDS(512),
+    .FLASH_INIT_HEX("firmware/build/prod_main/firmware.hex")
+) u_boot_flash (
+    .spi_clk(boot_spi_clk),
+    .spi_cs_n(boot_spi_cs_n),
+    .spi_mosi(boot_spi_mosi),
+    .spi_miso(boot_spi_miso)
 );
 
 always #10 clk = ~clk;

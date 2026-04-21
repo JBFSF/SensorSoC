@@ -63,6 +63,7 @@ module sim_top_unified_env;
   // without rewriting the DUT or creating scenario-specific wrappers.
   logic test_force_irq  = 1'b0;
   logic test_force_wake = 1'b0;
+  logic [2:0] test_irq_src = 3'b000;
 
   // Host-I2C drive controls. Cocotb can bit-bang transactions by driving SCL
   // directly and pulling SDA low when needed. Idle state is released/high.
@@ -100,6 +101,10 @@ module sim_top_unified_env;
   wire        spi_mosi;
   wire        spi_miso;
   wire        spi_cs_n;
+  wire        boot_spi_clk;
+  wire        boot_spi_mosi;
+  wire        boot_spi_miso;
+  wire        boot_spi_cs_n;
   wire        host_i2c_scl;
   tri1        host_i2c_sda;
 
@@ -108,11 +113,13 @@ module sim_top_unified_env;
   wire signed [15:0]        time_feat;
   wire signed [15:0]        motion_feat;
   wire signed [15:0]        delta_hr_feat;
-  wire signed [15:0]        rmssd_feat;
+  wire signed [15:0]        mssd_feat;
   wire                      ml_update_gate;
   wire [7:0]                invalid_reason;
   wire                      epoch_end;
   wire                      alarm;
+  wire [2:0]                irq_eoi;
+  wire                      boot_done;
   wire                      pico_trap;
   wire                      pico_cpu_clk_en;
   wire                      pico_mem_valid;
@@ -133,7 +140,7 @@ module sim_top_unified_env;
   wire signed [15:0]        feat_latched_time;
   wire signed [15:0]        feat_latched_motion;
   wire signed [15:0]        feat_latched_delta_hr;
-  wire signed [15:0]        feat_latched_rmssd;
+  wire signed [15:0]        feat_latched_mssd;
   wire                      feat_latched_gate;
   wire [7:0]                feat_latched_invalid_reason;
   wire [31:0]               irq_pending;
@@ -178,6 +185,7 @@ module sim_top_unified_env;
   // and the sensor side runs with short simulation-friendly periods.
   top #(
     .MEM_WORDS(8192),
+    .BOOT_WORDS(512),
     .FIRMWARE_HEX("firmware/build/prod_main/firmware.hex"),
     .WEIGHT_INIT_HEX(""),
     .CLK_HZ(1000),
@@ -198,10 +206,7 @@ module sim_top_unified_env;
     .CFG_MAX_MISSED(8'd3),
     .CFG_MOTION_HI_TH(16'hFFFF),
     .CFG_MAX_MOTION_HI(16'hFFFF),
-    .COS_PERIOD_SECONDS(32'd16),
-    .COS_LUT_BITS(3'd6),
-    .COS_SCALE_Q15(16'h7FFF),
-    .RMSSD_MIN_RR_COUNT(1)
+    .MSSD_MIN_RR_COUNT(1)
   ) u_dut (
     .clk_i(clk),
     .reset_i(reset),
@@ -224,17 +229,24 @@ module sim_top_unified_env;
     .time_feat_o(time_feat),
     .motion_feat_o(motion_feat),
     .delta_hr_feat_o(delta_hr_feat),
-    .rmssd_feat_o(rmssd_feat),
+    .mssd_feat_o(mssd_feat),
     .ml_update_gate_o(ml_update_gate),
     .invalid_reason_o(invalid_reason),
     .spi_clk_o(spi_clk),
     .spi_mosi_o(spi_mosi),
     .spi_miso_i(spi_miso),
     .spi_cs_n_o(spi_cs_n),
+    .boot_spi_clk_o(boot_spi_clk),
+    .boot_spi_mosi_o(boot_spi_mosi),
+    .boot_spi_miso_i(boot_spi_miso),
+    .boot_spi_cs_n_o(boot_spi_cs_n),
     .epoch_end_o(epoch_end),
     .alarm_o(alarm),
     .test_force_irq_i(test_force_irq),
     .test_force_wake_i(test_force_wake),
+    .test_irq_src_i(test_irq_src),
+    .irq_eoi_o(irq_eoi),
+    .boot_done_o(boot_done),
     .pico_trap_o(pico_trap),
     .pico_cpu_clk_en_o(pico_cpu_clk_en),
     .pico_mem_valid_o(pico_mem_valid),
@@ -298,13 +310,23 @@ module sim_top_unified_env;
     .spi_miso(spi_miso)
   );
 
+  spi_flash_model #(
+    .FLASH_WORDS(512),
+    .FLASH_INIT_HEX("firmware/build/prod_main/firmware.hex")
+  ) u_boot_flash (
+    .spi_clk(boot_spi_clk),
+    .spi_cs_n(boot_spi_cs_n),
+    .spi_mosi(boot_spi_mosi),
+    .spi_miso(boot_spi_miso)
+  );
+
   // Internal mirrors used by cocotb tests. These keep the Python layer simple
   // and make reset/init / repeated-loop checks much easier to express.
   assign feat_latched_valid          = u_dut.feat_latched_valid_r;
   assign feat_latched_time           = u_dut.feat_time_latched_r;
   assign feat_latched_motion         = u_dut.feat_motion_latched_r;
   assign feat_latched_delta_hr       = u_dut.feat_delta_hr_latched_r;
-  assign feat_latched_rmssd          = u_dut.feat_rmssd_latched_r;
+  assign feat_latched_mssd           = u_dut.feat_mssd_latched_r;
   assign feat_latched_gate           = u_dut.feat_gate_latched_r;
   assign feat_latched_invalid_reason = u_dut.feat_invalid_reason_latched_r;
   assign irq_pending                 = u_dut.u_irqc.pending;

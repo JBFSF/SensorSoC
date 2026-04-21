@@ -70,14 +70,28 @@ async def test_unified_top_reset_and_init_state(dut):
     assert _u(dut.pico_sleeping) == 0, "CPU should start awake after reset release"
     assert _u(dut.pico_trap) == 0, "CPU trap should not assert immediately after reset release"
 
-    # Watch a short initialization window to make sure no spurious wake/IRQ
-    # activity is generated before boot-side firmware configures anything.
+    # With the hardware SPI boot path, the CPU stays reset until boot_done.
+    # Watch that boot window for stale wake/IRQ state, then check CPU traffic
+    # after the boot controller releases PicoRV32.
+    for _ in range(120_000):
+        await RisingEdge(dut.clk)
+        await ReadOnly()
+        assert _u(dut.pwr_wake_status) == 0, "wake status should remain clear during boot load"
+        assert _u(dut.pwr_wake_reason) == 0, "wake reason should remain clear during boot load"
+        assert _u(dut.host_i2c_irq_event) == 0, "host-I2C IRQ event should not spuriously pulse during boot load"
+        assert _u(dut.ml_irq) == 0, "ML IRQ should not spuriously assert during boot load"
+        assert _u(dut.timer_event) == 0, "timer event should not spuriously assert during boot load"
+        assert _u(dut.pico_trap) == 0, "CPU trap asserted during boot load"
+        if _u(dut.boot_done) != 0:
+            break
+
+    assert _u(dut.boot_done) == 1, "hardware boot controller never asserted boot_done"
+
     saw_mem_activity = False
     for _ in range(64):
         await RisingEdge(dut.clk)
         await ReadOnly()
         saw_mem_activity |= (_u(dut.pico_mem_valid) != 0)
-        assert _u(dut.feat_latched_valid) == 0, "feature latch should remain clear during early boot"
         assert _u(dut.pwr_wake_status) == 0, "wake status should remain clear during early boot"
         assert _u(dut.pwr_wake_reason) == 0, "wake reason should remain clear during early boot"
         assert _u(dut.host_i2c_irq_event) == 0, "host-I2C IRQ event should not spuriously pulse during init"

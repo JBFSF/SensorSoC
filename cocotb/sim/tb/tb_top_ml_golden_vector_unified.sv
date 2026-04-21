@@ -140,10 +140,7 @@ top #(
     .CFG_MAX_MISSED(8'd3),
     .CFG_MOTION_HI_TH(16'hFFFF),
     .CFG_MAX_MOTION_HI(16'hFFFF),
-    .COS_PERIOD_SECONDS(32'd16),
-    .COS_LUT_BITS(3'd6),
-    .COS_SCALE_Q15(16'h7FFF),
-    .RMSSD_MIN_RR_COUNT(1)
+    .MSSD_MIN_RR_COUNT(1)
 ) dut (
     .clk_i(clk),
     .reset_i(reset),
@@ -166,15 +163,24 @@ top #(
     .time_feat_o(),
     .motion_feat_o(),
     .delta_hr_feat_o(),
-    .rmssd_feat_o(),
+    .mssd_feat_o(),
     .ml_update_gate_o(),
     .invalid_reason_o(),
     .spi_clk_o(spi_clk),
     .spi_mosi_o(spi_mosi),
     .spi_miso_i(spi_miso),
     .spi_cs_n_o(spi_cs_n),
+    .boot_spi_clk_o(),
+    .boot_spi_mosi_o(),
+    .boot_spi_miso_i(1'b1),
+    .boot_spi_cs_n_o(),
     .epoch_end_o(),
-    .alarm_o()
+    .alarm_o(),
+    .test_force_irq_i(1'b0),
+    .test_force_wake_i(1'b0),
+    .test_irq_src_i(3'b000),
+    .irq_eoi_o(),
+    .boot_done_o()
 );
 
 assign host_i2c_scl = 1'b1;
