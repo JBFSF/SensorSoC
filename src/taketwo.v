@@ -1,3 +1,5 @@
+
+
 module taketwo
 (
   input CLK,
@@ -942,7 +944,7 @@ module taketwo
                                              (matmul_11_control_param_index == 1)? 32'h0 : 32'h0;
   assign cparam_matmul_11_cshamt_sum_value = (matmul_11_control_param_index == 0)? 32'h0 : 
                                              (matmul_11_control_param_index == 1)? 32'h0 : 32'h0;
-  assign cparam_matmul_11_cshamt_out_value = (matmul_11_control_param_index == 0)? 32'h1e : 
+  assign cparam_matmul_11_cshamt_out_value = (matmul_11_control_param_index == 0)? 32'h1d : 
                                              (matmul_11_control_param_index == 1)? 32'h1e : 32'h1f;
   assign cparam_matmul_11_act_func_index = (matmul_11_control_param_index == 0)? 32'h0 : 
                                            (matmul_11_control_param_index == 1)? 32'h0 : 32'h1;
@@ -10015,35 +10017,6 @@ module ram_w16_l512_id0_0
   assign ram_w16_l512_id0_0_0_rdata = {q_top, q_bot};
   assign ram_w16_l512_id0_0_1_rdata = {q_top, q_bot};
 
-  // reg [16-1:0] ram_w16_l512_id0_0_0_rdata_out;
-  // assign ram_w16_l512_id0_0_0_rdata = ram_w16_l512_id0_0_0_rdata_out;
-  // reg [16-1:0] ram_w16_l512_id0_0_1_rdata_out;
-  // assign ram_w16_l512_id0_0_1_rdata = ram_w16_l512_id0_0_1_rdata_out;
-  // reg [16-1:0] mem [0:256-1];
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id0_0_0_enable) begin
-  //     if(ram_w16_l512_id0_0_0_wenable) begin
-  //       mem[ram_w16_l512_id0_0_0_addr] <= ram_w16_l512_id0_0_0_wdata;
-  //       ram_w16_l512_id0_0_0_rdata_out <= ram_w16_l512_id0_0_0_wdata;
-  //     end else begin
-  //       ram_w16_l512_id0_0_0_rdata_out <= mem[ram_w16_l512_id0_0_0_addr];
-  //     end
-  //   end 
-  // end
-
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id0_0_1_enable) begin
-  //     if(ram_w16_l512_id0_0_1_wenable) begin
-  //       mem[ram_w16_l512_id0_0_1_addr] <= ram_w16_l512_id0_0_1_wdata;
-  //       ram_w16_l512_id0_0_1_rdata_out <= ram_w16_l512_id0_0_1_wdata;
-  //     end else begin
-  //       ram_w16_l512_id0_0_1_rdata_out <= mem[ram_w16_l512_id0_0_1_addr];
-  //     end
-  //   end 
-  // end
-
 
 endmodule
 
@@ -10107,35 +10080,6 @@ module ram_w16_l512_id0_1
 
   assign ram_w16_l512_id0_1_0_rdata = {q_top, q_bot};
   assign ram_w16_l512_id0_1_1_rdata = {q_top, q_bot};
-
-  // reg [16-1:0] ram_w16_l512_id0_1_0_rdata_out;
-  // assign ram_w16_l512_id0_1_0_rdata = ram_w16_l512_id0_1_0_rdata_out;
-  // reg [16-1:0] ram_w16_l512_id0_1_1_rdata_out;
-  // assign ram_w16_l512_id0_1_1_rdata = ram_w16_l512_id0_1_1_rdata_out;
-  // reg [16-1:0] mem [0:256-1];
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id0_1_0_enable) begin
-  //     if(ram_w16_l512_id0_1_0_wenable) begin
-  //       mem[ram_w16_l512_id0_1_0_addr] <= ram_w16_l512_id0_1_0_wdata;
-  //       ram_w16_l512_id0_1_0_rdata_out <= ram_w16_l512_id0_1_0_wdata;
-  //     end else begin
-  //       ram_w16_l512_id0_1_0_rdata_out <= mem[ram_w16_l512_id0_1_0_addr];
-  //     end
-  //   end 
-  // end
-
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id0_1_1_enable) begin
-  //     if(ram_w16_l512_id0_1_1_wenable) begin
-  //       mem[ram_w16_l512_id0_1_1_addr] <= ram_w16_l512_id0_1_1_wdata;
-  //       ram_w16_l512_id0_1_1_rdata_out <= ram_w16_l512_id0_1_1_wdata;
-  //     end else begin
-  //       ram_w16_l512_id0_1_1_rdata_out <= mem[ram_w16_l512_id0_1_1_addr];
-  //     end
-  //   end 
-  // end
 
 
 endmodule
@@ -10201,35 +10145,6 @@ module ram_w16_l512_id1_0
   assign ram_w16_l512_id1_0_0_rdata = {q_top, q_bot};
   assign ram_w16_l512_id1_0_1_rdata = {q_top, q_bot};
 
-  // reg [16-1:0] ram_w16_l512_id1_0_0_rdata_out;
-  // assign ram_w16_l512_id1_0_0_rdata = ram_w16_l512_id1_0_0_rdata_out;
-  // reg [16-1:0] ram_w16_l512_id1_0_1_rdata_out;
-  // assign ram_w16_l512_id1_0_1_rdata = ram_w16_l512_id1_0_1_rdata_out;
-  // reg [16-1:0] mem [0:256-1];
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id1_0_0_enable) begin
-  //     if(ram_w16_l512_id1_0_0_wenable) begin
-  //       mem[ram_w16_l512_id1_0_0_addr] <= ram_w16_l512_id1_0_0_wdata;
-  //       ram_w16_l512_id1_0_0_rdata_out <= ram_w16_l512_id1_0_0_wdata;
-  //     end else begin
-  //       ram_w16_l512_id1_0_0_rdata_out <= mem[ram_w16_l512_id1_0_0_addr];
-  //     end
-  //   end 
-  // end
-
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id1_0_1_enable) begin
-  //     if(ram_w16_l512_id1_0_1_wenable) begin
-  //       mem[ram_w16_l512_id1_0_1_addr] <= ram_w16_l512_id1_0_1_wdata;
-  //       ram_w16_l512_id1_0_1_rdata_out <= ram_w16_l512_id1_0_1_wdata;
-  //     end else begin
-  //       ram_w16_l512_id1_0_1_rdata_out <= mem[ram_w16_l512_id1_0_1_addr];
-  //     end
-  //   end 
-  // end
-
 
 endmodule
 
@@ -10293,35 +10208,6 @@ module ram_w16_l512_id1_1
 
   assign ram_w16_l512_id1_1_0_rdata = {q_top, q_bot};
   assign ram_w16_l512_id1_1_1_rdata = {q_top, q_bot};
-
-  // reg [16-1:0] ram_w16_l512_id1_1_0_rdata_out;
-  // assign ram_w16_l512_id1_1_0_rdata = ram_w16_l512_id1_1_0_rdata_out;
-  // reg [16-1:0] ram_w16_l512_id1_1_1_rdata_out;
-  // assign ram_w16_l512_id1_1_1_rdata = ram_w16_l512_id1_1_1_rdata_out;
-  // reg [16-1:0] mem [0:256-1];
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id1_1_0_enable) begin
-  //     if(ram_w16_l512_id1_1_0_wenable) begin
-  //       mem[ram_w16_l512_id1_1_0_addr] <= ram_w16_l512_id1_1_0_wdata;
-  //       ram_w16_l512_id1_1_0_rdata_out <= ram_w16_l512_id1_1_0_wdata;
-  //     end else begin
-  //       ram_w16_l512_id1_1_0_rdata_out <= mem[ram_w16_l512_id1_1_0_addr];
-  //     end
-  //   end 
-  // end
-
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id1_1_1_enable) begin
-  //     if(ram_w16_l512_id1_1_1_wenable) begin
-  //       mem[ram_w16_l512_id1_1_1_addr] <= ram_w16_l512_id1_1_1_wdata;
-  //       ram_w16_l512_id1_1_1_rdata_out <= ram_w16_l512_id1_1_1_wdata;
-  //     end else begin
-  //       ram_w16_l512_id1_1_1_rdata_out <= mem[ram_w16_l512_id1_1_1_addr];
-  //     end
-  //   end 
-  // end
 
 
 endmodule
@@ -10387,35 +10273,6 @@ module ram_w16_l512_id2_0
   assign ram_w16_l512_id2_0_0_rdata = {q_top, q_bot};
   assign ram_w16_l512_id2_0_1_rdata = {q_top, q_bot};
 
-  // reg [16-1:0] ram_w16_l512_id2_0_0_rdata_out;
-  // assign ram_w16_l512_id2_0_0_rdata = ram_w16_l512_id2_0_0_rdata_out;
-  // reg [16-1:0] ram_w16_l512_id2_0_1_rdata_out;
-  // assign ram_w16_l512_id2_0_1_rdata = ram_w16_l512_id2_0_1_rdata_out;
-  // reg [16-1:0] mem [0:256-1];
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id2_0_0_enable) begin
-  //     if(ram_w16_l512_id2_0_0_wenable) begin
-  //       mem[ram_w16_l512_id2_0_0_addr] <= ram_w16_l512_id2_0_0_wdata;
-  //       ram_w16_l512_id2_0_0_rdata_out <= ram_w16_l512_id2_0_0_wdata;
-  //     end else begin
-  //       ram_w16_l512_id2_0_0_rdata_out <= mem[ram_w16_l512_id2_0_0_addr];
-  //     end
-  //   end 
-  // end
-
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id2_0_1_enable) begin
-  //     if(ram_w16_l512_id2_0_1_wenable) begin
-  //       mem[ram_w16_l512_id2_0_1_addr] <= ram_w16_l512_id2_0_1_wdata;
-  //       ram_w16_l512_id2_0_1_rdata_out <= ram_w16_l512_id2_0_1_wdata;
-  //     end else begin
-  //       ram_w16_l512_id2_0_1_rdata_out <= mem[ram_w16_l512_id2_0_1_addr];
-  //     end
-  //   end 
-  // end
-
 
 endmodule
 
@@ -10479,35 +10336,6 @@ module ram_w16_l512_id2_1
 
   assign ram_w16_l512_id2_1_0_rdata = {q_top, q_bot};
   assign ram_w16_l512_id2_1_1_rdata = {q_top, q_bot};
-
-  // reg [16-1:0] ram_w16_l512_id2_1_0_rdata_out;
-  // assign ram_w16_l512_id2_1_0_rdata = ram_w16_l512_id2_1_0_rdata_out;
-  // reg [16-1:0] ram_w16_l512_id2_1_1_rdata_out;
-  // assign ram_w16_l512_id2_1_1_rdata = ram_w16_l512_id2_1_1_rdata_out;
-  // reg [16-1:0] mem [0:256-1];
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id2_1_0_enable) begin
-  //     if(ram_w16_l512_id2_1_0_wenable) begin
-  //       mem[ram_w16_l512_id2_1_0_addr] <= ram_w16_l512_id2_1_0_wdata;
-  //       ram_w16_l512_id2_1_0_rdata_out <= ram_w16_l512_id2_1_0_wdata;
-  //     end else begin
-  //       ram_w16_l512_id2_1_0_rdata_out <= mem[ram_w16_l512_id2_1_0_addr];
-  //     end
-  //   end 
-  // end
-
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id2_1_1_enable) begin
-  //     if(ram_w16_l512_id2_1_1_wenable) begin
-  //       mem[ram_w16_l512_id2_1_1_addr] <= ram_w16_l512_id2_1_1_wdata;
-  //       ram_w16_l512_id2_1_1_rdata_out <= ram_w16_l512_id2_1_1_wdata;
-  //     end else begin
-  //       ram_w16_l512_id2_1_1_rdata_out <= mem[ram_w16_l512_id2_1_1_addr];
-  //     end
-  //   end 
-  // end
 
 
 endmodule
@@ -10573,35 +10401,6 @@ module ram_w16_l512_id3_0
   assign ram_w16_l512_id3_0_0_rdata = {q_top, q_bot};
   assign ram_w16_l512_id3_0_1_rdata = {q_top, q_bot};
 
-  // reg [16-1:0] ram_w16_l512_id3_0_0_rdata_out;
-  // assign ram_w16_l512_id3_0_0_rdata = ram_w16_l512_id3_0_0_rdata_out;
-  // reg [16-1:0] ram_w16_l512_id3_0_1_rdata_out;
-  // assign ram_w16_l512_id3_0_1_rdata = ram_w16_l512_id3_0_1_rdata_out;
-  // reg [16-1:0] mem [0:256-1];
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id3_0_0_enable) begin
-  //     if(ram_w16_l512_id3_0_0_wenable) begin
-  //       mem[ram_w16_l512_id3_0_0_addr] <= ram_w16_l512_id3_0_0_wdata;
-  //       ram_w16_l512_id3_0_0_rdata_out <= ram_w16_l512_id3_0_0_wdata;
-  //     end else begin
-  //       ram_w16_l512_id3_0_0_rdata_out <= mem[ram_w16_l512_id3_0_0_addr];
-  //     end
-  //   end 
-  // end
-
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id3_0_1_enable) begin
-  //     if(ram_w16_l512_id3_0_1_wenable) begin
-  //       mem[ram_w16_l512_id3_0_1_addr] <= ram_w16_l512_id3_0_1_wdata;
-  //       ram_w16_l512_id3_0_1_rdata_out <= ram_w16_l512_id3_0_1_wdata;
-  //     end else begin
-  //       ram_w16_l512_id3_0_1_rdata_out <= mem[ram_w16_l512_id3_0_1_addr];
-  //     end
-  //   end 
-  // end
-
 
 endmodule
 
@@ -10665,35 +10464,6 @@ module ram_w16_l512_id3_1
 
   assign ram_w16_l512_id3_1_0_rdata = {q_top, q_bot};
   assign ram_w16_l512_id3_1_1_rdata = {q_top, q_bot};
-
-  // reg [16-1:0] ram_w16_l512_id3_1_0_rdata_out;
-  // assign ram_w16_l512_id3_1_0_rdata = ram_w16_l512_id3_1_0_rdata_out;
-  // reg [16-1:0] ram_w16_l512_id3_1_1_rdata_out;
-  // assign ram_w16_l512_id3_1_1_rdata = ram_w16_l512_id3_1_1_rdata_out;
-  // reg [16-1:0] mem [0:256-1];
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id3_1_0_enable) begin
-  //     if(ram_w16_l512_id3_1_0_wenable) begin
-  //       mem[ram_w16_l512_id3_1_0_addr] <= ram_w16_l512_id3_1_0_wdata;
-  //       ram_w16_l512_id3_1_0_rdata_out <= ram_w16_l512_id3_1_0_wdata;
-  //     end else begin
-  //       ram_w16_l512_id3_1_0_rdata_out <= mem[ram_w16_l512_id3_1_0_addr];
-  //     end
-  //   end 
-  // end
-
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id3_1_1_enable) begin
-  //     if(ram_w16_l512_id3_1_1_wenable) begin
-  //       mem[ram_w16_l512_id3_1_1_addr] <= ram_w16_l512_id3_1_1_wdata;
-  //       ram_w16_l512_id3_1_1_rdata_out <= ram_w16_l512_id3_1_1_wdata;
-  //     end else begin
-  //       ram_w16_l512_id3_1_1_rdata_out <= mem[ram_w16_l512_id3_1_1_addr];
-  //     end
-  //   end 
-  // end
 
 
 endmodule
@@ -10759,35 +10529,6 @@ module ram_w16_l512_id4_0
   assign ram_w16_l512_id4_0_0_rdata = {q_top, q_bot};
   assign ram_w16_l512_id4_0_1_rdata = {q_top, q_bot};
 
-  // reg [16-1:0] ram_w16_l512_id4_0_0_rdata_out;
-  // assign ram_w16_l512_id4_0_0_rdata = ram_w16_l512_id4_0_0_rdata_out;
-  // reg [16-1:0] ram_w16_l512_id4_0_1_rdata_out;
-  // assign ram_w16_l512_id4_0_1_rdata = ram_w16_l512_id4_0_1_rdata_out;
-  // reg [16-1:0] mem [0:256-1];
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id4_0_0_enable) begin
-  //     if(ram_w16_l512_id4_0_0_wenable) begin
-  //       mem[ram_w16_l512_id4_0_0_addr] <= ram_w16_l512_id4_0_0_wdata;
-  //       ram_w16_l512_id4_0_0_rdata_out <= ram_w16_l512_id4_0_0_wdata;
-  //     end else begin
-  //       ram_w16_l512_id4_0_0_rdata_out <= mem[ram_w16_l512_id4_0_0_addr];
-  //     end
-  //   end 
-  // end
-
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id4_0_1_enable) begin
-  //     if(ram_w16_l512_id4_0_1_wenable) begin
-  //       mem[ram_w16_l512_id4_0_1_addr] <= ram_w16_l512_id4_0_1_wdata;
-  //       ram_w16_l512_id4_0_1_rdata_out <= ram_w16_l512_id4_0_1_wdata;
-  //     end else begin
-  //       ram_w16_l512_id4_0_1_rdata_out <= mem[ram_w16_l512_id4_0_1_addr];
-  //     end
-  //   end 
-  // end
-
 
 endmodule
 
@@ -10851,36 +10592,6 @@ module ram_w16_l512_id4_1
 
   assign ram_w16_l512_id4_1_0_rdata = {q_top, q_bot};
   assign ram_w16_l512_id4_1_1_rdata = {q_top, q_bot};
-
-  // reg [16-1:0] ram_w16_l512_id4_1_0_rdata_out;
-  // assign ram_w16_l512_id4_1_0_rdata = ram_w16_l512_id4_1_0_rdata_out;
-  // reg [16-1:0] ram_w16_l512_id4_1_1_rdata_out;
-  // assign ram_w16_l512_id4_1_1_rdata = ram_w16_l512_id4_1_1_rdata_out;
-  // reg [16-1:0] mem [0:256-1];
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id4_1_0_enable) begin
-  //     if(ram_w16_l512_id4_1_0_wenable) begin
-  //       mem[ram_w16_l512_id4_1_0_addr] <= ram_w16_l512_id4_1_0_wdata;
-  //       ram_w16_l512_id4_1_0_rdata_out <= ram_w16_l512_id4_1_0_wdata;
-  //     end else begin
-  //       ram_w16_l512_id4_1_0_rdata_out <= mem[ram_w16_l512_id4_1_0_addr];
-  //     end
-  //   end 
-  // end
-
-
-  // always @(posedge CLK) begin
-  //   if(ram_w16_l512_id4_1_1_enable) begin
-  //     if(ram_w16_l512_id4_1_1_wenable) begin
-  //       mem[ram_w16_l512_id4_1_1_addr] <= ram_w16_l512_id4_1_1_wdata;
-  //       ram_w16_l512_id4_1_1_rdata_out <= ram_w16_l512_id4_1_1_wdata;
-  //     end else begin
-  //       ram_w16_l512_id4_1_1_rdata_out <= mem[ram_w16_l512_id4_1_1_addr];
-  //     end
-  //   end 
-  // end
-
 
 endmodule
 
@@ -11002,3 +10713,4 @@ module multiplier_core_0
 
 
 endmodule
+
