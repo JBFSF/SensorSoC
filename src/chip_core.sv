@@ -4,9 +4,9 @@
 `default_nettype none
 
 module chip_core #(
-    parameter NUM_INPUT_PADS
-    parameter NUM_BIDIR_PADS
-    parameter NUM_ANALOG_PADS
+    parameter NUM_INPUT_PADS = 12,
+    parameter NUM_BIDIR_PADS = 40,
+    parameter NUM_ANALOG_PADS = 2
 )(
     `ifdef USE_POWER_PINS
     inout  wire VDD,
@@ -42,9 +42,15 @@ module chip_core #(
     // bidir[5]      : I2C SCL input
     // bidir[6]      : I2C SDA open drain
     // bidir[22:7]   : 16-bit debug bus for test mode outputs
-    // bidir[43]     : force Pico IRQ input, only used by test mode = 1010
-    // bidir[44]     : force wake source input, only used by test mode = 1011
-    // bidir[45]     : external test clock, only for test mode = 0101
+    // bidir[37]     : force Pico IRQ input, only used by test mode = 1010
+    // bidir[38]     : force wake source input, only used by test mode = 1011
+    // bidir[39]     : external test clock, only for test mode = 0101
+
+    localparam int DEBUG_BUS_LO        = 7;
+    localparam int DEBUG_BUS_HI        = 22;
+    localparam int TEST_FORCE_IRQ_PAD  = 37;
+    localparam int TEST_FORCE_WAKE_PAD = 38;
+    localparam int TEST_CLK_PAD        = 39;
 
     logic [3:0] test_mode_w;
     logic       core_clk_w;
@@ -106,15 +112,11 @@ module chip_core #(
     assign bidir_pd = '0;
 
     assign test_mode_w = input_in[3:0];
-    assign test_force_irq_w = bidir_in[43];
-    assign test_force_wake_w = bidir_in[44];
+    assign test_force_irq_w = bidir_in[TEST_FORCE_IRQ_PAD];
+    assign test_force_wake_w = bidir_in[TEST_FORCE_WAKE_PAD];
 
-    //muxing to use external clock if we want, may need clock mux????   
-    assign core_clk_w = (test_mode_w == 4'b0101) ? bidir_in[45] : clk;
-
-//ff, ?
-//area of this thing?
-//other testing options?
+    // Use the external test clock only in the dedicated clock-test mode.
+    assign core_clk_w = (test_mode_w == 4'b0101) ? bidir_in[TEST_CLK_PAD] : clk;
 
     always_comb begin
         debug_bus_w = '0;
@@ -162,8 +164,7 @@ module chip_core #(
 
             4'b1000: begin
                 // observe pico MMIO writes with the low byte of the address and
-                // low nibble of write data, plus a few key qualifiers 
-                // had chatgpt do this one, it said it might be useful
+                // low nibble of write data, plus a few key qualifiers
                 debug_bus_w = {
                     pico_mem_valid_w && (pico_mem_wstrb_w != 4'b0000),
                     pico_trap_w,
@@ -175,14 +176,14 @@ module chip_core #(
             end
 
             4'b1001: begin
-                // observe pico sleep/irq
+                // observe pico sleep/irq with summary flags
                 debug_bus_w = {pico_trap_w, pico_sleeping_w, pico_cpu_clk_en_w, |pico_irq_w, 12'b0};
             end
 
             4'b1010: begin 
                 // force pico IRQ and watch memory activity
                 debug_bus_w = {
-                    bidir_in[43], pico_trap_w, pico_cpu_clk_en_w, pico_mem_instr_w, pico_mem_valid_w, pico_mem_ready_w, pico_mem_addr_w[9:0]};
+                    test_force_irq_w, pico_trap_w, pico_cpu_clk_en_w, pico_mem_instr_w, pico_mem_valid_w, pico_mem_ready_w, pico_mem_addr_w[9:0]};
             end
             4'b1011: begin 
                 // force pico wake and expose the wake/IRQ sources directly
@@ -190,7 +191,7 @@ module chip_core #(
             end
 
 
-            // plenty of space to add more of these, just need to expose signals in top
+            // reserved test modes for future debug views
             4'b1100: begin 
                 debug_bus_w = '0;
             end
@@ -227,8 +228,8 @@ module chip_core #(
         bidir_oe_w[6] = i2c_sda_drive_low_w;
 
         if (test_mode_w != 4'b0000) begin
-            bidir_out_w[22:7] = debug_bus_w;
-            bidir_oe_w[22:7] = 16'hFFFF;
+            bidir_out_w[DEBUG_BUS_HI:DEBUG_BUS_LO] = debug_bus_w;
+            bidir_oe_w[DEBUG_BUS_HI:DEBUG_BUS_LO] = '1;
         end
     end
 
