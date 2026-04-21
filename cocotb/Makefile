@@ -178,6 +178,7 @@ $(SIM_BUILD) $(FW_BUILD) $(FW_GEN_DIR):
 SOC_RTL_SRCS := \
   $(RTL_DIR)/soc_top.v \
   $(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_boot_ctrl.v \
   $(MAKEFILE_DIR)/../ip/picorv32.v \
   $(RTL_DIR)/gpio_mmio.v \
   $(RTL_DIR)/test_mmio.v \
@@ -203,11 +204,12 @@ UNIFIED_TOP_RTL_SRCS := \
   $(RTL_DIR)/motion_process.sv \
   $(RTL_DIR)/ppg_fifo_reader.sv \
   $(RTL_DIR)/ppg_process.sv \
-  $(RTL_DIR)/MSSD_engine.sv \
+  $(RTL_DIR)/mssd_engine.sv \
   $(RTL_DIR)/signal_quality.sv \
   $(RTL_DIR)/feature_engine.sv \
   $(RTL_DIR)/globaltimer.sv \
   $(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_boot_ctrl.v \
   $(MAKEFILE_DIR)/../ip/picorv32.v \
   $(RTL_DIR)/test_mmio.v \
   $(RTL_DIR)/timer_mmio.v \
@@ -271,6 +273,7 @@ FW_C_test_top_spi_init_unified := $(FW_TESTS)/test_top_spi_init_unified.c
 FW_C_test_top_ml_control_unified := $(FW_TESTS)/test_top_ml_control_unified.c
 FW_C_test_top_sleep_wake_unified := $(FW_TESTS)/test_top_sleep_wake_unified.c
 FW_C_test_top_ml_golden_vector_unified := $(FW_TESTS)/test_top_ml_golden_vector_unified.c
+FW_C_irq_test              := $(FW_DIR)/irq_test.c
 
 # Select the C source based on FW_VARIANT
 FW_SRC = $(FW_C_$(FW_VARIANT))
@@ -289,6 +292,7 @@ FW_ARCH_test_top_spi_init_unified := rv32im
 FW_ARCH_test_top_ml_control_unified := rv32im
 FW_ARCH_test_top_sleep_wake_unified := rv32im
 FW_ARCH_test_top_ml_golden_vector_unified := rv32im
+FW_ARCH_irq_test := rv32im
 FW_ARCH := $(if $(FW_ARCH_$(FW_VARIANT)),$(FW_ARCH_$(FW_VARIANT)),$(FW_ARCH_DEFAULT))
 FW_OPT_DEFAULT := -O2
 FW_OPT_test_ml_cpu_wake_i2c := -O0
@@ -452,11 +456,12 @@ TOP_FEATURE_ML_CPU_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/MSSD_engine.sv \
+	$(RTL_DIR)/mssd_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_boot_ctrl.v \
 	$(RTL_DIR)/spi_master_mmio.v \
 	$(MAKEFILE_DIR)/../ip/picorv32.v \
 	$(RTL_DIR)/test_mmio.v \
@@ -495,11 +500,12 @@ TOP_FEATURE_ML_CPU_SPI_FLASH_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/MSSD_engine.sv \
+	$(RTL_DIR)/mssd_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_boot_ctrl.v \
 	$(RTL_DIR)/spi_master_mmio.v \
 	$(MAKEFILE_DIR)/../ip/picorv32.v \
 	$(RTL_DIR)/test_mmio.v \
@@ -541,11 +547,12 @@ TOP_SPI_INIT_UNIFIED_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/MSSD_engine.sv \
+	$(RTL_DIR)/mssd_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_boot_ctrl.v \
 	$(RTL_DIR)/spi_master_mmio.v \
 	$(MAKEFILE_DIR)/../ip/picorv32.v \
 	$(RTL_DIR)/test_mmio.v \
@@ -587,11 +594,12 @@ TOP_ML_CONTROL_UNIFIED_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/MSSD_engine.sv \
+	$(RTL_DIR)/mssd_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_boot_ctrl.v \
 	$(RTL_DIR)/spi_master_mmio.v \
 	$(MAKEFILE_DIR)/../ip/picorv32.v \
 	$(RTL_DIR)/test_mmio.v \
@@ -635,11 +643,12 @@ TOP_ML_GOLDEN_VECTOR_UNIFIED_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/MSSD_engine.sv \
+	$(RTL_DIR)/mssd_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_boot_ctrl.v \
 	$(RTL_DIR)/spi_master_mmio.v \
 	$(MAKEFILE_DIR)/../ip/picorv32.v \
 	$(RTL_DIR)/test_mmio.v \
@@ -678,11 +687,12 @@ TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/MSSD_engine.sv \
+	$(RTL_DIR)/mssd_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_boot_ctrl.v \
 	$(RTL_DIR)/spi_master_mmio.v \
 	$(MAKEFILE_DIR)/../ip/picorv32.v \
 	$(RTL_DIR)/test_mmio.v \
@@ -724,11 +734,12 @@ TOP_SLEEP_WAKE_UNIFIED_SOURCES := \
 	$(RTL_DIR)/motion_process.sv \
 	$(RTL_DIR)/ppg_fifo_reader.sv \
 	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/MSSD_engine.sv \
+	$(RTL_DIR)/mssd_engine.sv \
 	$(RTL_DIR)/signal_quality.sv \
 	$(RTL_DIR)/feature_engine.sv \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_boot_ctrl.v \
 	$(RTL_DIR)/spi_master_mmio.v \
 	$(MAKEFILE_DIR)/../ip/picorv32.v \
 	$(RTL_DIR)/test_mmio.v \
@@ -956,6 +967,7 @@ SIMPLE_SRAM_VVP     := $(BUILD_DIR)/$(SIMPLE_SRAM_TOP).vvp
 SIMPLE_SRAM_PYMOD   := simple_sram_tb
 SIMPLE_SRAM_SOURCES := $(TB_DIR)/tb_simple_sram.sv \
                        $(RTL_DIR)/simple_sram.v \
+	$(RTL_DIR)/spi_boot_ctrl.v \
                        $(MAKEFILE_DIR)/../ip/gf180mcu_fd_ip_sram__sram512x8m8wm1.v
 
 $(SIMPLE_SRAM_VVP): $(SIMPLE_SRAM_SOURCES) | $(BUILD_DIR)
@@ -1049,10 +1061,10 @@ sim-accel-reader: $(ACCEL_READER_VVP)
 # MSSD ENGINE
 # ============================================================
 
-MSSD_ENGINE_TOP     := MSSD_engine_tb
+MSSD_ENGINE_TOP     := mssd_engine_tb
 MSSD_ENGINE_VVP     := $(BUILD_DIR)/$(MSSD_ENGINE_TOP).vvp
-MSSD_ENGINE_SOURCES := sim/tb/MSSD_engine_tb.sv $(RTL_DIR)/MSSD_engine.sv $(RTL_DIR)/ewma_baseline.sv
-MSSD_ENGINE_VCD     := $(WAVE_DIR)/MSSD_engine_tb.vcd
+MSSD_ENGINE_SOURCES := sim/tb/mssd_engine_tb.sv $(RTL_DIR)/mssd_engine.sv $(RTL_DIR)/ewma_baseline.sv
+MSSD_ENGINE_VCD     := $(WAVE_DIR)/mssd_engine_tb.vcd
 
 $(MSSD_ENGINE_VVP): $(MSSD_ENGINE_SOURCES)
 	$(IVERILOG) -g2012 -o $@ $^
@@ -1150,6 +1162,8 @@ $(TOP_UNIFIED_ENV_VVP): $(TOP_UNIFIED_ENV_SRCS)
 
 .PHONY: test-top-unified-reset-init
 test-top-unified-reset-init: $(TOP_UNIFIED_ENV_VVP)
+	@$(SELF_MAKE) FW_VARIANT=prod_main firmware
+	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
 	@echo "[COCOTB] Running $(TOP_UNIFIED_ENV_PYMOD) on $(TOP_UNIFIED_ENV_TOP)"
 	@export COCOTB_TOPLEVEL=$(TOP_UNIFIED_ENV_TOP); \
 	export COCOTB_TEST_MODULES=$(TOP_UNIFIED_ENV_PYMOD); \
@@ -1279,11 +1293,11 @@ test-ppg-process-ref: $(PPG_REF_VVP)
 	export COCOTB_TEST_MODULES=$(PPG_REF_PYMOD); \
 	$(call RUN_COCOTB_ICARUS,$(PPG_REF_VVP))
 
-MSSD_REF_TOP      := sim_MSSD_engine_ref
-MSSD_REF_TOP_V    := $(TB_DIR)/sim_MSSD_engine_ref.sv
+MSSD_REF_TOP      := sim_mssd_engine_ref
+MSSD_REF_TOP_V    := $(TB_DIR)/sim_mssd_engine_ref.sv
 MSSD_REF_VVP      := $(BUILD_DIR)/$(MSSD_REF_TOP).vvp
 MSSD_REF_PYMOD    := test_MSSD_engine_ref
-MSSD_REF_SRCS     := $(MSSD_REF_TOP_V) $(RTL_DIR)/MSSD_engine.sv
+MSSD_REF_SRCS     := $(MSSD_REF_TOP_V) $(RTL_DIR)/mssd_engine.sv
 
 $(MSSD_REF_VVP): $(MSSD_REF_SRCS)
 	@echo "[COCOTB] Building $@"
@@ -1418,6 +1432,59 @@ test-weight-placement: $(WPLACEMENT_VVP)
 	@export COCOTB_TOPLEVEL=sim_weight_placement; \
 	export COCOTB_TEST_MODULES=$(WPLACEMENT_PYMOD); \
 	$(call RUN_COCOTB_ICARUS,$(WPLACEMENT_VVP))
+
+# ============================================================
+# Cocotb: spi_boot_ctrl standalone SPI boot load verification
+# ============================================================
+
+SPI_BOOT_CTRL_TOP    := sim_spi_boot_ctrl
+SPI_BOOT_CTRL_TOP_V  := $(TB_DIR)/sim_spi_boot_ctrl.v
+SPI_BOOT_CTRL_VVP    := $(BUILD_DIR)/$(SPI_BOOT_CTRL_TOP).vvp
+SPI_BOOT_CTRL_PYMOD  := test_spi_boot_ctrl
+
+SPI_BOOT_CTRL_SRCS := \
+  $(SPI_BOOT_CTRL_TOP_V) \
+  $(RTL_DIR)/spi_boot_ctrl.v \
+  $(RTL_DIR)/simple_sram.v \
+  $(TB_DIR)/spi_flash_model.v \
+  $(MAKEFILE_DIR)/../ip/gf180mcu_fd_ip_sram__sram512x8m8wm1.v
+
+$(SPI_BOOT_CTRL_VVP): $(SPI_BOOT_CTRL_SRCS) | $(BUILD_DIR)
+	@echo "[COCOTB] Building $@"
+	$(IVERILOG) -g2012 -s $(SPI_BOOT_CTRL_TOP) -o $@ $(SPI_BOOT_CTRL_SRCS)
+
+.PHONY: test-spi-boot-ctrl
+test-spi-boot-ctrl: $(SPI_BOOT_CTRL_VVP)
+	@echo "[COCOTB] Running $(SPI_BOOT_CTRL_PYMOD) on $(SPI_BOOT_CTRL_TOP)"
+	@export COCOTB_TOPLEVEL=$(SPI_BOOT_CTRL_TOP); \
+	export COCOTB_TEST_MODULES=$(SPI_BOOT_CTRL_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(SPI_BOOT_CTRL_VVP))
+
+# ============================================================
+# Cocotb: external IRQ source injection through top.sv
+# ============================================================
+
+IRQ_STATES_TOP    := sim_irq_test
+IRQ_STATES_VVP    := $(BUILD_DIR)/$(IRQ_STATES_TOP).vvp
+IRQ_STATES_PYMOD  := test_irq_states
+
+IRQ_STATES_SRCS := \
+	$(TB_DIR)/sim_irq_test.sv \
+	$(TB_DIR)/spi_flash_model.v \
+	$(UNIFIED_TOP_RTL_SRCS)
+
+$(IRQ_STATES_VVP): $(IRQ_STATES_SRCS) | $(BUILD_DIR)
+	@echo "[COCOTB] Building $@"
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) \
+	  -s $(IRQ_STATES_TOP) -o $@ $(IRQ_STATES_SRCS)
+
+.PHONY: test-irq-states
+test-irq-states: $(IRQ_STATES_VVP)
+	@$(SELF_MAKE) FW_VARIANT=irq_test firmware
+	@echo "[COCOTB] Running $(IRQ_STATES_PYMOD) on $(IRQ_STATES_TOP)"
+	@export COCOTB_TOPLEVEL=$(IRQ_STATES_TOP); \
+	export COCOTB_TEST_MODULES=$(IRQ_STATES_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(IRQ_STATES_VVP))
 
 # ============================================================
 # ML LOGIT SRAM MMIO (compile/elab check)

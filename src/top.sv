@@ -3,7 +3,8 @@
 `include "taketwo_feature_bridge.sv"
 
 module top #(
-    parameter int unsigned MEM_WORDS = 1024,
+    parameter int unsigned MEM_WORDS    = 1024,
+    parameter int unsigned BOOT_WORDS   = 1024,
     parameter string       FIRMWARE_HEX = "",
     parameter string       WEIGHT_INIT_HEX = "",
 
@@ -77,6 +78,12 @@ module top #(
     input  logic                      spi_miso_i,
     output logic                      spi_cs_n_o,
 
+    // Dedicated SPI interface for hardware boot controller (firmware load).
+    output logic                      boot_spi_clk_o,
+    output logic                      boot_spi_mosi_o,
+    input  logic                      boot_spi_miso_i,
+    output logic                      boot_spi_cs_n_o,
+
     // Epoch pulse for TB orchestration
     output logic                      epoch_end_o,      // epoch boundary pulse (from globaltimer)
 
@@ -85,6 +92,9 @@ module top #(
     // Signals used for test modes.
     input  logic        test_force_irq_i,
     input  logic        test_force_wake_i,
+    input  logic [2:0]  test_irq_src_i,
+    output logic [2:0]  irq_eoi_o,
+    output logic        boot_done_o,
     output logic        pico_trap_o,
     output logic        pico_cpu_clk_en_o,
     output logic        pico_mem_valid_o,
@@ -222,6 +232,12 @@ module top #(
 
     wire        sram_ready;
     wire [31:0] sram_rdata;
+
+    wire        boot_done;
+    wire        boot_sram_valid_w;
+    wire [3:0]  boot_sram_wstrb_w;
+    wire [31:0] boot_sram_addr_w;
+    wire [31:0] boot_sram_wdata_w;
 
     wire        timer_ready;
     wire [31:0] timer_rdata;
@@ -401,7 +417,7 @@ module top #(
         .ENABLE_IRQ_QREGS(1)
     ) cpu (
         .clk       (cpu_clk),
-        .resetn    (~reset_i),
+        .resetn    (~reset_i & boot_done),
         .mem_valid (mem_valid),
         .mem_instr (mem_instr),
         .mem_ready (mem_ready),
@@ -410,8 +426,13 @@ module top #(
         .mem_wstrb (mem_wstrb),
         .mem_rdata (mem_rdata),
         .irq       (pico_irq),
+        .eoi       (irq_eoi_o_wide),
         .trap      (trap)
     );
+
+    wire [31:0] irq_eoi_o_wide;
+    assign irq_eoi_o   = irq_eoi_o_wide[2:0];
+    assign boot_done_o = boot_done;
 
     assign bus_valid  = mem_valid && cpu_clk_en_lat;
     assign sram_sel   = bus_valid && (mem_addr < 4 * MEM_WORDS);
@@ -430,15 +451,15 @@ module top #(
     // planned to be replaced by macro-backed SRAM plus a flash boot path later.
     simple_sram #(
         .WORDS(MEM_WORDS),
-        .INIT_HEX(FIRMWARE_HEX)
+        .INIT_HEX("")
     ) sram (
-        .clk   (cpu_clk),
+        .clk   (clk_i),
         .resetn(~reset_i),
-        .valid (sram_sel),
+        .valid (boot_done ? sram_sel          : boot_sram_valid_w),
         .ready (sram_ready),
-        .wstrb (mem_wstrb),
-        .addr  (mem_addr),
-        .wdata (mem_wdata),
+        .wstrb (boot_done ? mem_wstrb         : boot_sram_wstrb_w),
+        .addr  (boot_done ? mem_addr          : boot_sram_addr_w),
+        .wdata (boot_done ? mem_wdata         : boot_sram_wdata_w),
         .rdata (sram_rdata)
     );
 
@@ -904,6 +925,26 @@ module top #(
         .spi_cs_n_o(spi_cs_n_o)
     );
 
+    // Hardware SPI boot controller: loads BOOT_WORDS words from external flash
+    // into SRAM before releasing the CPU from reset.
+    spi_boot_ctrl #(
+        .WORDS    (BOOT_WORDS),
+        .CLK_DIV  (2),
+        .FLASH_ADDR(24'h000000)
+    ) u_boot_ctrl (
+        .clk         (clk_i),
+        .resetn      (~reset_i),
+        .spi_clk_o   (boot_spi_clk_o),
+        .spi_mosi_o  (boot_spi_mosi_o),
+        .spi_miso_i  (boot_spi_miso_i),
+        .spi_cs_n_o  (boot_spi_cs_n_o),
+        .sram_valid_o(boot_sram_valid_w),
+        .sram_wstrb_o(boot_sram_wstrb_w),
+        .sram_addr_o (boot_sram_addr_w),
+        .sram_wdata_o(boot_sram_wdata_w),
+        .boot_done   (boot_done)
+    );
+
     // Off-chip host I2C target bridge in the always-on domain. This mirrors
     // soc_top so the unified top can participate in end-to-end host config and
     // score visibility tests without changing production firmware.
@@ -950,7 +991,10 @@ module top #(
         .irqc_rdata_i         (host_i2c_irqc_rdata)
     );
 
-    assign irq_sources = {28'b0, test_force_wake_i, host_i2c_irq_event, ml_irq, timer_event};
+    assign irq_sources = {28'b0, test_force_wake_i,
+        host_i2c_irq_event | test_irq_src_i[2],
+        ml_irq             | test_irq_src_i[1],
+        timer_event        | test_irq_src_i[0]};
     assign wake_sources = irq_sources;
     assign pico_irq = irq | {31'b0, test_force_irq_i};
 
