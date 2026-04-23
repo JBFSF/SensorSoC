@@ -403,6 +403,7 @@ module top #(
     assign cpu_clk = clk_i & cpu_clk_en_lat;
 
     // PicoRV32 remains the owner of ML orchestration in the unified top.
+    //JF: Wait on this for now, look more into pwrctrl_mmio
     picorv32 #(
         .STACKADDR(STACKADDR),
         .PROGADDR_RESET(PROGADDR_RESET),
@@ -478,6 +479,8 @@ module top #(
 
     assign time_value_w = seconds_w;
 
+
+    //JF: Feat Pipline, sleep until watchdog
     i2c_master u_i2c_master (
         .clk(clk_i),
         .resetn(~reset_i),
@@ -520,6 +523,7 @@ module top #(
         .sim_err(sim_err_i)                        // receive sim sensor-bus error indication
     );
 
+    //JF: Feat Pipline, sleep until watchdog
     accel_reader u_accel_reader (
         .clk(clk_i),
         .rst_i(reset_i),
@@ -549,6 +553,7 @@ module top #(
         .nack_seen_o()                           // unused: NACK-seen flag
     );
 
+    //JF: Feat Pipeline: sleep until watchdog
     motion_process #(
         .AX_W(16)
     ) u_motion_process (
@@ -570,6 +575,7 @@ module top #(
         (ay_w[15] ? (~ay_w + 16'd1) : ay_w) +
         (az_w[15] ? (~az_w + 16'd1) : az_w);
 
+    //JF: Feat Pipeline: sleep until watchdog
     ppg_fifo_reader #(
         .POLL_PERIOD(PPG_POLL_PERIOD_TICKS),
         .WATERMARK(PPG_WATERMARK),
@@ -598,6 +604,7 @@ module top #(
         .i2c_error_flag(ppg_i2c_err_w)          // sticky I2C error flag on PPG path
     );
 
+    //JF: Feat Pipeline, sleep pipeline
     ppg_process u_beat_detect (
         .clk_i(clk_i),
         .rst_i(reset_i),
@@ -631,6 +638,7 @@ module top #(
         .ppg_invalid_o(ppg_invalid_w)           // invalid PPG indicator output
     );
 
+    //JF: Feat Pipeline, sleep until watchdog
     mssd_engine #(
         .MIN_RR_COUNT(MSSD_MIN_RR_COUNT)
     ) u_mssd (
@@ -645,6 +653,7 @@ module top #(
         .rr_diff_count_o()              // unused: number of RR diffs included
     );
 
+    //JF: Feat Pipeline, sleep until watchdog
     signal_quality u_signal_quality (
         .clk_i(clk_i),
         .rst_i(reset_i),
@@ -667,6 +676,7 @@ module top #(
         .ml_update_gate_o(ml_update_gate_o)     // outputs gate controlling ML update at epoch end
     );
 
+    //Feat Pipeline, sleep until watchdog
     feature_engine u_feature_engine (
         .clk_i(clk_i),
         .rst_i(reset_i),
@@ -740,6 +750,7 @@ module top #(
     assign feat_mmio_ready = feat_sel;
 
     // Always-on watchdog timer used by firmware for wake/scheduling.
+    //JF: This is watchdog, look for timer event(?)
     timer_mmio #(.BASE_ADDR(TIMER_BASE)) u_timer (
         .clk      (clk_i),
         .resetn   (~reset_i),
@@ -754,6 +765,7 @@ module top #(
     );
 
     // CPU MMIO -> AXI-Lite bridge into the taketwo control/status port.
+    //JF: Feat Pipeline, sleep until watchdog
     ml_axil_bridge_mmio #(.BASE_ADDR(ML_BASE)) u_ml (
         .clk         (clk_i),
         .resetn      (~reset_i),
@@ -788,6 +800,8 @@ module top #(
 
     // ML accelerator instance. Firmware talks to it through u_ml above,
     // and the core reads/writes its working set through weight_ram_axi below.
+    //JF: ML, Sleep until features are ready
+    //      figure out how to sleep rest of chip BESIDES ram within, also expose interfaces
     taketwo_wrap u_taketwo_wrap (
         .CLK   (clk_i),
         .RESETN(~reset_i),
@@ -854,8 +868,9 @@ module top #(
 
     // Shared ML memory. Firmware writes inputs/weights through MMIO, while
     // taketwo accesses the same storage through its AXI master interface.
+    //JF: work with Rishi to make sure this works with the reduced size, 16 words probably fine? maybe less
     weight_ram_axi #(
-        .WORDS          (4096),
+        .WORDS          (16),
         .BASE_ADDR      (WEIGHT_BASE),
         .WEIGHT_INIT_HEX(WEIGHT_INIT_HEX)
     ) u_weight_ram (
@@ -910,6 +925,7 @@ module top #(
 
     // CPU-driven SPI master used by the simulation boot stub to stream
     // taketwo weights from external flash into shared WRAM.
+    //JF: probably not needed
     spi_master_mmio #(.BASE_ADDR(SPI_BASE)) u_spi (
         .clk       (clk_i),
         .resetn    (~reset_i),
@@ -927,6 +943,7 @@ module top #(
 
     // Hardware SPI boot controller: loads BOOT_WORDS words from external flash
     // into SRAM before releasing the CPU from reset.
+    //JF: probably not needed
     spi_boot_ctrl #(
         .WORDS    (BOOT_WORDS),
         .CLK_DIV  (2),
@@ -948,6 +965,7 @@ module top #(
     // Off-chip host I2C target bridge in the always-on domain. This mirrors
     // soc_top so the unified top can participate in end-to-end host config and
     // score visibility tests without changing production firmware.
+    //JF: we can probably remove this
     host_i2c_target #(
         .SLAVE_ADDR(7'h42)
     ) u_host_i2c_target (
@@ -965,6 +983,7 @@ module top #(
         .proto_err_o        (host_i2c_proto_err)
     );
 
+    //JF: do we need this?
     host_i2c_bridge_regs u_host_i2c_bridge_regs (
         .clk                  (clk_i),
         .resetn               (~reset_i),
@@ -999,6 +1018,7 @@ module top #(
     assign pico_irq = irq | {31'b0, test_force_irq_i};
 
     // Minimal interrupt controller used for CPU-visible pending bits and wake.
+    //JF: if this is in always on domain, just leave this on
     irq_ctrl_mmio #(.BASE_ADDR(IRQC_BASE)) u_irqc (
         .clk        (clk_i),
         .resetn     (~reset_i),
@@ -1020,6 +1040,7 @@ module top #(
     );
 
     // Power/sleep control block.
+    //JF: power sleep controls for CPU, always on Domain
     pwrctrl_mmio #(.BASE_ADDR(PWR_BASE)) u_pwr (
         .clk        (clk_i),
         .resetn     (~reset_i),
@@ -1035,6 +1056,7 @@ module top #(
     );
 
     // Simulation/debug mailbox for firmware-driven status and result reporting.
+    //JF: probably dont need this
     test_mmio #(.BASE_ADDR(TEST_BASE)) u_test (
         .clk(clk_i),
         .resetn(~reset_i),
@@ -1083,50 +1105,51 @@ module top #(
                        32'h0000_0000;
 
     // Sleep/wake control copied from soc_top.
-    reg sleeping_r;
-    reg cpu_idle_seen_r;
-    reg sleep_req_d_r;
-    reg [31:0] wake_sources_d_r;
-    wire [31:0] wake_rise_w = wake_sources & ~wake_sources_d_r;
-    wire        wake_event_w = |wake_rise_w;
-    wire        sleep_req_rise_w = sleep_req & ~sleep_req_d_r;
+    //JF: move this to top_fsm.v?
+    // reg sleeping_r;
+    // reg cpu_idle_seen_r;
+    // reg sleep_req_d_r;
+    // reg [31:0] wake_sources_d_r;
+    // wire [31:0] wake_rise_w = wake_sources & ~wake_sources_d_r;
+    // wire        wake_event_w = |wake_rise_w;
+    // wire        sleep_req_rise_w = sleep_req & ~sleep_req_d_r;
 
-    always_ff @(posedge clk_i) begin
-        if (reset_i)
-            wake_sources_d_r <= 32'h0;
-        else
-            wake_sources_d_r <= wake_sources;
-    end
+    // always_ff @(posedge clk_i) begin
+    //     if (reset_i)
+    //         wake_sources_d_r <= 32'h0;
+    //     else
+    //         wake_sources_d_r <= wake_sources;
+    // end
 
-    always_ff @(posedge clk_i) begin
-        if (reset_i) begin
-            cpu_clk_en    <= 1'b1;
-            sleeping_r    <= 1'b0;
-            cpu_idle_seen_r <= 1'b0;
-            sleep_req_d_r <= 1'b0;
-        end else begin
-            sleep_req_d_r <= sleep_req;
+    // always_ff @(posedge clk_i) begin
+    //     if (reset_i) begin
+    //         cpu_clk_en    <= 1'b1;
+    //         sleeping_r    <= 1'b0;
+    //         cpu_idle_seen_r <= 1'b0;
+    //         sleep_req_d_r <= 1'b0;
+    //     end else begin
+    //         sleep_req_d_r <= sleep_req;
 
-            if (cpu_clk_en && sleep_req_rise_w)
-                cpu_idle_seen_r <= 1'b0;
-            else if (cpu_clk_en)
-                cpu_idle_seen_r <= cpu_idle_seen_r | (~mem_valid);
+    //         if (cpu_clk_en && sleep_req_rise_w)
+    //             cpu_idle_seen_r <= 1'b0;
+    //         else if (cpu_clk_en)
+    //             cpu_idle_seen_r <= cpu_idle_seen_r | (~mem_valid);
 
-            if (sleeping_r) begin
-                if (irqc_wake_req || wake_event_w) begin
-                    cpu_clk_en      <= 1'b1;
-                    sleeping_r      <= 1'b0;
-                    cpu_idle_seen_r <= 1'b0;
-                end
-            end else begin
-                if (sleep_req && cpu_idle_seen_r && !(irqc_wake_req || wake_event_w)) begin
-                    cpu_clk_en      <= 1'b0;
-                    sleeping_r      <= 1'b1;
-                    cpu_idle_seen_r <= 1'b0;
-                end
-            end
-        end
-    end
+    //         if (sleeping_r) begin
+    //             if (irqc_wake_req || wake_event_w) begin
+    //                 cpu_clk_en      <= 1'b1;
+    //                 sleeping_r      <= 1'b0;
+    //                 cpu_idle_seen_r <= 1'b0;
+    //             end
+    //         end else begin
+    //             if (sleep_req && cpu_idle_seen_r && !(irqc_wake_req || wake_event_w)) begin
+    //                 cpu_clk_en      <= 1'b0;
+    //                 sleeping_r      <= 1'b1;
+    //                 cpu_idle_seen_r <= 1'b0;
+    //             end
+    //         end
+    //     end
+    // end
     
     assign pico_trap_o       = trap;
     assign pico_cpu_clk_en_o = cpu_clk_en_lat;
