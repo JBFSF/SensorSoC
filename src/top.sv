@@ -191,6 +191,11 @@ module top #(
     logic       ppg_i2c_rsp_err_w;       // i2c_master -> ppg_fifo_reader: transaction error (e.g., NACK)
     logic       ppg_i2c_rsp_ready_w;     // ppg_fifo_reader -> i2c_master: ready to accept response stream
 
+    logic       feat_en;                 // Feature pipeline enable wire
+    logic       ml_en;                   // ML enable wire
+    logic       cpu_clk_en;                  // CPU clock enable wire
+    logic       sleeping_r;
+
     // ---------------------------------------------------------------------
     // Unified SoC/CPU/ML path
     // ---------------------------------------------------------------------
@@ -198,7 +203,7 @@ module top #(
     // produces epoch features, while the logic below provides the CPU-owned
     // SoC path that reads those features, writes them into shared ML memory,
     // and starts the taketwo accelerator.
-    reg cpu_clk_en;
+    //reg cpu_clk_en;
     reg cpu_clk_en_lat;
     wire cpu_clk;
 
@@ -450,6 +455,7 @@ module top #(
 
     // Temporary CPU memory backing store for simulation. This is the block
     // planned to be replaced by macro-backed SRAM plus a flash boot path later.
+    //JF: always on domain
     simple_sram #(
         .WORDS(MEM_WORDS),
         .INIT_HEX("")
@@ -464,6 +470,7 @@ module top #(
         .rdata (sram_rdata)
     );
 
+    //JF: always on domain
     globaltimer #(
         .clk_speed_hz(GT_CLK_HZ),
         .epoch_hz(GT_EPOCH_HZ),
@@ -484,6 +491,7 @@ module top #(
     i2c_master u_i2c_master (
         .clk(clk_i),
         .resetn(~reset_i),
+        //.en_i(feat_en),
         .accel_cmd_valid_i(acc_i2c_cmd_valid_w),   // accel_reader command valid -> I2C master
         .accel_cmd_ready_o(acc_i2c_cmd_ready_w),   // I2C master ready/accept -> accel_reader
         .accel_cmd_addr_i(acc_i2c_cmd_addr_w),     // accel target 7-bit I2C address
@@ -527,6 +535,7 @@ module top #(
     accel_reader u_accel_reader (
         .clk(clk_i),
         .rst_i(reset_i),
+        //.en_i(feat_en),
         .cfg_enable_i(1'b1),                     // enables accel polling/reads (always on in this top)
         .cfg_init_en_i(1'b1),                    // enables accel init writes before polling
         .cfg_poll_period_ticks_i(ACC_POLL_PERIOD_TICKS), // poll interval in clk ticks
@@ -559,6 +568,7 @@ module top #(
     ) u_motion_process (
         .clk(clk_i),
         .rst_i(reset_i),
+        //.en_i(feat_en),
         .sample_valid_i(accel_valid_w),     // drive motion accumulation with each valid accel sample
         // accel_valid_o already indicates a completed good read.
         .ax_i(ax_w),                        // accel X input for motion energy
@@ -583,6 +593,7 @@ module top #(
     ) u_ppg_fifo_reader (
         .clk_i(clk_i),
         .rst_i(reset_i),
+        //.en_i(feat_en),
         .t_now(time_ms_w),                      // current timebase (ms) used to timestamp samples
         .i2c_cmd_valid(ppg_i2c_cmd_valid_w),    // command stream to i2c_master (PPG)
         .i2c_cmd_ready(ppg_i2c_cmd_ready_w),    // ready/accept from i2c_master (PPG)
@@ -608,6 +619,7 @@ module top #(
     ppg_process u_beat_detect (
         .clk_i(clk_i),
         .rst_i(reset_i),
+        //.en_i(feat_en),
         .ppg_sample_i(ppg_sample_w),            // raw PPG sample stream input
         .ppg_valid_i(ppg_sample_valid_w),       // strobe: PPG sample input valid
         .ppg_sample_time_i(ppg_sample_time_w),  // timestamp for RR interval computation
@@ -644,6 +656,7 @@ module top #(
     ) u_mssd (
         .clk_i(clk_i),
         .rst_i(reset_i),
+        //.en_i(feat_en),
         .rr_interval_i(rr_interval_w[15:0]),  // RR interval input for HRV calculation
         .rr_valid_i(rr_valid_w),        // strobe: RR interval input valid
         .rr_accepted_i(rr_accepted_w),  // only include accepted RR intervals
@@ -657,6 +670,7 @@ module top #(
     signal_quality u_signal_quality (
         .clk_i(clk_i),
         .rst_i(reset_i),
+        //.en_i(feat_en),
         .epoch_end_i(epoch_end_w),              // epoch boundary: evaluate signal quality for that epoch
         .beat_event_i(beat_pulse_w),            // beat events counted for valid fraction and anomalies
         .beat_quality_i(beat_quality_w),        // beat-quality score for "good beat" counting
@@ -680,6 +694,7 @@ module top #(
     feature_engine u_feature_engine (
         .clk_i(clk_i),
         .rst_i(reset_i),
+        //.en_i(feat_en),
         .enable_i(epoch_end_d),                 // epoch strobe (delayed) to emit a consolidated feature vector
         .seconds_valid_i(1'b1),                 // time feature treated as always valid here
         .time_value_i(time_value_w),            // raw time feature input
@@ -769,6 +784,7 @@ module top #(
     ml_axil_bridge_mmio #(.BASE_ADDR(ML_BASE)) u_ml (
         .clk         (clk_i),
         .resetn      (~reset_i),
+        //.en_i(feat_en),
         .mem_valid   (mmio_sel),
         .mem_addr    (mem_addr),
         .mem_wdata   (mem_wdata),
@@ -806,6 +822,7 @@ module top #(
         .CLK   (clk_i),
         .RESETN(~reset_i),
         .irq   (ml_irq),
+        //.en_i(ml_en), //TODO: check where to add enable logic, possibly not for whole module, maybe just stalling axi interface will work for that
         .maxi_awid   (wram_awid),
         .maxi_awaddr (wram_awaddr),
         .maxi_awlen  (wram_awlen),
@@ -943,7 +960,7 @@ module top #(
 
     // Hardware SPI boot controller: loads BOOT_WORDS words from external flash
     // into SRAM before releasing the CPU from reset.
-    //JF: probably not needed
+    //JF: probably not needed, SIKE
     spi_boot_ctrl #(
         .WORDS    (BOOT_WORDS),
         .CLK_DIV  (2),
@@ -1106,50 +1123,24 @@ module top #(
 
     // Sleep/wake control copied from soc_top.
     //JF: move this to top_fsm.v?
-    // reg sleeping_r;
-    // reg cpu_idle_seen_r;
-    // reg sleep_req_d_r;
-    // reg [31:0] wake_sources_d_r;
-    // wire [31:0] wake_rise_w = wake_sources & ~wake_sources_d_r;
-    // wire        wake_event_w = |wake_rise_w;
-    // wire        sleep_req_rise_w = sleep_req & ~sleep_req_d_r;
+    top_fsm fsm (
+        resetn_i(~reset_i),
+        clk_i(clk_i),
+        // Pipeline done signals
+        feat_valid_i(feat_valid_o),    // one-cycle strobe: feature vector ready (FEAT_ONLY -> ALL)
+        ml_irq_i(ml_irq),        // ML inference complete (ALL -> CPU_FEAT)
 
-    // always_ff @(posedge clk_i) begin
-    //     if (reset_i)
-    //         wake_sources_d_r <= 32'h0;
-    //     else
-    //         wake_sources_d_r <= wake_sources;
-    // end
+        // CPU sleep/wake inputs
+        wake_sources_i(wake_sources),
+        sleep_req_i(sleep_req),     // CPU requests sleep (from pwrctrl MMIO)
+        mem_valid_i(mem_valid),     // CPU memory-access valid (for idle detection)
+        irqc_wake_req_i(irqc_wake_req), // interrupt controller forces wake
 
-    // always_ff @(posedge clk_i) begin
-    //     if (reset_i) begin
-    //         cpu_clk_en    <= 1'b1;
-    //         sleeping_r    <= 1'b0;
-    //         cpu_idle_seen_r <= 1'b0;
-    //         sleep_req_d_r <= 1'b0;
-    //     end else begin
-    //         sleep_req_d_r <= sleep_req;
-
-    //         if (cpu_clk_en && sleep_req_rise_w)
-    //             cpu_idle_seen_r <= 1'b0;
-    //         else if (cpu_clk_en)
-    //             cpu_idle_seen_r <= cpu_idle_seen_r | (~mem_valid);
-
-    //         if (sleeping_r) begin
-    //             if (irqc_wake_req || wake_event_w) begin
-    //                 cpu_clk_en      <= 1'b1;
-    //                 sleeping_r      <= 1'b0;
-    //                 cpu_idle_seen_r <= 1'b0;
-    //             end
-    //         end else begin
-    //             if (sleep_req && cpu_idle_seen_r && !(irqc_wake_req || wake_event_w)) begin
-    //                 cpu_clk_en      <= 1'b0;
-    //                 sleeping_r      <= 1'b1;
-    //                 cpu_idle_seen_r <= 1'b0;
-    //             end
-    //         end
-    //     end
-    // end
+        feat_en_o(feat_en),
+        ml_en_o(ml_en),
+        cpu_en_o(cpu_clk_en),
+        sleeping_o(sleeping_r)
+    );
     
     assign pico_trap_o       = trap;
     assign pico_cpu_clk_en_o = cpu_clk_en_lat;
