@@ -4,7 +4,7 @@
 //
 // Purpose:
 //   - reuse the proven flash-backed parameter path from the unified top
-//   - write the canonical writeverilog.py-aligned input vector
+//   - write the canonical_v1 quantized input vector from golden_vectors.py
 //   - kick ML through the normal CPU-owned control registers
 //   - let the SV bench compare the final logits numerically
 //
@@ -17,7 +17,7 @@
 //   6. start inference and poll BUSY until it returns low
 //   7. leave the final output word in WRAM for the bench to check
 //
-// Canonical vector:
+// Canonical vector (canonical_v1 in golden_vectors.py):
 //   x_float = [0.5, -0.25, 0.1, -1.0]
 //   x_int   = [256, -128, 51, -512] with X_SCALE = 512
 
