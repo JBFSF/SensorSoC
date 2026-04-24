@@ -48,29 +48,56 @@ module top #(
     inout  wire  i2c_sda_io,
     input  logic i2c_sda_i,
     output logic i2c_sda_drive_low_o,
-    // Functional simulation bus to sensor models (through i2c_master).
-    output logic        sim_req_o,     // request strobe from i2c_master into simulated sensor bus
-    output logic [6:0]  sim_addr_o,    // 7-bit I2C address for the active simulated sensor transaction
-    output logic [7:0]  sim_reg_o,     // I2C register address for the active simulated sensor transaction
-    output logic [7:0]  sim_len_o,     // number of bytes to read/write for the active simulated sensor transaction
-    output logic        sim_write_o,   // 1: write transaction, 0: read transaction
-    output logic [7:0]  sim_wdata_o,   // write data byte for the active simulated sensor transaction
-    input  logic        sim_ack_i,     // simulated sensor acknowledges/accepts the requested transaction
-    input  logic [7:0]  sim_rdata_i,   // read data byte returned by simulated sensor
-    input  logic        sim_rvalid_i,  // read data valid strobe from simulated sensor
-    input  logic        sim_rlast_i,   // marks last read byte of the transaction from simulated sensor
-    input  logic        sim_err_i,     // error indicator from simulated sensor (e.g., NACK/invalid access)
 
-    // Pipeline outputs toward ML
-    output logic                      feat_valid_o,     // one-cycle strobe: feature vector is ready for ML consumption
-    output logic signed [15:0]        time_feat_o,      // time-of-night feature (raw seconds)
-    output logic signed [15:0]        motion_feat_o,    // motion feature (per-epoch motion energy)
-    output logic signed [15:0]        delta_hr_feat_o,  // delta heart-rate feature derived from RR intervals
-    output logic signed [15:0]        mssd_feat_o,     // HRV feature (MSSD) for the epoch
+    `ifdef SIM 
+        // Functional simulation bus to sensor models (through i2c_master).
+        output logic        sim_req_o,     // request strobe from i2c_master into simulated sensor bus
+        output logic [6:0]  sim_addr_o,    // 7-bit I2C address for the active simulated sensor transaction
+        output logic [7:0]  sim_reg_o,     // I2C register address for the active simulated sensor transaction
+        output logic [7:0]  sim_len_o,     // number of bytes to read/write for the active simulated sensor transaction
+        output logic        sim_write_o,   // 1: write transaction, 0: read transaction
+        output logic [7:0]  sim_wdata_o,   // write data byte for the active simulated sensor transaction
+        input  logic        sim_ack_i,     // simulated sensor acknowledges/accepts the requested transaction
+        input  logic [7:0]  sim_rdata_i,   // read data byte returned by simulated sensor
+        input  logic        sim_rvalid_i,  // read data valid strobe from simulated sensor
+        input  logic        sim_rlast_i,   // marks last read byte of the transaction from simulated sensor
+        input  logic        sim_err_i,     // error indicator from simulated sensor (e.g., NACK/invalid access)
 
-    // Signal quality outputs
-    output logic                      ml_update_gate_o,  // gate: only update ML when signal-quality checks pass
-    output logic [7:0]                invalid_reason_o,  // reason code when ML update is gated off
+    
+        // Signals used for test modes.
+        input  logic        test_force_irq_i,
+        input  logic        test_force_wake_i,
+        input  logic [2:0]  test_irq_src_i,
+        output logic [2:0]  irq_eoi_o,
+        output logic        boot_done_o,
+        output logic        pico_trap_o,
+        output logic        pico_cpu_clk_en_o,
+        output logic        pico_mem_valid_o,
+        output logic        pico_mem_instr_o,
+        output logic        pico_mem_ready_o,
+        output logic [3:0]  pico_mem_wstrb_o,
+        output logic [31:0] pico_mem_addr_o,
+        output logic [31:0] pico_mem_wdata_o,
+        output logic [31:0] pico_irq_o,
+        output logic        pico_sleeping_o,
+        output logic        host_i2c_irq_event_o,
+        output logic        ml_irq_o,
+        output logic        timer_event_o
+
+        // Pipeline outputs toward ML
+        output logic                      feat_valid_o,     // one-cycle strobe: feature vector is ready for ML consumption
+        output logic signed [15:0]        time_feat_o,      // time-of-night feature (raw seconds)
+        output logic signed [15:0]        motion_feat_o,    // motion feature (per-epoch motion energy)
+        output logic signed [15:0]        delta_hr_feat_o,  // delta heart-rate feature derived from RR intervals
+        output logic signed [15:0]        mssd_feat_o,     // HRV feature (MSSD) for the epoch
+
+        output logic                      epoch_end_o,      // epoch boundary pulse (from globaltimer)
+    
+
+        // Signal quality outputs
+        output logic                      ml_update_gate_o,  // gate: only update ML when signal-quality checks pass
+        output logic [7:0]                invalid_reason_o,  // reason code when ML update is gated off
+    `endif
 
     // SPI flash interface used by the simulation boot stub.
     output logic                      spi_clk_o,
@@ -85,29 +112,10 @@ module top #(
     output logic                      boot_spi_cs_n_o,
 
     // Epoch pulse for TB orchestration
-    output logic                      epoch_end_o,      // epoch boundary pulse (from globaltimer)
 
     output logic                      alarm_o,          // placeholder alarm output (unused in current RTL)
 
-    // Signals used for test modes.
-    input  logic        test_force_irq_i,
-    input  logic        test_force_wake_i,
-    input  logic [2:0]  test_irq_src_i,
-    output logic [2:0]  irq_eoi_o,
-    output logic        boot_done_o,
-    output logic        pico_trap_o,
-    output logic        pico_cpu_clk_en_o,
-    output logic        pico_mem_valid_o,
-    output logic        pico_mem_instr_o,
-    output logic        pico_mem_ready_o,
-    output logic [3:0]  pico_mem_wstrb_o,
-    output logic [31:0] pico_mem_addr_o,
-    output logic [31:0] pico_mem_wdata_o,
-    output logic [31:0] pico_irq_o,
-    output logic        pico_sleeping_o,
-    output logic        host_i2c_irq_event_o,
-    output logic        ml_irq_o,
-    output logic        timer_event_o
+    
 );
 
     localparam logic [11:0] CFG_LP_BETA_Q10      = 12'd128;
@@ -1126,7 +1134,8 @@ module top #(
     top_fsm fsm (
         resetn_i(~reset_i),
         clk_i(clk_i),
-        // Pipeline done signals
+        
+        watchdog_i(timer_event),       // when the watchdog timer goes off
         feat_valid_i(feat_valid_o),    // one-cycle strobe: feature vector ready (FEAT_ONLY -> ALL)
         ml_irq_i(ml_irq),        // ML inference complete (ALL -> CPU_FEAT)
 

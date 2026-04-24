@@ -6,17 +6,19 @@
     4. ALL,       feat + ML + CPU all on; waits for ML inference to complete
     5. CPU_FEAT,  feat + CPU on, goes back to just feats on when CPU is done
 */
-module top_fsm #()
+module top_fsm
 (
     input         resetn_i,
     input         clk_i,
+
+    //add input start? 
 
     // Pipeline done signals
     input         feat_valid_i,    // one-cycle strobe: feature vector ready (FEAT_ONLY -> ALL)
     input         ml_irq_i,        // ML inference complete (ALL -> CPU_FEAT)
 
     // CPU sleep/wake inputs
-    input  [31:0] wake_sources_i,
+    input  [31:0] wake_sources_i,  // this includes watchdog
     input         sleep_req_i,     // CPU requests sleep (from pwrctrl MMIO)
     input         mem_valid_i,     // CPU memory-access valid (for idle detection)
     input         irqc_wake_req_i, // interrupt controller forces wake
