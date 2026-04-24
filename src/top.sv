@@ -402,6 +402,8 @@ module top #(
 
     assign cpu_clk = clk_i & cpu_clk_en_lat;
 
+    wire [31:0] irq_eoi_o_wide;
+
     // PicoRV32 remains the owner of ML orchestration in the unified top.
     picorv32 #(
         .STACKADDR(STACKADDR),
@@ -430,7 +432,6 @@ module top #(
         .trap      (trap)
     );
 
-    wire [31:0] irq_eoi_o_wide;
     assign irq_eoi_o   = irq_eoi_o_wide[2:0];
     assign boot_done_o = boot_done;
 

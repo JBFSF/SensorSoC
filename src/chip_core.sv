@@ -6,7 +6,27 @@
 module chip_core #(
     parameter NUM_INPUT_PADS = 12,
     parameter NUM_BIDIR_PADS = 40,
-    parameter NUM_ANALOG_PADS = 2
+    parameter NUM_ANALOG_PADS = 2,
+    parameter DEBUG_STIM_EN = 0,
+    parameter CLK_HZ = 10_000_000,
+    parameter GT_CLK_HZ = 10_000_000,
+    parameter GT_EPOCH_HZ = 100,
+    parameter GT_EPOCH_COUNT_MAX = 1000,
+    parameter ACC_POLL_PERIOD_TICKS = 50_000,
+    parameter PPG_POLL_PERIOD_TICKS = 100,
+    parameter PPG_WATERMARK = 8,
+    parameter PPG_MAX_BURST_SAMPLES = 32,
+    parameter CFG_REFRACT_MS = 32'd250,
+    parameter CFG_RR_MIN_MS = 32'd300,
+    parameter CFG_RR_MAX_MS = 32'd2000,
+    parameter CFG_Q_MIN_ACCEPT = 8'd10,
+    parameter CFG_BEAT_Q_MIN = 8'd16,
+    parameter CFG_MIN_VALID_FRAC = 8'd96,
+    parameter CFG_MAX_DOUBLE = 8'd4,
+    parameter CFG_MAX_MISSED = 8'd3,
+    parameter CFG_MOTION_HI_TH = 16'd2000,
+    parameter CFG_MAX_MOTION_HI = 16'd3,
+    parameter MSSD_MIN_RR_COUNT = 1
 )(
     `ifdef USE_POWER_PINS
     inout  wire VDD,
@@ -28,6 +48,24 @@ module chip_core #(
     output wire [NUM_BIDIR_PADS-1:0] bidir_ie,   // Input enable
     output wire [NUM_BIDIR_PADS-1:0] bidir_pu,   // Pull-up
     output wire [NUM_BIDIR_PADS-1:0] bidir_pd,   // Pull-down
+
+    output wire       sim_req_o,
+    output wire [6:0] sim_addr_o,
+    output wire [7:0] sim_reg_o,
+    output wire [7:0] sim_len_o,
+    output wire       sim_write_o,
+    output wire [7:0] sim_wdata_o,
+    input  wire       sim_ack_i,
+    input  wire [7:0] sim_rdata_i,
+    input  wire       sim_rvalid_i,
+    input  wire       sim_rlast_i,
+    input  wire       sim_err_i,
+
+    input  wire        debug_stim_override_en_i,
+    input  wire [15:0] debug_stim_mssd_i,
+    input  wire [15:0] debug_stim_delta_hr_i,
+    input  wire [15:0] debug_stim_time_i,
+    input  wire [15:0] debug_stim_motion_i,
 
     inout  wire [NUM_ANALOG_PADS-1:0] analog     // Analog
 );
@@ -60,18 +98,15 @@ module chip_core #(
 
     logic [15:0] debug_bus_w;
 
-    logic sim_req_w;
-    logic [6:0] sim_addr_w;
-    logic [7:0] sim_reg_w;
-    logic [7:0] sim_len_w;
-    logic sim_write_w;
-    logic [7:0] sim_wdata_w;
-
     logic feat_valid_w;
     logic signed [15:0] time_feat_w;
     logic signed [15:0] motion_feat_w;
     logic signed [15:0] delta_hr_feat_w;
-    logic signed [15:0] rmssd_feat_w;
+    logic signed [15:0] mssd_feat_w;
+    logic signed [15:0] time_feat_top_w;
+    logic signed [15:0] motion_feat_top_w;
+    logic signed [15:0] delta_hr_feat_top_w;
+    logic signed [15:0] mssd_feat_top_w;
 
     logic ml_update_gate_w;
     logic [7:0] invalid_reason_w;
@@ -118,6 +153,11 @@ module chip_core #(
     // Use the external test clock only in the dedicated clock-test mode.
     assign core_clk_w = (test_mode_w == 4'b0101) ? bidir_in[TEST_CLK_PAD] : clk;
 
+    assign time_feat_w = (DEBUG_STIM_EN && debug_stim_override_en_i) ? $signed(debug_stim_time_i) : time_feat_top_w;
+    assign motion_feat_w = (DEBUG_STIM_EN && debug_stim_override_en_i) ? $signed(debug_stim_motion_i) : motion_feat_top_w;
+    assign delta_hr_feat_w = (DEBUG_STIM_EN && debug_stim_override_en_i) ? $signed(debug_stim_delta_hr_i) : delta_hr_feat_top_w;
+    assign mssd_feat_w = (DEBUG_STIM_EN && debug_stim_override_en_i) ? $signed(debug_stim_mssd_i) : mssd_feat_top_w;
+
     always_comb begin
         debug_bus_w = '0;
         unique case (test_mode_w)
@@ -126,9 +166,9 @@ module chip_core #(
             end
 
             4'b0001: begin
-                // view processed RMSSD
+                // view processed MSSD
                 //these busses are not cut off, just writing [15:0 to be explicit]
-                debug_bus_w = rmssd_feat_w[15:0];
+                debug_bus_w = mssd_feat_w[15:0];
             end
 
             4'b0010: begin
@@ -233,7 +273,27 @@ module chip_core #(
         end
     end
 
-    top u_top (
+    top #(
+        .CLK_HZ(CLK_HZ),
+        .GT_CLK_HZ(GT_CLK_HZ),
+        .GT_EPOCH_HZ(GT_EPOCH_HZ),
+        .GT_EPOCH_COUNT_MAX(GT_EPOCH_COUNT_MAX),
+        .ACC_POLL_PERIOD_TICKS(ACC_POLL_PERIOD_TICKS),
+        .PPG_POLL_PERIOD_TICKS(PPG_POLL_PERIOD_TICKS),
+        .PPG_WATERMARK(PPG_WATERMARK),
+        .PPG_MAX_BURST_SAMPLES(PPG_MAX_BURST_SAMPLES),
+        .CFG_REFRACT_MS(CFG_REFRACT_MS),
+        .CFG_RR_MIN_MS(CFG_RR_MIN_MS),
+        .CFG_RR_MAX_MS(CFG_RR_MAX_MS),
+        .CFG_Q_MIN_ACCEPT(CFG_Q_MIN_ACCEPT),
+        .CFG_BEAT_Q_MIN(CFG_BEAT_Q_MIN),
+        .CFG_MIN_VALID_FRAC(CFG_MIN_VALID_FRAC),
+        .CFG_MAX_DOUBLE(CFG_MAX_DOUBLE),
+        .CFG_MAX_MISSED(CFG_MAX_MISSED),
+        .CFG_MOTION_HI_TH(CFG_MOTION_HI_TH),
+        .CFG_MAX_MOTION_HI(CFG_MAX_MOTION_HI),
+        .MSSD_MIN_RR_COUNT(MSSD_MIN_RR_COUNT)
+    ) u_top (
         .clk_i                 (core_clk_w),
         .reset_i               (~rst_n),
 
@@ -242,23 +302,23 @@ module chip_core #(
         .i2c_sda_i             (bidir_in[6]),
         .i2c_sda_drive_low_o   (i2c_sda_drive_low_w),
 
-        .sim_req_o             (),
-        .sim_addr_o            (),
-        .sim_reg_o             (),
-        .sim_len_o             (),
-        .sim_write_o           (),
-        .sim_wdata_o           (),
-        .sim_ack_i             (1'b0),
-        .sim_rdata_i           (8'h00),
-        .sim_rvalid_i          (1'b0),
-        .sim_rlast_i           (1'b0),
-        .sim_err_i             (1'b0),
+        .sim_req_o             (sim_req_o),
+        .sim_addr_o            (sim_addr_o),
+        .sim_reg_o             (sim_reg_o),
+        .sim_len_o             (sim_len_o),
+        .sim_write_o           (sim_write_o),
+        .sim_wdata_o           (sim_wdata_o),
+        .sim_ack_i             (sim_ack_i),
+        .sim_rdata_i           (sim_rdata_i),
+        .sim_rvalid_i          (sim_rvalid_i),
+        .sim_rlast_i           (sim_rlast_i),
+        .sim_err_i             (sim_err_i),
 
         .feat_valid_o          (feat_valid_w),
-        .time_feat_o           (time_feat_w),
-        .motion_feat_o         (motion_feat_w),
-        .delta_hr_feat_o       (delta_hr_feat_w),
-        .rmssd_feat_o          (rmssd_feat_w),
+        .time_feat_o           (time_feat_top_w),
+        .motion_feat_o         (motion_feat_top_w),
+        .delta_hr_feat_o       (delta_hr_feat_top_w),
+        .mssd_feat_o           (mssd_feat_top_w),
 
         .ml_update_gate_o      (ml_update_gate_w),
         .invalid_reason_o      (invalid_reason_w),
@@ -267,12 +327,19 @@ module chip_core #(
         .spi_mosi_o            (spi_mosi_w),
         .spi_miso_i            (bidir_in[4]),
         .spi_cs_n_o            (spi_cs_n_w),
+        .boot_spi_clk_o        (),
+        .boot_spi_mosi_o       (),
+        .boot_spi_miso_i       (1'b1),
+        .boot_spi_cs_n_o       (),
 
         .epoch_end_o           (epoch_end_w),
         .alarm_o               (alarm_w),
         
         .test_force_irq_i      (test_force_irq_w),
         .test_force_wake_i     (test_force_wake_w),
+        .test_irq_src_i        (3'b000),
+        .irq_eoi_o             (),
+        .boot_done_o           (),
         .pico_trap_o           (pico_trap_w),
         .pico_cpu_clk_en_o     (pico_cpu_clk_en_w),
         .pico_mem_valid_o      (pico_mem_valid_w),
@@ -295,5 +362,3 @@ module chip_core #(
     assign unused_analog = &analog;
 
 endmodule
-
-`default_nettype wire

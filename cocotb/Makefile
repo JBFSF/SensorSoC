@@ -233,19 +233,20 @@ IRQ_VVP      := sim_irq.vvp
 # Cocotb configuration helper (cocotb 2.x via oss-cad-suite)
 # ----------------------------
 # cocotb's Icarus VPI shared library directory:
-COCOTB_LIBDIR := $(shell cocotb-config --lib-dir 2>/dev/null)
+COCOTB_LIBDIR := $(shell $(COCOTB_CONFIG) --lib-dir 2>/dev/null)
 
 # Absolute path + entry point needed by cocotb 2.x GPI loader:
-COCOTB_PYGPI  := $(shell cocotb-config --pygpi-entry-point 2>/dev/null)
+COCOTB_PYGPI  := $(shell $(COCOTB_CONFIG) --pygpi-entry-point 2>/dev/null)
+COCOTB_LIBPYTHON := $(shell $(COCOTB_CONFIG) --libpython 2>/dev/null)
 
 # Use the same python interpreter cocotb will embed
-export PYGPI_PYTHON_BIN := $(shell cocotb-config --python-bin 2>/dev/null)
+export PYGPI_PYTHON_BIN := $(shell $(COCOTB_CONFIG) --python-bin 2>/dev/null)
 
 # Make sure cocotb can import your tests
 export PYTHONPATH := $(abspath $(TB_DIR))
 
 define RUN_COCOTB_ICARUS
-	GPI_USERS="$(COCOTB_PYGPI)" LD_LIBRARY_PATH="$(COCOTB_LIBDIR):$$LD_LIBRARY_PATH" $(VVP) -M "$(COCOTB_LIBDIR)" -m libcocotbvpi_icarus $1
+	GPI_USERS="$(COCOTB_PYGPI)" LD_PRELOAD="$(COCOTB_LIBPYTHON):$$LD_PRELOAD" LD_LIBRARY_PATH="$(COCOTB_LIBDIR):$$LD_LIBRARY_PATH" $(VVP) -M "$(COCOTB_LIBDIR)" -m libcocotbvpi_icarus $1
 endef
 
 # ----------------------------
@@ -1281,7 +1282,33 @@ test-top-feature-mmio-unified: $(TOP_FEATURE_MMIO_VVP)
 	$(call RUN_COCOTB_ICARUS,$(TOP_FEATURE_MMIO_VVP))
 
 # ============================================================
-# Cocotb: top sensor pipeline stage-by-stage reference scoreboard
+# Cocotb: sensor pipeline debug mode test
+# ============================================================
+
+CHIP_CORE_DEBUG_TOP    := sim_chip_core_debug_modes
+CHIP_CORE_DEBUG_TOP_V  := $(TB_DIR)/sim_chip_core_debug_modes.sv
+CHIP_CORE_DEBUG_VVP    := $(BUILD_DIR)/$(CHIP_CORE_DEBUG_TOP).vvp
+CHIP_CORE_DEBUG_PYMOD  := test_chip_core_debug_modes
+CHIP_CORE_DEBUG_SRCS   := \
+  $(CHIP_CORE_DEBUG_TOP_V) \
+  $(RTL_DIR)/chip_core.sv \
+  $(UNIFIED_TOP_RTL_SRCS) \
+  sensors/i2c_slave_lis2dw12.sv \
+  sensors/i2c_slave_adpd144ri.sv
+
+$(CHIP_CORE_DEBUG_VVP): $(CHIP_CORE_DEBUG_SRCS)
+	@echo "[COCOTB] Building $@"
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(CHIP_CORE_DEBUG_TOP) -o $@ $(CHIP_CORE_DEBUG_SRCS)
+
+.PHONY: test-chip-core-debug-modes
+test-chip-core-debug-modes: $(CHIP_CORE_DEBUG_VVP)
+	@echo "[COCOTB] Running $(CHIP_CORE_DEBUG_PYMOD) on $(CHIP_CORE_DEBUG_TOP)"
+	@export COCOTB_TOPLEVEL=$(CHIP_CORE_DEBUG_TOP); \
+	export COCOTB_TEST_MODULES=$(CHIP_CORE_DEBUG_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(CHIP_CORE_DEBUG_VVP))
+
+# ============================================================
+# Cocotb: top sensor pipeline stage-by-stage reference
 # ============================================================
 
 TOP_SENSOR_PIPELINE_TOP    := sim_top_sensor_pipeline
@@ -1305,8 +1332,12 @@ test-top-sensor-pipeline: $(TOP_SENSOR_PIPELINE_VVP)
 	export COCOTB_TEST_MODULES=$(TOP_SENSOR_PIPELINE_PYMOD); \
 	$(call RUN_COCOTB_ICARUS,$(TOP_SENSOR_PIPELINE_VVP))
 
-.PHONY: test-top-pipeline-scoreboard
-test-top-pipeline-scoreboard: test-top-sensor-pipeline
+.PHONY: test-top-pipeline
+test-top-pipeline: test-top-sensor-pipeline
+	@true
+
+.PHONY: test-chip-debug-feature-regression
+test-chip-debug-feature-regression: test-chip-core-debug-modes test-MSSD-engine-ref test-motion-process-ref test-ppg-process-ref test-top-sensor-pipeline
 	@true
 
 .PHONY: test-top-e2e-inference
@@ -1352,7 +1383,7 @@ test-ppg-process-ref: $(PPG_REF_VVP)
 MSSD_REF_TOP      := sim_mssd_engine_ref
 MSSD_REF_TOP_V    := $(TB_DIR)/sim_mssd_engine_ref.sv
 MSSD_REF_VVP      := $(BUILD_DIR)/$(MSSD_REF_TOP).vvp
-MSSD_REF_PYMOD    := test_MSSD_engine_ref
+MSSD_REF_PYMOD    := test_mssd_engine_ref
 MSSD_REF_SRCS     := $(MSSD_REF_TOP_V) $(RTL_DIR)/mssd_engine.sv
 
 $(MSSD_REF_VVP): $(MSSD_REF_SRCS)
