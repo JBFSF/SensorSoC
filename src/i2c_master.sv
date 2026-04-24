@@ -33,7 +33,7 @@
 module i2c_master (
     input  wire        clk,
     input  wire        resetn,
-
+    input  wire        en_i,
 
     // Client 0: accel_reader
 
@@ -139,7 +139,7 @@ module i2c_master (
             cmd_write_r       <= 1'b0;
             cmd_wdata_r       <= 8'h00;
             byte_cnt_r        <= 8'h00;
-        end else begin
+        end else if (en_i) begin
             accel_cmd_ready_o <= 1'b0;
             accel_rsp_valid_o <= 1'b0;
             accel_rsp_last_o  <= 1'b0;

@@ -1,6 +1,7 @@
 module feature_engine (
     input  wire                     clk_i,
     input  wire                     rst_i,
+    input  wire                     en_i,
 
     // enable on epoch end at top level
     input  wire                     enable_i,
@@ -38,7 +39,7 @@ module feature_engine (
             motion_feat_o <= 16'sd0;
             delta_hr_feat_o <= 16'sd0;
             mssd_feat_o <= 16'sd0;
-        end else begin
+        end else if (en_i) begin
             feat_valid_o <= 1'b0;
 
             // capture latest features when their valid strobes fire

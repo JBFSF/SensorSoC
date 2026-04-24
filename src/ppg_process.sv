@@ -30,6 +30,7 @@ module ppg_process #(
 ) (
     input  logic                         clk_i,
     input  logic                         rst_i,
+    input  logic                         en_i,
 
     input  logic [SAMPLE_W-1:0]          ppg_sample_i,
     input  logic                         ppg_valid_i,
@@ -218,7 +219,7 @@ module ppg_process #(
             prev_hr_bpm_r     <= 16'd0;
             have_prev_hr_r    <= 1'b0;
             have_init_r       <= 1'b0;
-        end else begin
+        end else if (en_i) begin
             beat_pulse_o   <= 1'b0;
             rr_valid_o     <= 1'b0;
             rr_accepted_o <= 1'b0;

@@ -2,6 +2,7 @@
 module taketwo_wrap (
   input  wire         CLK,
   input  wire         RESETN,
+  input  wire         en_i,
   output wire         irq,
 
   output wire [0:0]   maxi_awid,
@@ -77,6 +78,17 @@ module taketwo_wrap (
   assign maxi_awid = 1'b0;
   assign maxi_arid = 1'b0;
 
+  // Gate AXI master handshake signals so the core cannot initiate new
+  // memory transactions when the ML domain is disabled.
+  wire core_maxi_awvalid, core_maxi_wvalid, core_maxi_arvalid;
+  wire core_maxi_bready,  core_maxi_rready;
+
+  assign maxi_awvalid = core_maxi_awvalid & en_i;
+  assign maxi_wvalid  = core_maxi_wvalid  & en_i;
+  assign maxi_arvalid = core_maxi_arvalid & en_i;
+  assign maxi_bready  = core_maxi_bready  & en_i;
+  assign maxi_rready  = core_maxi_rready  & en_i;
+
   taketwo u_core (
     .CLK(CLK),
     .RESETN(RESETN),
@@ -91,18 +103,18 @@ module taketwo_wrap (
     .maxi_awprot (maxi_awprot),
     .maxi_awqos  (maxi_awqos),
     .maxi_awuser (maxi_awuser),
-    .maxi_awvalid(maxi_awvalid),
+    .maxi_awvalid(core_maxi_awvalid),
     .maxi_awready(maxi_awready),
 
     .maxi_wdata  (maxi_wdata),
     .maxi_wstrb  (maxi_wstrb),
     .maxi_wlast  (maxi_wlast),
-    .maxi_wvalid (maxi_wvalid),
+    .maxi_wvalid (core_maxi_wvalid),
     .maxi_wready (maxi_wready),
 
     .maxi_bresp  (maxi_bresp),
     .maxi_bvalid (maxi_bvalid),
-    .maxi_bready (maxi_bready),
+    .maxi_bready (core_maxi_bready),
 
     .maxi_araddr (maxi_araddr),
     .maxi_arlen  (maxi_arlen),
@@ -113,14 +125,14 @@ module taketwo_wrap (
     .maxi_arprot (maxi_arprot),
     .maxi_arqos  (maxi_arqos),
     .maxi_aruser (maxi_aruser),
-    .maxi_arvalid(maxi_arvalid),
+    .maxi_arvalid(core_maxi_arvalid),
     .maxi_arready(maxi_arready),
 
     .maxi_rdata  (maxi_rdata),
     .maxi_rresp  (maxi_rresp),
     .maxi_rlast  (maxi_rlast),
     .maxi_rvalid (maxi_rvalid),
-    .maxi_rready (maxi_rready),
+    .maxi_rready (core_maxi_rready),
 
 
     .saxi_awaddr (saxi_awaddr),

@@ -258,7 +258,7 @@ module chip_core #(
         .time_feat_o           (time_feat_w),
         .motion_feat_o         (motion_feat_w),
         .delta_hr_feat_o       (delta_hr_feat_w),
-        .rmssd_feat_o          (rmssd_feat_w),
+        .mssd_feat_o          (rmssd_feat_w),
 
         .ml_update_gate_o      (ml_update_gate_w),
         .invalid_reason_o      (invalid_reason_w),

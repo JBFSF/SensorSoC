@@ -499,7 +499,7 @@ module top #(
     i2c_master u_i2c_master (
         .clk(clk_i),
         .resetn(~reset_i),
-        //.en_i(feat_en),
+        .en_i(feat_en),
         .accel_cmd_valid_i(acc_i2c_cmd_valid_w),   // accel_reader command valid -> I2C master
         .accel_cmd_ready_o(acc_i2c_cmd_ready_w),   // I2C master ready/accept -> accel_reader
         .accel_cmd_addr_i(acc_i2c_cmd_addr_w),     // accel target 7-bit I2C address
@@ -543,7 +543,7 @@ module top #(
     accel_reader u_accel_reader (
         .clk(clk_i),
         .rst_i(reset_i),
-        //.en_i(feat_en),
+        .en_i(feat_en),
         .cfg_enable_i(1'b1),                     // enables accel polling/reads (always on in this top)
         .cfg_init_en_i(1'b1),                    // enables accel init writes before polling
         .cfg_poll_period_ticks_i(ACC_POLL_PERIOD_TICKS), // poll interval in clk ticks
@@ -576,7 +576,7 @@ module top #(
     ) u_motion_process (
         .clk(clk_i),
         .rst_i(reset_i),
-        //.en_i(feat_en),
+        .en_i(feat_en),
         .sample_valid_i(accel_valid_w),     // drive motion accumulation with each valid accel sample
         // accel_valid_o already indicates a completed good read.
         .ax_i(ax_w),                        // accel X input for motion energy
@@ -601,7 +601,7 @@ module top #(
     ) u_ppg_fifo_reader (
         .clk_i(clk_i),
         .rst_i(reset_i),
-        //.en_i(feat_en),
+        .en_i(feat_en),
         .t_now(time_ms_w),                      // current timebase (ms) used to timestamp samples
         .i2c_cmd_valid(ppg_i2c_cmd_valid_w),    // command stream to i2c_master (PPG)
         .i2c_cmd_ready(ppg_i2c_cmd_ready_w),    // ready/accept from i2c_master (PPG)
@@ -627,7 +627,7 @@ module top #(
     ppg_process u_beat_detect (
         .clk_i(clk_i),
         .rst_i(reset_i),
-        //.en_i(feat_en),
+        .en_i(feat_en),
         .ppg_sample_i(ppg_sample_w),            // raw PPG sample stream input
         .ppg_valid_i(ppg_sample_valid_w),       // strobe: PPG sample input valid
         .ppg_sample_time_i(ppg_sample_time_w),  // timestamp for RR interval computation
@@ -664,7 +664,7 @@ module top #(
     ) u_mssd (
         .clk_i(clk_i),
         .rst_i(reset_i),
-        //.en_i(feat_en),
+        .en_i(feat_en),
         .rr_interval_i(rr_interval_w[15:0]),  // RR interval input for HRV calculation
         .rr_valid_i(rr_valid_w),        // strobe: RR interval input valid
         .rr_accepted_i(rr_accepted_w),  // only include accepted RR intervals
@@ -678,7 +678,7 @@ module top #(
     signal_quality u_signal_quality (
         .clk_i(clk_i),
         .rst_i(reset_i),
-        //.en_i(feat_en),
+        .en_i(feat_en),
         .epoch_end_i(epoch_end_w),              // epoch boundary: evaluate signal quality for that epoch
         .beat_event_i(beat_pulse_w),            // beat events counted for valid fraction and anomalies
         .beat_quality_i(beat_quality_w),        // beat-quality score for "good beat" counting
@@ -702,7 +702,7 @@ module top #(
     feature_engine u_feature_engine (
         .clk_i(clk_i),
         .rst_i(reset_i),
-        //.en_i(feat_en),
+        .en_i(feat_en),
         .enable_i(epoch_end_d),                 // epoch strobe (delayed) to emit a consolidated feature vector
         .seconds_valid_i(1'b1),                 // time feature treated as always valid here
         .time_value_i(time_value_w),            // raw time feature input
@@ -792,7 +792,7 @@ module top #(
     ml_axil_bridge_mmio #(.BASE_ADDR(ML_BASE)) u_ml (
         .clk         (clk_i),
         .resetn      (~reset_i),
-        //.en_i(feat_en),
+        .en_i        (ml_en),
         .mem_valid   (mmio_sel),
         .mem_addr    (mem_addr),
         .mem_wdata   (mem_wdata),
@@ -829,8 +829,8 @@ module top #(
     taketwo_wrap u_taketwo_wrap (
         .CLK   (clk_i),
         .RESETN(~reset_i),
+        .en_i  (ml_en),
         .irq   (ml_irq),
-        //.en_i(ml_en), //TODO: check where to add enable logic, possibly not for whole module, maybe just stalling axi interface will work for that
         .maxi_awid   (wram_awid),
         .maxi_awaddr (wram_awaddr),
         .maxi_awlen  (wram_awlen),

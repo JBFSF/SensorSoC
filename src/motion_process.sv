@@ -8,6 +8,7 @@ module motion_process #(
 )(
     input  logic                     clk,
     input  logic                     rst_i,
+    input  logic                     en_i,
 
     // Sample capture
     input  logic                     sample_valid_i,
@@ -70,7 +71,7 @@ module motion_process #(
             motion_energy_accum_r <= {ENERGY_W{1'b0}};
             motion_energy_epoch_o <= {ENERGY_W{1'b0}};
             epoch_done_o          <= 1'b0;
-        end else begin
+        end else if (en_i) begin
             epoch_done_o <= 1'b0;
 
             if (sample_fire) begin

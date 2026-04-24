@@ -10,6 +10,7 @@ module accel_reader #(
 ) (
     input  logic                  clk,
     input  logic                  rst_i,
+    input  logic                  en_i,
 
     input  logic                  cfg_enable_i,
     input  logic                  cfg_init_en_i,
@@ -101,7 +102,7 @@ module accel_reader #(
             i2c_error_o <= 1'b0;
             timeout_o <= 1'b0;
             nack_seen_o <= 1'b0;
-        end else begin
+        end else if (en_i) begin
             i2c_cmd_valid_o <= 1'b0;
             i2c_cmd_write_o <= 1'b0;
             i2c_cmd_wdata_o <= 8'd0;
