@@ -78,14 +78,6 @@ sim-view: ## View simulation waveforms in GTKWave
 	gtkwave cocotb/sim_build/chip_top.fst
 .PHONY: sim-view
 
-sim-clock-mux: ## Run clock mux RTL simulation and write cocotb/sim/waves/clock_mux.vcd
-	$(MAKE) -C cocotb sim-clock-mux
-.PHONY: sim-clock-mux
-
-view-clock-mux: ## Run clock mux RTL simulation and open the waveform in GTKWave
-	$(MAKE) -C cocotb view-clock-mux
-.PHONY: view-clock-mux
-
 render-image: ## Render an image from the final layout (after copy-final)
 	mkdir -p img/
 	PDK_ROOT=${PDK_ROOT} PDK=${PDK} python3 scripts/lay2img.py final/gds/${TOP}.gds img/${TOP}.png --width 2048 --oversampling 4
