@@ -60,7 +60,11 @@ module taketwo
   output reg [32-1:0] saxi_rdata,
   output [2-1:0] saxi_rresp,
   output reg saxi_rvalid,
-  input saxi_rready
+  input saxi_rready,
+
+  output reg signed [15:0] dbg_logit0,
+  output reg signed [15:0] dbg_logit1
+
 );
 
   wire RESETN_inv;
@@ -8511,6 +8515,8 @@ module taketwo
       matmul_11_arg_objaddr_2 <= 0;
       matmul_11_arg_objaddr_3 <= 0;
       matmul_11_control_param_index <= 0;
+      dbg_logit0 <= 16'sd0;
+      dbg_logit1 <= 16'sd0;
     end else begin
       case(main_fsm)
         main_fsm_init: begin
@@ -8674,7 +8680,22 @@ module taketwo
       endcase
     end
   end
-
+  ///NEW
+always @(posedge CLK) begin
+  if (RST) begin
+    dbg_logit0 <= 16'sd0;
+    dbg_logit1 <= 16'sd0;
+  end else begin
+    if (_stream_matmul_11_stream_oready &&
+        _stream_matmul_11_sink_26_sink_wenable &&
+        (_stream_matmul_11_sink_26_sink_sel == 5)) begin
+      if (_stream_matmul_11_sink_26_sink_waddr == 0)
+        dbg_logit0 <= $signed(_stream_matmul_11_sink_26_sink_wdata);
+      if (_stream_matmul_11_sink_26_sink_waddr == 1)
+        dbg_logit1 <= $signed(_stream_matmul_11_sink_26_sink_wdata);
+    end
+  end
+end
   localparam control_matmul_11_1 = 1;
   localparam control_matmul_11_2 = 2;
   localparam control_matmul_11_3 = 3;

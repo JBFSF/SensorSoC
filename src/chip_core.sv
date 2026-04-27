@@ -119,6 +119,9 @@ module chip_core #(
     logic epoch_end_w;
     logic alarm_w;
 
+    logic [15:0] logit0_w;
+    logic [15:0] logit1_w;
+
     logic        pico_trap_w;
     logic        pico_cpu_clk_en_w;
     logic        pico_mem_valid_w;
@@ -193,6 +196,7 @@ module chip_core #(
 
             4'b0110: begin 
                 // view ML update gating
+                // this was made by chatgpt I'm not too sure what these signals do
                 debug_bus_w = {ml_update_gate_w, epoch_end_w, invalid_reason_w[7:0], 6'b0};
             end
             4'b0111: begin
@@ -233,10 +237,10 @@ module chip_core #(
 
             // reserved test modes for future debug views
             4'b1100: begin 
-                debug_bus_w = '0;
+                debug_bus_w = logit0_w[15:0];
             end
             4'b1101: begin 
-                debug_bus_w = '0;
+                debug_bus_w = logit1_w[15:0];
             end
             4'b1110: begin 
                 debug_bus_w = '0;
@@ -334,6 +338,9 @@ module chip_core #(
 
         .epoch_end_o           (epoch_end_w),
         .alarm_o               (alarm_w),
+
+        .logit0                (logit0_w),
+        .logit1                (logit1_w),
         
         .test_force_irq_i      (test_force_irq_w),
         .test_force_wake_i     (test_force_wake_w),

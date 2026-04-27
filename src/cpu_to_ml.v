@@ -126,6 +126,8 @@ module cpu_to_ml #(
   wire        maxi_arvalid;
 
   wire        maxi_rready;
+  wire signed [15:0] dbg_logit0;
+  wire signed [15:0] dbg_logit1;
 
   taketwo_wrap u_taketwo (
     .CLK   (clk),
@@ -200,7 +202,11 @@ module cpu_to_ml #(
     .saxi_rdata  (saxi_rdata),
     .saxi_rresp  (saxi_rresp),
     .saxi_rvalid (saxi_rvalid),
-    .saxi_rready (saxi_rready)
+    .saxi_rready (saxi_rready),
+
+    // Debug-only exported logits; unused in this wrapper.
+    .dbg_logit0  (dbg_logit0),
+    .dbg_logit1  (dbg_logit1)
   );
 
 endmodule

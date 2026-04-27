@@ -223,6 +223,8 @@ module soc_top #(
     wire        wram_rready;
 
     wire        ml_irq;   // taketwo inference-done interrupt
+    wire signed [15:0] ml_dbg_logit0;
+    wire signed [15:0] ml_dbg_logit1;
     wire        ml_ready;
     wire [31:0] ml_rdata;
     wire        test_ready;
@@ -259,7 +261,9 @@ module soc_top #(
         .saxi_rdata  (ml_saxi_rdata),
         .saxi_rresp  (ml_saxi_rresp),
         .saxi_rvalid (ml_saxi_rvalid),
-        .saxi_rready (ml_saxi_rready)
+        .saxi_rready (ml_saxi_rready),
+        .dbg_logit0  (ml_dbg_logit0),
+        .dbg_logit1  (ml_dbg_logit1)
     );
 
     taketwo_wrap u_taketwo (

@@ -89,6 +89,8 @@ module top #(
 
     output logic                      alarm_o,          // placeholder alarm output (unused in current RTL)
 
+    output logic signed [15:0] logit0,
+    output logic signed [15:0] logit1,
     // Signals used for test modes.
     input  logic        test_force_irq_i,
     input  logic        test_force_wake_i,
@@ -850,7 +852,9 @@ module top #(
         .saxi_rdata  (ml_saxi_rdata),
         .saxi_rresp  (ml_saxi_rresp),
         .saxi_rvalid (ml_saxi_rvalid),
-        .saxi_rready (ml_saxi_rready)
+        .saxi_rready (ml_saxi_rready),
+        .dbg_logit0  (logit0),
+        .dbg_logit1  (logit1)
     );
 
     // Shared ML memory. Firmware writes inputs/weights through MMIO, while
