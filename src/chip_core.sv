@@ -1,6 +1,40 @@
 // SPDX-FileCopyrightText: © 2025 XXX Authors
 // SPDX-License-Identifier: Apache-2.0
 
+    // Current pinout:
+    // input_in[4:0] : test mode selector
+    // bidir[0]      : alarm output
+    // bidir[1]      : SPI flash clock output
+    // bidir[2]      : SPI flash MOSI output
+    // bidir[3]      : SPI flash CS_n output
+    // bidir[4]      : SPI flash MISO input
+    // bidir[5]      : I2C SCL input
+    // bidir[6]      : I2C SDA open drain
+    // bidir[22:7]   : 16-bit debug bus for test mode outputs
+    // bidir[37]     : force Pico IRQ input, only used by test modes = 01010 / 11010
+    // bidir[38]     : force wake source input, only used by test modes = 01011 / 11011
+    // bidir[39]     : external test clock, used by the 1xxxx test-mode bank
+    //
+    // Test mode map:
+    //   00000 : normal mode, PLL clock, debug bus disabled
+    //   00001 : MSSD feature
+    //   00010 : delta HR feature
+    //   00011 : time feature
+    //   00100 : motion feature
+    //   00101 : pipeline smoke-test summary
+    //   00110 : ML update gate / invalid-reason summary
+    //   00111 : Pico core state and low address bits
+    //   01000 : Pico MMIO write summary
+    //   01001 : Pico sleep / IRQ summary
+    //   01010 : force Pico IRQ view
+    //   01011 : force wake-source view
+    //   01100 : logit0
+    //   01101 : logit1
+    //   01110 : not used yet
+    //   01111 : reserved
+    //   10000 : normal mode, external clock, debug bus disabled
+    //   1xxxx : same debug-bus mapping as 0xxxx, but clocked from bidir[39]
+
 `default_nettype none
 
 module chip_core #(
@@ -70,19 +104,6 @@ module chip_core #(
     inout  wire [NUM_ANALOG_PADS-1:0] analog     // Analog
 );
 
-    // Current pinout:
-    // input_in[3:0] : test mode selector
-    // bidir[0]      : alarm output
-    // bidir[1]      : SPI flash clock output
-    // bidir[2]      : SPI flash MOSI output
-    // bidir[3]      : SPI flash CS_n output
-    // bidir[4]      : SPI flash MISO input
-    // bidir[5]      : I2C SCL input
-    // bidir[6]      : I2C SDA open drain
-    // bidir[22:7]   : 16-bit debug bus for test mode outputs
-    // bidir[37]     : force Pico IRQ input, only used by test mode = 1010
-    // bidir[38]     : force wake source input, only used by test mode = 1011
-    // bidir[39]     : external test clock, only for test mode = 0101
 
     localparam int DEBUG_BUS_LO        = 7;
     localparam int DEBUG_BUS_HI        = 22;
@@ -90,7 +111,7 @@ module chip_core #(
     localparam int TEST_FORCE_WAKE_PAD = 38;
     localparam int TEST_CLK_PAD        = 39;
 
-    logic [3:0] test_mode_w;
+    logic [4:0] test_mode_w;
     logic       core_clk_w;
 
     logic [NUM_BIDIR_PADS-1:0] bidir_out_w;
@@ -149,12 +170,12 @@ module chip_core #(
     assign bidir_pu = '0;
     assign bidir_pd = '0;
 
-    assign test_mode_w = input_in[3:0];
+    assign test_mode_w = input_in[4:0];
     assign test_force_irq_w = bidir_in[TEST_FORCE_IRQ_PAD];
     assign test_force_wake_w = bidir_in[TEST_FORCE_WAKE_PAD];
 
-    // Use the external test clock only in the dedicated clock-test mode.
-    assign core_clk_w = (test_mode_w == 4'b0101) ? bidir_in[TEST_CLK_PAD] : clk;
+    // Upper-half test modes run from the external test clock.
+    assign core_clk_w = test_mode_w[4] ? bidir_in[TEST_CLK_PAD] : clk;
 
     assign time_feat_w = (DEBUG_STIM_EN && debug_stim_override_en_i) ? $signed(debug_stim_time_i) : time_feat_top_w;
     assign motion_feat_w = (DEBUG_STIM_EN && debug_stim_override_en_i) ? $signed(debug_stim_motion_i) : motion_feat_top_w;
@@ -164,49 +185,49 @@ module chip_core #(
     always_comb begin
         debug_bus_w = '0;
         unique case (test_mode_w)
-            4'b0000: begin
+            5'b00000: begin
+                //normal mode, pll clock
                 debug_bus_w = '0;
             end
 
-            4'b0001: begin
+            5'b00001: begin
                 // view processed MSSD
                 //these busses are not cut off, just writing [15:0 to be explicit]
                 debug_bus_w = mssd_feat_w[15:0];
             end
 
-            4'b0010: begin
+            5'b00010: begin
                 // view processed deltaHR
                 debug_bus_w = delta_hr_feat_w[15:0];
 
             end
-            4'b0011: begin
+            5'b00011: begin
                 // view processed time feature
                 debug_bus_w = time_feat_w[15:0];
             end
 
-            4'b0100: begin
+            5'b00100: begin
                 // view processed motion feature
                 debug_bus_w = motion_feat_w[15:0];
             end
-            4'b0101: begin
-                // external clock test mode. we do the muxing above,
-                // may want to assign other signals here or put the internal clock as an output?
-                debug_bus_w = '0;
+            5'b00101: begin
+                // smoke test, to see that important signals are there, and updating
+                debug_bus_w = {|mssd_feat_w, |delta_hr_feat_w, |time_feat_w, |motion_feat_w, feat_valid_w, |logit0_w, |logit1_w, ml_update_gate_w, epoch_end_w, alarm_w, 6'b000000};
             end
 
-            4'b0110: begin 
+            5'b00110: begin 
                 // view ML update gating
                 // this was made by chatgpt I'm not too sure what these signals do
                 debug_bus_w = {ml_update_gate_w, epoch_end_w, invalid_reason_w[7:0], 6'b0};
             end
-            4'b0111: begin
+            5'b00111: begin
                 // observe pico state (ie fetch, read, write, stalled, trapped),
                 // with the low 7 address bits for quick activity checks
                 debug_bus_w = {pico_trap_w, pico_cpu_clk_en_w, pico_mem_valid_w,
                 pico_mem_instr_w, pico_mem_ready_w, pico_mem_wstrb_w, pico_mem_addr_w[6:0]};
             end
 
-            4'b1000: begin
+            5'b01000: begin
                 // observe pico MMIO writes with the low byte of the address and
                 // low nibble of write data, plus a few key qualifiers
                 debug_bus_w = {
@@ -219,34 +240,125 @@ module chip_core #(
                 };
             end
 
-            4'b1001: begin
+            5'b01001: begin
                 // observe pico sleep/irq with summary flags
                 debug_bus_w = {pico_trap_w, pico_sleeping_w, pico_cpu_clk_en_w, |pico_irq_w, 12'b0};
             end
 
-            4'b1010: begin 
+            5'b01010: begin 
                 // force pico IRQ and watch memory activity
                 debug_bus_w = {
                     test_force_irq_w, pico_trap_w, pico_cpu_clk_en_w, pico_mem_instr_w, pico_mem_valid_w, pico_mem_ready_w, pico_mem_addr_w[9:0]};
             end
-            4'b1011: begin 
+            5'b01011: begin 
                 // force pico wake and expose the wake/IRQ sources directly
                 debug_bus_w = {test_force_wake_w, host_i2c_irq_event_w, ml_irq_w, timer_event_w, 12'b0};
             end
 
 
             // reserved test modes for future debug views
-            4'b1100: begin 
+            5'b01100: begin 
                 debug_bus_w = logit0_w[15:0];
             end
-            4'b1101: begin 
+            5'b01101: begin 
                 debug_bus_w = logit1_w[15:0];
             end
-            4'b1110: begin 
+
+            5'b01110: begin 
+                //not yet used
                 debug_bus_w = '0;
             end
-            4'b1111: begin 
+            5'b01111: begin
+                //not yet used 
+                debug_bus_w = '0;
+            end
 
+            5'b10000: begin
+                // normal mode, with external clock
+                debug_bus_w = '0;
+            end
+
+            5'b10001: begin
+                // view processed MSSD
+                //these busses are not cut off, just writing [15:0 to be explicit]
+                debug_bus_w = mssd_feat_w[15:0];
+            end
+
+            5'b10010: begin
+                // view processed deltaHR
+                debug_bus_w = delta_hr_feat_w[15:0];
+
+            end
+            5'b10011: begin
+                // view processed time feature
+                debug_bus_w = time_feat_w[15:0];
+            end
+
+            5'b10100: begin
+                // view processed motion feature
+                debug_bus_w = motion_feat_w[15:0];
+            end
+            5'b10101: begin
+                //  // smoke test, to see that important signals are there, and updating
+                debug_bus_w = {|mssd_feat_w, |delta_hr_feat_w, |time_feat_w, |motion_feat_w, feat_valid_w, |logit0_w, |logit1_w, ml_update_gate_w, epoch_end_w, alarm_w, 6'b000000};
+            end
+
+            5'b10110: begin 
+                // view ML update gating
+                // this was made by chatgpt I'm not too sure what these signals do
+                debug_bus_w = {ml_update_gate_w, epoch_end_w, invalid_reason_w[7:0], 6'b0};
+            end
+            5'b10111: begin
+                // observe pico state (ie fetch, read, write, stalled, trapped),
+                // with the low 7 address bits for quick activity checks
+                debug_bus_w = {pico_trap_w, pico_cpu_clk_en_w, pico_mem_valid_w,
+                pico_mem_instr_w, pico_mem_ready_w, pico_mem_wstrb_w, pico_mem_addr_w[6:0]};
+            end
+
+            5'b11000: begin
+                // observe pico MMIO writes with the low byte of the address and
+                // low nibble of write data, plus a few key qualifiers
+                debug_bus_w = {
+                    pico_mem_valid_w && (pico_mem_wstrb_w != 4'b0000),
+                    pico_trap_w,
+                    |pico_mem_wstrb_w,
+                    pico_mem_wstrb_w == 4'hF,
+                    pico_mem_addr_w[7:0],
+                    pico_mem_wdata_w[3:0]
+                };
+            end
+            
+            5'b11001: begin
+                // observe pico sleep/irq with summary flags
+                debug_bus_w = {pico_trap_w, pico_sleeping_w, pico_cpu_clk_en_w, |pico_irq_w, 12'b0};
+            end
+
+            5'b11010: begin 
+                // force pico IRQ and watch memory activity
+                debug_bus_w = {
+                    test_force_irq_w, pico_trap_w, pico_cpu_clk_en_w, pico_mem_instr_w, pico_mem_valid_w, pico_mem_ready_w, pico_mem_addr_w[9:0]};
+            end
+            5'b11011: begin 
+                // force pico wake and expose the wake/IRQ sources directly
+                debug_bus_w = {test_force_wake_w, host_i2c_irq_event_w, ml_irq_w, timer_event_w, 12'b0};
+            end
+
+
+            // reserved test modes for future debug views
+            5'b11100: begin 
+                debug_bus_w = logit0_w[15:0];
+            end
+            5'b11101: begin 
+                debug_bus_w = logit1_w[15:0];
+            end
+
+            5'b11110: begin 
+                //not yet used
+                debug_bus_w = '0;
+            end
+
+            5'b11111: begin
+                //not yet used 
                 debug_bus_w = '0;
             end
             default: begin
@@ -271,7 +383,7 @@ module chip_core #(
         bidir_oe_w[3] = 1'b1;
         bidir_oe_w[6] = i2c_sda_drive_low_w;
 
-        if (test_mode_w != 4'b0000) begin
+        if (test_mode_w[3:0] != 4'b0000) begin
             bidir_out_w[DEBUG_BUS_HI:DEBUG_BUS_LO] = debug_bus_w;
             bidir_oe_w[DEBUG_BUS_HI:DEBUG_BUS_LO] = '1;
         end
