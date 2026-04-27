@@ -1,0 +1,5 @@
+cocotb>=2.0,<3.0
+cocotb-tools>=0.1
+cocotbext-axi>=0.1
+Pillow>=10.0
+docopt>=0.6

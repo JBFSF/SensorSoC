@@ -790,6 +790,10 @@ test-soc-wake-e2e-p0:
 .PHONY: test-functional-matrix
 test-functional-matrix:
 	@bash tools/test_functionality_matrix.sh
+
+.PHONY: test-firmware-matrix
+test-firmware-matrix:
+	@bash $(TOOLS_DIR)/test_functionality_matrix.sh
 # ----------------------------
 # IRQ testbench (tb_irq)
 # ----------------------------

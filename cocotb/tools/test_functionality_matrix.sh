@@ -4,18 +4,25 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+printf "\n=== Pre-flight: Python dependencies ===\n"
+pip install -q --break-system-packages -r "${ROOT_DIR}/../requirements.txt"
+
+printf "\n=== Pre-flight: RISC-V firmware build ===\n"
+"${ROOT_DIR}/tools/build-all-firmware.sh"
+
 declare -a CASES=(
-  "test-cpu-ml|Strict ML IRQ contract: completion edge, latched status, clear, and rearm (including tight-gap restart)"
-  "sim-ml-weight-load|CPU writes weight SRAM, programs ML base address, starts inference, and proves AXI compute traffic"
-  "sim-ml-cpu-wake-i2c|End-to-end SoC path: timer wake, ML IRQ wake, host-I2C wake event, and wake policy boundary checks"
-  "test-host-i2c-bridge|Host-I2C bridge register contract, threshold event behavior, and IRQC proxy interactions"
-  "test-irq-ctrl-races|IRQ controller simultaneous-source, masking/reassert, claim/complete, and sideband access races"
+  "test-irq-states|IRQ state machine: irq_test.c firmware on PicoRV32, claim/complete, re-arm"
+  "sim-ml-weight-load|CPU firmware writes weight SRAM, programs ML base address, starts inference, proves AXI compute traffic"
+  "test-top-ml-golden-vector-unified|Full unified-top ML golden-vector regression: weights loaded via SPI, inference run, output checked against reference"
+  "test-top-mlp-features|MLP feature-extraction path: weight SRAM visibility, AXI traffic, and inference completion signalling"
+  "test-top-unified-reset-init|Unified-top initialization: SPI boot, register reset state, and reset corner cases"
+  "test-top-unified-runtime|Unified-top runtime integration: host-I2C bridge, production sleep/wake loop, and forced-wake IRQ path"
 )
 
 declare -a PASSED=()
 declare -a FAILED=()
 
-printf "\n=== SleepSoC Functionality Matrix ===\n"
+printf "\n=== SleepSoC Firmware Matrix ===\n"
 
 for case in "${CASES[@]}"; do
   target="${case%%|*}"
