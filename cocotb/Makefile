@@ -31,6 +31,7 @@
 #   # Cocotb unit tests (simple_sram_tb.py wrapper)
 #   make test-simple-sram
 #   make sim-logit-confidence
+#   make test-ml-canonical-v1
 #   make sim-top-feature-ml-cpu
 #   make sim-top-feature-ml-cpu-spi-flash
 #   make sim-top-spi-init-unified
@@ -1206,6 +1207,15 @@ test-top-unified-forced-wake-irq: $(TOP_UNIFIED_ENV_VVP)
 .PHONY: test-top-unified-runtime
 test-top-unified-runtime: test-top-unified-host-i2c test-top-unified-prod-loop test-top-unified-forced-wake-irq
 	@true
+
+# ============================================================
+# Bare taketwo_wrap: canonical_v1 isolated golden-vector check
+# ============================================================
+
+.PHONY: test-ml-canonical-v1
+test-ml-canonical-v1:
+	@echo "[COCOTB] Running isolated taketwo_wrap canonical_v1 check"
+	@$(MAKE) -C $(TB_DIR)/ml MODULE=ml_tb_canonical
 
 # ============================================================
 # Cocotb: unified-top golden-vector check via golden_vectors.py
