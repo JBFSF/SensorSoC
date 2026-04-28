@@ -97,6 +97,23 @@ async def apply_reset(dut, cycles: int = 20) -> None:
     await ClockCycles(dut.clk, 2)
 
 
+async def pulse_forced_wake(dut, cycles: int = 2) -> None:
+    """Inject a short wake pulse through the shared wrapper's test hook."""
+    await NextTimeStep()
+    dut.test_force_wake.value = 1
+    await ClockCycles(dut.clk, cycles)
+    dut.test_force_wake.value = 0
+    await ClockCycles(dut.clk, 2)
+
+
+def _handle_nonzero(dut, name: str) -> bool:
+    """Return True when an optional wrapper signal exists and is nonzero."""
+    try:
+        return int(getattr(dut, name).value) != 0
+    except AttributeError:
+        return False
+
+
 def mmio_write_active(dut) -> bool:
     """True when PicoRV32 is completing an MMIO write in the current cycle."""
     return (
@@ -118,23 +135,45 @@ def mmio_read_active(dut) -> bool:
 
 
 async def wait_for_boot_load(dut, timeout_cycles: int = 200000) -> None:
-    """Wait until firmware has copied the first flash words into WRAM.
+    """Wait until the hardware boot paths complete and the CPU has been woken.
 
-    The production firmware first streams the taketwo parameter image from the
-    SPI flash model into WRAM. A simple and stable "boot complete" checkpoint is
-    to wait until the leading WRAM words match the leading flash words.
+    The current architecture no longer uses deep WRAM probing as the bring-up
+    checkpoint. Instead, the stable contracts are:
+
+    - firmware boot controller asserted ``boot_done``
+    - weight boot controller asserted ``weight_boot_done``
+    - the shared-wrapper test hook can wake the system out of the reset-time
+      sleep posture so the feature pipeline can run
+    - in normal mode, CPU activity is expected only after the feature path
+      advances far enough to transition the FSM into a CPU-enabled state
     """
     for _ in range(timeout_cycles):
         await RisingEdge(dut.clk)
         await ReadOnly()
-        if (
-            int(dut.u_dut.u_weight_ram.mem[32].value) == int(dut.u_flash.mem[0].value)
-            and int(dut.u_dut.u_weight_ram.mem[33].value) == int(dut.u_flash.mem[1].value)
-            and int(dut.u_dut.u_weight_ram.mem[34].value) == int(dut.u_flash.mem[2].value)
-            and int(dut.u_dut.u_weight_ram.mem[35].value) == int(dut.u_flash.mem[3].value)
+        if int(dut.boot_done.value) != 0 and int(dut.weight_boot_done.value) != 0:
+            break
+    else:
+        raise AssertionError("timed out waiting for boot_done and weight_boot_done")
+
+    if int(dut.pico_sleeping.value) != 0:
+        await pulse_forced_wake(dut)
+
+    saw_postwake_progress = False
+    for _ in range(timeout_cycles):
+        await RisingEdge(dut.clk)
+        await ReadOnly()
+        saw_postwake_progress |= (
+            int(dut.feat_valid.value) != 0 or
+            _handle_nonzero(dut, "feat_latched_valid") or
+            int(dut.pico_sleeping.value) == 0
+        )
+        if saw_postwake_progress and (
+            int(dut.pico_mem_valid.value) != 0 or
+            int(dut.test_status.value) != 0 or
+            int(dut.pico_cpu_clk_en.value) != 0
         ):
             return
-    raise AssertionError("timed out waiting for firmware SPI boot load into WRAM")
+    raise AssertionError("timed out waiting for post-wake feature/CPU activity after boot")
 
 
 async def wait_for_coherent_score(dut, timeout_cycles: int = 600000) -> None:
@@ -144,8 +183,8 @@ async def wait_for_coherent_score(dut, timeout_cycles: int = 600000) -> None:
         await ReadOnly()
         score = int(dut.ml_score_hw.value)
         code = int(dut.test_code.value)
-        logit_word = int(dut.u_dut.u_weight_ram.mem[1376].value)
-        if score != 0 and (code & 0xFFFF) == (score & 0xFFFF) and logit_word != 0xA5A55A5A:
+        logit0_proxy = int(dut.host_logit0_proxy.value)
+        if score != 0 and (code & 0xFFFF) == (score & 0xFFFF) and logit0_proxy != 0:
             return
     raise AssertionError("timed out waiting for first coherent firmware score/logit update")
 

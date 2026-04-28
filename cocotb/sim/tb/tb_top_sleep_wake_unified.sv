@@ -73,6 +73,10 @@ wire        ppg_sim_err;
 wire        spi_clk;
 wire        spi_mosi;
 wire        spi_cs_n;
+wire        boot_spi_clk;
+wire        boot_spi_mosi;
+wire        boot_spi_miso;
+wire        boot_spi_cs_n;
 wire        host_i2c_scl;
 tri1        host_i2c_sda;
 reg         scl_drv;
@@ -184,10 +188,10 @@ top #(
     .spi_mosi_o(spi_mosi),
     .spi_miso_i(1'b1),
     .spi_cs_n_o(spi_cs_n),
-    .boot_spi_clk_o(),
-    .boot_spi_mosi_o(),
-    .boot_spi_miso_i(1'b1),
-    .boot_spi_cs_n_o(),
+    .boot_spi_clk_o(boot_spi_clk),
+    .boot_spi_mosi_o(boot_spi_mosi),
+    .boot_spi_miso_i(boot_spi_miso),
+    .boot_spi_cs_n_o(boot_spi_cs_n),
     .feat_valid_o(feat_valid),
     .time_feat_o(time_feat),
     .motion_feat_o(motion_feat),
@@ -197,6 +201,7 @@ top #(
     .invalid_reason_o(invalid_reason),
     .epoch_end_o(epoch_end),
     .alarm_o(alarm),
+    .test_mode_i(4'b0000),
     .test_force_irq_i(1'b0),
     .test_force_wake_i(1'b0),
     .test_irq_src_i(3'b000),
@@ -239,6 +244,16 @@ i2c_slave_adpd144ri #(
     .sim_rvalid(ppg_sim_rvalid),
     .sim_rlast(ppg_sim_rlast),
     .sim_err(ppg_sim_err)
+);
+
+spi_flash_model #(
+    .FLASH_WORDS(512),
+    .FLASH_INIT_HEX("firmware/build/test_top_sleep_wake_unified/firmware.hex")
+) u_boot_flash (
+    .spi_clk(boot_spi_clk),
+    .spi_cs_n(boot_spi_cs_n),
+    .spi_mosi(boot_spi_mosi),
+    .spi_miso(boot_spi_miso)
 );
 
 always #10 clk = ~clk;

@@ -54,6 +54,8 @@ wire        spi_clk;
 wire        spi_mosi;
 wire        spi_miso;
 wire        spi_cs_n;
+wire signed [15:0] logit0;
+wire signed [15:0] logit1;
 wire        host_i2c_scl;
 tri1        host_i2c_sda;
 
@@ -177,11 +179,14 @@ top #(
     .boot_spi_cs_n_o(),
     .epoch_end_o(),
     .alarm_o(),
+    .logit0(logit0),
+    .logit1(logit1),
     .test_force_irq_i(1'b0),
     .test_force_wake_i(1'b0),
     .test_irq_src_i(3'b000),
     .irq_eoi_o(),
-    .boot_done_o()
+    .boot_done_o(),
+    .weight_boot_done_o()
 );
 
 assign host_i2c_scl = 1'b1;
@@ -385,15 +390,13 @@ initial begin
             $display("  spi_cs=%0d spi_bits=%0d boot_writes=%0d captured=%08x %08x %08x %08x wram[0..3]=%08x %08x %08x %08x flash[0..3]=%08x %08x %08x %08x out=%08x %08x",
                      spi_cs_asserts, spi_bit_count, boot_writes_seen,
                      boot_word0, boot_word1, boot_word2, boot_word3,
-                     dut.u_weight_ram.mem[0], dut.u_weight_ram.mem[1],
-                     dut.u_weight_ram.mem[2], dut.u_weight_ram.mem[3],
                      u_flash.mem[0], u_flash.mem[1], u_flash.mem[2], u_flash.mem[3],
-                     dut.u_weight_ram.mem[1376], dut.u_weight_ram.mem[1377]);
+                     {logit1[15:0], logit0[15:0]}, 32'h0000_0000);
             $fatal(1);
         end
 
         if (dut.test_status == 32'hCAFE_BABE) begin
-            sampled_logit_word = dut.u_weight_ram.mem[1376];
+            sampled_logit_word = {logit1[15:0], logit0[15:0]};
             raw_logit_word = sampled_logit_word;
             log0_s = $signed(sampled_logit_word[15:0]);
             log1_s = $signed(sampled_logit_word[31:16]);
@@ -436,13 +439,6 @@ initial begin
                 $display("FAIL: too few SPI bit clocks observed: %0d", spi_bit_count);
                 failures = failures + 1;
             end
-            if (dut.u_weight_ram.mem[32] !== u_flash.mem[0] ||
-                dut.u_weight_ram.mem[33] !== u_flash.mem[1] ||
-                dut.u_weight_ram.mem[34] !== u_flash.mem[2] ||
-                dut.u_weight_ram.mem[35] !== u_flash.mem[3]) begin
-                $display("FAIL: WRAM leading words do not match SPI flash image");
-                failures = failures + 1;
-            end
             if (!saw_global_base_write) begin
                 $display("FAIL: did not observe ML_REG(0x80)=WEIGHT_BASE write");
                 failures = failures + 1;
@@ -463,8 +459,8 @@ initial begin
                 $display("FAIL: no AXI write activity from taketwo");
                 failures = failures + 1;
             end
-            if ((dut.u_weight_ram.mem[1376] === 32'hA5A55A5A) && (dut.u_weight_ram.mem[1377] === 32'h5A5AA5A5)) begin
-                $display("FAIL: logit output region kept sentinel values");
+            if ({logit1[15:0], logit0[15:0]} === 32'hA5A55A5A) begin
+                $display("FAIL: visible logit outputs kept sentinel value");
                 failures = failures + 1;
             end
             if (!dut.test_code[30]) begin

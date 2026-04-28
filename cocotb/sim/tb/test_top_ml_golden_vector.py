@@ -9,7 +9,8 @@ What it checks
 --------------
 1. The golden metadata is self-consistent.
 2. The unified top boots through the hardware boot SPI path.
-3. The golden firmware writes the expected quantized feature vector into WRAM.
+3. The golden firmware writes the expected quantized feature vector through the
+   CPU MMIO path into the visible feature/logit register window.
 4. Firmware reaches PASS without trapping.
 5. The final WRAM logit word matches the packed logits for ``canonical_v1``.
 """
@@ -24,19 +25,11 @@ from golden_vectors import (
     predicted_class_from_logits,
     unpack_int16_pair,
 )
-from top_unified_env import apply_reset, start_clock
+from top_unified_env import X_BASE, apply_reset, start_clock, wait_for_boot_load
 
 
 TEST_PASS = 0xCAFEBABE
 TEST_FAIL = 0xDEADBEEF
-WEIGHT_BASE = 0x03006000
-X_BASE_BYTES = 64
-LOGIT_BASE_BYTES = 5504
-X_WORD0_IDX = X_BASE_BYTES // 4
-X_WORD1_IDX = X_WORD0_IDX + 1
-LOGIT_WORD_IDX = LOGIT_BASE_BYTES // 4
-
-
 def _u(handle) -> int:
     return int(handle.value)
 
@@ -60,6 +53,10 @@ async def test_unified_top_canonical_v1(dut):
 
     cocotb.start_soon(start_clock(dut))
     await apply_reset(dut)
+    await wait_for_boot_load(dut)
+
+    observed_x_word0 = None
+    observed_x_word1 = None
 
     for _ in range(3_000_000):
         await RisingEdge(dut.clk)
@@ -69,6 +66,20 @@ async def test_unified_top_canonical_v1(dut):
             raise AssertionError("CPU trap asserted during unified-top golden test")
         if _u(dut.test_status) == TEST_FAIL:
             raise AssertionError(f"firmware reported FAIL with code 0x{_u(dut.test_code):08x}")
+        if (
+            _u(dut.pico_mem_valid)
+            and _u(dut.pico_mem_ready)
+            and _u(dut.pico_mem_wstrb) != 0
+            and _u(dut.pico_mem_addr) == X_BASE
+        ):
+            observed_x_word0 = _u(dut.pico_mem_wdata)
+        if (
+            _u(dut.pico_mem_valid)
+            and _u(dut.pico_mem_ready)
+            and _u(dut.pico_mem_wstrb) != 0
+            and _u(dut.pico_mem_addr) == (X_BASE + 4)
+        ):
+            observed_x_word1 = _u(dut.pico_mem_wdata)
         if _u(dut.test_status) == TEST_PASS:
             break
     else:
@@ -77,9 +88,10 @@ async def test_unified_top_canonical_v1(dut):
     await ClockCycles(dut.clk, 4)
     await ReadOnly()
 
-    observed_x_word0 = _u(dut.u_dut.u_weight_ram.mem[X_WORD0_IDX])
-    observed_x_word1 = _u(dut.u_dut.u_weight_ram.mem[X_WORD1_IDX])
-    observed_logit_word = _u(dut.u_dut.u_weight_ram.mem[LOGIT_WORD_IDX])
+    assert observed_x_word0 is not None, "never observed CPU write of canonical input word0"
+    assert observed_x_word1 is not None, "never observed CPU write of canonical input word1"
+
+    observed_logit_word = pack_int16_pair(_u(dut.logit0), _u(dut.logit1))
     observed_logits = unpack_int16_pair(observed_logit_word)
 
     assert observed_x_word0 == expected_x_word0, (

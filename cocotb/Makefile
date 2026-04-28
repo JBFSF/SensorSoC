@@ -673,6 +673,7 @@ TOP_ML_CONTROL_UNIFIED_TOP     := tb_top_ml_control_unified
 TOP_ML_CONTROL_UNIFIED_VVP     := $(BUILD_DIR)/$(TOP_ML_CONTROL_UNIFIED_TOP).vvp
 TOP_ML_CONTROL_UNIFIED_SOURCES := \
 	$(TB_DIR)/tb_top_ml_control_unified.sv \
+	$(TB_DIR)/spi_flash_model.v \
 	$(RTL_DIR)/top.sv \
 	$(RTL_DIR)/top_fsm.v \
 	$(RTL_DIR)/host_i2c_target.v \
@@ -766,6 +767,7 @@ TOP_SLEEP_WAKE_UNIFIED_TOP     := tb_top_sleep_wake_unified
 TOP_SLEEP_WAKE_UNIFIED_VVP     := $(BUILD_DIR)/$(TOP_SLEEP_WAKE_UNIFIED_TOP).vvp
 TOP_SLEEP_WAKE_UNIFIED_SOURCES := \
 	$(TB_DIR)/tb_top_sleep_wake_unified.sv \
+	$(TB_DIR)/spi_flash_model.v \
 	$(RTL_DIR)/top.sv \
 	$(RTL_DIR)/top_fsm.v \
 	$(RTL_DIR)/host_i2c_target.v \
@@ -1318,6 +1320,7 @@ TOP_FEATURE_MMIO_PYMOD  := test_top_feature_mmio_unified
 TOP_FEATURE_MMIO_SRCS   := \
   $(TOP_FEATURE_MMIO_TOP_V) \
   $(UNIFIED_TOP_RTL_SRCS) \
+  $(TB_DIR)/spi_flash_model.v \
   sensors/i2c_slave_lis2dw12.sv \
   sensors/i2c_slave_adpd144ri.sv
 

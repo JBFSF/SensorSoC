@@ -1,7 +1,7 @@
 import cocotb
 from cocotb.triggers import ClockCycles, ReadOnly, RisingEdge
 
-from top_unified_env import apply_reset, start_clock
+from top_unified_env import apply_reset, pulse_forced_wake, start_clock, wait_for_boot_load
 
 
 def _u(value) -> int:
@@ -25,7 +25,8 @@ async def test_unified_top_reset_and_init_state(dut):
         - IRQ controller state starts clean
         - wake bookkeeping starts clean
         - no spurious timer / ML / host IRQ events appear during early boot
-        - CPU begins normal memory traffic after reset release
+        - reset now lands the chip in the sleep-first FSM posture
+        - a wake source is required before feature-pipeline / firmware activity is expected
         - no immediate trap occurs
 
     This intentionally does *not* try to validate the full production loop.
@@ -67,7 +68,7 @@ async def test_unified_top_reset_and_init_state(dut):
     assert _u(dut.irq_pending) == 0, "IRQC pending came up stale after reset release"
     assert _u(dut.pwr_wake_status) == 0, "wake status came up stale after reset release"
     assert _u(dut.pwr_wake_reason) == 0, "wake reason came up stale after reset release"
-    assert _u(dut.pico_sleeping) == 0, "CPU should start awake after reset release"
+    assert _u(dut.pico_sleeping) == 1, "CPU should default to sleep after reset release"
     assert _u(dut.pico_trap) == 0, "CPU trap should not assert immediately after reset release"
 
     # With the hardware SPI boot path, the CPU stays reset until boot_done.
@@ -86,17 +87,29 @@ async def test_unified_top_reset_and_init_state(dut):
             break
 
     assert _u(dut.boot_done) == 1, "hardware boot controller never asserted boot_done"
+    assert _u(dut.weight_boot_done) == 1, "hardware weight boot controller never asserted weight_boot_done"
+    assert _u(dut.pico_sleeping) == 1, "CPU should remain asleep after boot until a wake source arrives"
 
-    saw_mem_activity = False
-    for _ in range(64):
+    await pulse_forced_wake(dut)
+
+    saw_postwake_progress = False
+    for _ in range(10000):
         await RisingEdge(dut.clk)
         await ReadOnly()
-        saw_mem_activity |= (_u(dut.pico_mem_valid) != 0)
-        assert _u(dut.pwr_wake_status) == 0, "wake status should remain clear during early boot"
-        assert _u(dut.pwr_wake_reason) == 0, "wake reason should remain clear during early boot"
+        saw_postwake_progress |= (
+            _u(dut.feat_valid) != 0 or
+            _u(dut.feat_latched_valid) != 0 or
+            _u(dut.pico_cpu_clk_en) != 0 or
+            _u(dut.pico_mem_valid) != 0 or
+            _u(dut.test_status) != 0
+        )
         assert _u(dut.host_i2c_irq_event) == 0, "host-I2C IRQ event should not spuriously pulse during init"
         assert _u(dut.ml_irq) == 0, "ML IRQ should not spuriously assert during init"
-        assert _u(dut.timer_event) == 0, "timer event should not spuriously assert during init"
         assert _u(dut.pico_trap) == 0, "CPU trap asserted during early init"
+        if saw_postwake_progress:
+            break
 
-    assert saw_mem_activity, "CPU never began instruction/data traffic after reset release"
+    assert saw_postwake_progress, "system never showed post-wake feature or CPU progress"
+
+    # Shared runtime tests rely on the helper's full boot-and-wake contract.
+    await wait_for_boot_load(dut)

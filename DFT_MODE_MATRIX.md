@@ -8,31 +8,46 @@ Purpose:
 - give one row per test mode
 - define what stimulus is needed
 - define what should appear on `bidir[22:7]`
+- define which components should be enabled in that mode
 - identify which modes need firmware and/or sensor models
 - provide a place to agree on golden outputs with Shane
 
 ## Current Table
 
-| Mode | Name | Clock | Stimulus Needed | Firmware Needed | Sensor Models Needed | Expected `bidir[22:7]` | Golden / Pass Condition | Priority |
-|---|---|---|---|---|---|---|---|---|
-| `00000` | Normal | Internal | None | Yes | Maybe | Debug bus disabled / zero | Debug bus inactive in normal mode | High |
-| `00001` | MSSD Feature | Internal | Let feature pipeline run | Yes | Yes | `mssd_feat[15:0]` | Matches internal feature signal at sample point | Medium |
-| `00010` | Delta HR Feature | Internal | Let feature pipeline run | Yes | Yes | `delta_hr_feat[15:0]` | Matches internal feature signal at sample point | Medium |
-| `00011` | Time Feature | Internal | Let feature pipeline run | Yes | Maybe | `time_feat[15:0]` | Matches internal feature signal at sample point | Medium |
-| `00100` | Motion Feature | Internal | Let feature pipeline run | Yes | Yes | `motion_feat[15:0]` | Matches internal feature signal at sample point | Medium |
-| `00101` | Pipeline Smoke Summary | Internal | Let system run | Yes | Yes | Summary bits for feature presence, logits, gate, epoch, and alarm | Expected summary bits go active when pipeline is live | High |
-| `00110` | ML Update / Invalid Reason | Internal | Run valid and invalid pipeline cases | Yes | Yes | `{ml_update_gate, epoch_end, invalid_reason[7:0], 6'b0}` | Matches internal control/status signals | Medium |
-| `00111` | Pico State Summary | Internal | Boot firmware | Yes | No | CPU trap/clock/mem summary | Reflects active CPU execution and no unexpected trap | High |
-| `01000` | Pico MMIO Write Summary | Internal | Run firmware with MMIO writes | Yes | No | MMIO write summary | Shows expected address/data/write activity | High |
-| `01001` | Pico Sleep / IRQ Summary | Internal | Run sleep/wake firmware | Yes | No | Sleep/IRQ summary | Matches expected sleep/awake/IRQ phase | High |
-| `01010` | Force IRQ View | Internal | Drive `bidir[37]` | Minimal | No | Forced IRQ summary | Forced IRQ bit and related fields respond correctly | Very High |
-| `01011` | Force Wake View | Internal | Drive `bidir[38]` | Minimal | No | Forced wake / wake-source summary | Forced wake bit visible and wake summary coherent | Very High |
-| `01100` | Logit0 View | Internal | Run ML once | Yes | Likely Yes | `logit0[15:0]` | Matches agreed internal/exported `logit0` value | Medium |
-| `01101` | Logit1 View | Internal | Run ML once | Yes | Likely Yes | `logit1[15:0]` | Matches agreed internal/exported `logit1` value | Medium |
-| `01110` | Unused | Internal | None | No | No | Zero | Reserved / no unexpected behavior | Low |
-| `01111` | Reserved | Internal | None | No | No | Zero | Reserved / no unexpected behavior | Low |
-| `10000` | Normal External Clock | External `bidir[39]` | Drive external clock | Maybe | Maybe | Debug bus disabled / zero | Same as normal mode, but advances only on external clock | High |
-| `1xxxx` | External-Clock Mirror Modes | External `bidir[39]` | Same as matching `0xxxx` mode plus external clock | Depends | Depends | Same mapping as the corresponding `0xxxx` mode | Same function as internal-clock mode, but externally clocked | Medium |
+The expected enable posture comes from the current `top_fsm.v` test-mode overrides:
+
+- `SLEEP`: `feat_en=0`, `ml_en=0`, `cpu_en=0`, `sleeping=1`
+- `FEAT_ONLY`: `feat_en=1`, `ml_en=0`, `cpu_en=0`, `sleeping=0`
+- `ALL`: `feat_en=1`, `ml_en=1`, `cpu_en=1`, `sleeping=0`
+- `ML_ONLY`: `feat_en=0`, `ml_en=1`, `cpu_en=0`, `sleeping=0`
+- `CPU_ONLY`: `feat_en=0`, `ml_en=0`, `cpu_en=1`, `sleeping=0`
+
+Important nuance for `00000`:
+
+- normal mode is not a fixed override
+- after reset it defaults to `SLEEP`
+- wake events then move it through the live FSM path (`SLEEP -> FEAT_ONLY -> ALL -> CPU_FEAT`)
+
+| Mode | Name | Clock | Stimulus Needed | Firmware Needed | Sensor Models Needed | Expected Enabled Components | Expected `bidir[22:7]` | Golden / Pass Condition | Priority |
+|---|---|---|---|---|---|---|---|---|---|
+| `00000` | Normal | Internal | None | Yes | Maybe | Dynamic FSM path; after reset expect `SLEEP`, then wake-driven transitions into `FEAT_ONLY`, `ALL`, and `CPU_FEAT` | Debug bus disabled / zero | Debug bus inactive in normal mode | High |
+| `00001` | MSSD Feature | Internal | Let feature pipeline run | Yes | Yes | `FEAT_ONLY`: feature on, ML off, CPU off, not sleeping | `mssd_feat[15:0]` | Matches internal feature signal at sample point | Medium |
+| `00010` | Delta HR Feature | Internal | Let feature pipeline run | Yes | Yes | `FEAT_ONLY`: feature on, ML off, CPU off, not sleeping | `delta_hr_feat[15:0]` | Matches internal feature signal at sample point | Medium |
+| `00011` | Time Feature | Internal | Let feature pipeline run | Yes | Maybe | `FEAT_ONLY`: feature on, ML off, CPU off, not sleeping | `time_feat[15:0]` | Matches internal feature signal at sample point | Medium |
+| `00100` | Motion Feature | Internal | Let feature pipeline run | Yes | Yes | `FEAT_ONLY`: feature on, ML off, CPU off, not sleeping | `motion_feat[15:0]` | Matches internal feature signal at sample point | Medium |
+| `00101` | Pipeline Smoke Summary | Internal | Let system run | Yes | Yes | `ALL`: feature on, ML on, CPU on, not sleeping | Summary bits for feature presence, logits, gate, epoch, and alarm | Expected summary bits go active when pipeline is live | High |
+| `00110` | ML Update / Invalid Reason | Internal | Run valid and invalid pipeline cases | Yes | Yes | `ML_ONLY`: feature off, ML on, CPU off, not sleeping | `{ml_update_gate, epoch_end, invalid_reason[7:0], 6'b0}` | Matches internal control/status signals | Medium |
+| `00111` | Pico State Summary | Internal | Boot firmware | Yes | No | `CPU_ONLY`: feature off, ML off, CPU on, not sleeping | CPU trap/clock/mem summary | Reflects active CPU execution and no unexpected trap | High |
+| `01000` | Pico MMIO Write Summary | Internal | Run firmware with MMIO writes | Yes | No | `CPU_ONLY`: feature off, ML off, CPU on, not sleeping | MMIO write summary | Shows expected address/data/write activity | High |
+| `01001` | Pico Sleep / IRQ Summary | Internal | Run sleep/wake firmware | Yes | No | `CPU_ONLY`: feature off, ML off, CPU on, not sleeping | Sleep/IRQ summary | Matches expected sleep/awake/IRQ phase | High |
+| `01010` | Force IRQ View | Internal | Drive `bidir[37]` | Minimal | No | `CPU_ONLY`: feature off, ML off, CPU on, not sleeping | Forced IRQ summary | Forced IRQ bit and related fields respond correctly | Very High |
+| `01011` | Force Wake View | Internal | Drive `bidir[38]` | Minimal | No | `CPU_ONLY`: feature off, ML off, CPU on, not sleeping | Forced wake / wake-source summary | Forced wake bit visible and wake summary coherent | Very High |
+| `01100` | Logit0 View | Internal | Run ML once | Yes | Likely Yes | No current `top_fsm` override; needs clarification before locking expected enable posture | `logit0[15:0]` | Matches agreed internal/exported `logit0` value | Medium |
+| `01101` | Logit1 View | Internal | Run ML once | Yes | Likely Yes | No current `top_fsm` override; needs clarification before locking expected enable posture | `logit1[15:0]` | Matches agreed internal/exported `logit1` value | Medium |
+| `01110` | Unused | Internal | None | No | No | No current `top_fsm` override; treat as reserved until clarified | Zero | Reserved / no unexpected behavior | Low |
+| `01111` | Reserved | Internal | None | No | No | No current `top_fsm` override; treat as reserved until clarified | Zero | Reserved / no unexpected behavior | Low |
+| `10000` | Normal External Clock | External `bidir[39]` | Drive external clock | Maybe | Maybe | Same dynamic FSM path as `00000`, but externally clocked | Debug bus disabled / zero | Same as normal mode, but advances only on external clock | High |
+| `1xxxx` | External-Clock Mirror Modes | External `bidir[39]` | Same as matching `0xxxx` mode plus external clock | Depends | Depends | Same enable posture as corresponding `0xxxx` mode, but externally clocked | Same mapping as the corresponding `0xxxx` mode | Same function as internal-clock mode, but externally clocked | Medium |
 
 ## Current Regression Coverage
 

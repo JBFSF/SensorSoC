@@ -2,18 +2,20 @@
 //
 // tb_top_spi_weights.sv
 //
-// Test 2: CPU-driven SPI weight loading into weight_ram_axi.
+// Legacy CPU-driven SPI weight-loading smoke test.
 //
-// Firmware is preloaded into simple_sram via FIRMWARE_HEX so the
-// hardware boot controller fires immediately (BOOT_WORDS=1).
-// Once the CPU starts, firmware uses spi_master_mmio to load
-// ML weights from the weight flash into weight_ram_axi.
+// The new architecture's primary weight-load proof is:
+//   make sim-weight-boot
+//
+// That path verifies hardware weight boot completion directly. This older
+// bench is kept as a firmware-side SPI smoke test only. It should not assume
+// a large, directly visible WRAM parameter image anymore.
 //
 // Verifies:
 //   - Weight SPI CS was asserted
 //   - Enough SPI bits were clocked for 208 weight words
-//   - weight_ram_axi contents match the weight flash model
 //   - Firmware reports PASS
+//   - TEST_CODE mirrors the first staged parameter word
 //
 // No sensor pipeline, no ML inference.
 //
@@ -117,6 +119,7 @@ top #(
     .epoch_end_o        (),
     .alarm_o            (),
     .boot_done_o        (),
+    .weight_boot_done_o (),
     .test_force_irq_i   (1'b0),
     .test_force_wake_i  (1'b0),
     .test_irq_src_i     (3'b000),
@@ -229,33 +232,10 @@ initial begin
                 failures = failures + 1;
             end
 
-            // --- Check 3: weight_ram_axi matches flash ---
-            // Firmware loads flash word[0] into WRAM at VAR_BASE (word index 32)
-            if (dut.u_weight_ram.mem[32] !== u_weight_flash.mem[0]) begin
-                $display("FAIL: wram[32]=0x%08x != flash[0]=0x%08x",
-                         dut.u_weight_ram.mem[32], u_weight_flash.mem[0]);
-                failures = failures + 1;
-            end
-            if (dut.u_weight_ram.mem[33] !== u_weight_flash.mem[1]) begin
-                $display("FAIL: wram[33]=0x%08x != flash[1]=0x%08x",
-                         dut.u_weight_ram.mem[33], u_weight_flash.mem[1]);
-                failures = failures + 1;
-            end
-            if (dut.u_weight_ram.mem[34] !== u_weight_flash.mem[2]) begin
-                $display("FAIL: wram[34]=0x%08x != flash[2]=0x%08x",
-                         dut.u_weight_ram.mem[34], u_weight_flash.mem[2]);
-                failures = failures + 1;
-            end
-            if (dut.u_weight_ram.mem[35] !== u_weight_flash.mem[3]) begin
-                $display("FAIL: wram[35]=0x%08x != flash[3]=0x%08x",
-                         dut.u_weight_ram.mem[35], u_weight_flash.mem[3]);
-                failures = failures + 1;
-            end
-
-            // --- Check 4: TEST_CODE == first weight word ---
-            if (dut.test_code !== dut.u_weight_ram.mem[32]) begin
-                $display("FAIL: TEST_CODE=0x%08x != wram[32]=0x%08x",
-                         dut.test_code, dut.u_weight_ram.mem[32]);
+            // --- Check 3: TEST_CODE == first flashed weight word ---
+            if (dut.test_code !== u_weight_flash.mem[0]) begin
+                $display("FAIL: TEST_CODE=0x%08x != flash[0]=0x%08x",
+                         dut.test_code, u_weight_flash.mem[0]);
                 failures = failures + 1;
             end
 
@@ -263,12 +243,8 @@ initial begin
                 $display("PASS: tb_top_spi_weights");
                 $display("  spi_cs=%0d spi_bits=%0d",
                          spi_cs_asserts, spi_bit_count);
-                $display("  wram[32..35]=%08x %08x %08x %08x",
-                         dut.u_weight_ram.mem[32], dut.u_weight_ram.mem[33],
-                         dut.u_weight_ram.mem[34], dut.u_weight_ram.mem[35]);
-                $display("  flash[0..3]=%08x %08x %08x %08x",
-                         u_weight_flash.mem[0], u_weight_flash.mem[1],
-                         u_weight_flash.mem[2], u_weight_flash.mem[3]);
+                $display("  test_code(first weight)=0x%08x flash[0]=0x%08x",
+                         dut.test_code, u_weight_flash.mem[0]);
                 $finish;
             end else begin
                 $display("FAIL: tb_top_spi_weights failures=%0d", failures);

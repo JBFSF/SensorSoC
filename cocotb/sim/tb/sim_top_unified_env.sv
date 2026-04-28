@@ -120,6 +120,7 @@ module sim_top_unified_env;
   wire                      alarm;
   wire [2:0]                irq_eoi;
   wire                      boot_done;
+  wire                      weight_boot_done;
   wire                      pico_trap;
   wire                      pico_cpu_clk_en;
   wire                      pico_mem_valid;
@@ -242,11 +243,13 @@ module sim_top_unified_env;
     .boot_spi_cs_n_o(boot_spi_cs_n),
     .epoch_end_o(epoch_end),
     .alarm_o(alarm),
+    .test_mode_i(4'b0000),
     .test_force_irq_i(test_force_irq),
     .test_force_wake_i(test_force_wake),
     .test_irq_src_i(test_irq_src),
     .irq_eoi_o(irq_eoi),
     .boot_done_o(boot_done),
+    .weight_boot_done_o(weight_boot_done),
     .pico_trap_o(pico_trap),
     .pico_cpu_clk_en_o(pico_cpu_clk_en),
     .pico_mem_valid_o(pico_mem_valid),

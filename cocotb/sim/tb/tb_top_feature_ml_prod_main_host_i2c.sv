@@ -84,6 +84,9 @@ wire        boot_spi_clk;
 wire        boot_spi_mosi;
 wire        boot_spi_miso;
 wire        boot_spi_cs_n;
+wire        weight_boot_done;
+wire signed [15:0] logit0;
+wire signed [15:0] logit1;
 
 localparam [6:0] ACC_ADDR = 7'h19;
 localparam [6:0] PPG_ADDR = 7'h64;
@@ -181,7 +184,7 @@ reg printed_first_ml_score_write;
 reg printed_first_postwake_logits;
 reg printed_stall_snapshot;
 reg printed_spi_internal_snapshot;
-reg boot_done;
+wire boot_done;
 reg printed_boot_done;
 reg printed_sensor_stream_enable;
 reg saw_preboot_feature_read;
@@ -276,12 +279,15 @@ top #(
     .boot_spi_cs_n_o(boot_spi_cs_n),
     .epoch_end_o(),
     .alarm_o(),
+    .logit0(logit0),
+    .logit1(logit1),
     .test_mode_i(4'b0101),
     .test_force_irq_i(1'b0),
     .test_force_wake_i(1'b0),
     .test_irq_src_i(3'b000),
     .irq_eoi_o(),
-    .boot_done_o()
+    .boot_done_o(),
+    .weight_boot_done_o(boot_done)
 );
 
 i2c_slave_lis2dw12 #(
@@ -418,7 +424,6 @@ always @(posedge clk) begin
         printed_first_postwake_logits <= 1'b0;
         printed_stall_snapshot <= 1'b0;
         printed_spi_internal_snapshot <= 1'b0;
-        boot_done <= 1'b0;
         printed_boot_done <= 1'b0;
         printed_sensor_stream_enable <= 1'b0;
         saw_preboot_feature_read <= 1'b0;
@@ -426,25 +431,14 @@ always @(posedge clk) begin
         prev_cpu_clk_en <= 1'b1;
         prev_ml_irq_pending <= 1'b0;
     end else begin
-        if (!boot_done &&
-            (spi_bit_count >= MIN_SPI_BITS) &&
-            (boot_writes_seen >= 4) &&
-            (dut.u_weight_ram.mem[32] === u_flash.mem[0]) &&
-            (dut.u_weight_ram.mem[33] === u_flash.mem[1]) &&
-            (dut.u_weight_ram.mem[34] === u_flash.mem[2]) &&
-            (dut.u_weight_ram.mem[35] === u_flash.mem[3])) begin
-            boot_done <= 1'b1;
-            if (!printed_boot_done) begin
-                printed_boot_done <= 1'b1;
-                $display("[%0t] TB: boot complete spi_bits=%0d boot_writes=%0d wram[32..35]=%08x %08x %08x %08x",
-                         $time, spi_bit_count, boot_writes_seen,
-                         dut.u_weight_ram.mem[32], dut.u_weight_ram.mem[33],
-                         dut.u_weight_ram.mem[34], dut.u_weight_ram.mem[35]);
-            end
-            if (!printed_sensor_stream_enable) begin
-                printed_sensor_stream_enable <= 1'b1;
-                $display("[%0t] TB: sensor streaming enabled after observed weight boot", $time);
-            end
+        if (boot_done && !printed_boot_done) begin
+            printed_boot_done <= 1'b1;
+            $display("[%0t] TB: weight boot complete spi_bits=%0d boot_writes=%0d",
+                     $time, spi_bit_count, boot_writes_seen);
+        end
+        if (boot_done && !printed_sensor_stream_enable) begin
+            printed_sensor_stream_enable <= 1'b1;
+            $display("[%0t] TB: sensor streaming enabled after weight_boot_done", $time);
         end
 
         if (prev_spi_cs_n && !spi_cs_n) begin
@@ -651,11 +645,10 @@ always @(posedge clk) begin
         prev_ml_irq_pending <= dut.u_irqc.pending[1];
 
         if (!printed_first_postwake_logits && (irq_claim_reads > 0 || wake_edges > 0)) begin
-            if ((dut.u_weight_ram.mem[1376] !== 32'hA5A55A5A) ||
-                (dut.u_weight_ram.mem[1377] !== 32'h5A5AA5A5)) begin
+            if ((logit0 !== 16'sd0) || (logit1 !== 16'sd0)) begin
                 printed_first_postwake_logits <= 1'b1;
-                $display("[%0t] TB: first post-irq logits word0=0x%08x word1=0x%08x",
-                         $time, dut.u_weight_ram.mem[1376], dut.u_weight_ram.mem[1377]);
+                $display("[%0t] TB: first post-irq logits logit0=%0d logit1=%0d",
+                         $time, $signed(logit0), $signed(logit1));
             end
         end
 
@@ -888,10 +881,10 @@ initial begin
         if (!printed_first_score &&
             (dut.ml_score_hw != 32'h0) &&
             (dut.test_code[15:0] == dut.ml_score_hw[15:0]) &&
-            (dut.u_weight_ram.mem[1376] !== 32'hA5A55A5A)) begin
+            ((logit0 !== 16'sd0) || (logit1 !== 16'sd0))) begin
             printed_first_score = 1'b1;
-            $display("[%0t] TB: first true output score=0x%08x code=0x%08x logit_word=0x%08x class=%0d",
-                     $time, dut.ml_score_hw, dut.test_code, dut.u_weight_ram.mem[1376], dut.test_code[31]);
+            $display("[%0t] TB: first true output score=0x%08x code=0x%08x logits=(%0d,%0d) class=%0d",
+                     $time, dut.ml_score_hw, dut.test_code, $signed(logit0), $signed(logit1), dut.test_code[31]);
         end
 
         if (dut.trap) begin
@@ -910,21 +903,19 @@ initial begin
 
         if (dut.test_status == TEST_FAIL) begin
             $display("FAIL: firmware reported FAIL code=0x%08x", dut.test_code);
-            $display("  spi_cs=%0d spi_bits=%0d boot_writes=%0d captured=%08x %08x %08x %08x wram[32..35]=%08x %08x %08x %08x flash[0..3]=%08x %08x %08x %08x out=%08x %08x",
+            $display("  spi_cs=%0d spi_bits=%0d boot_writes=%0d captured=%08x %08x %08x %08x flash[0..3]=%08x %08x %08x %08x logits=(%0d,%0d)",
                      spi_cs_asserts, spi_bit_count, boot_writes_seen,
                      boot_word0, boot_word1, boot_word2, boot_word3,
-                     dut.u_weight_ram.mem[32], dut.u_weight_ram.mem[33],
-                     dut.u_weight_ram.mem[34], dut.u_weight_ram.mem[35],
                      u_flash.mem[0], u_flash.mem[1], u_flash.mem[2], u_flash.mem[3],
-                     dut.u_weight_ram.mem[1376], dut.u_weight_ram.mem[1377]);
+                     $signed(logit0), $signed(logit1));
             $fatal(1);
         end
 
         if ((irq_claim_reads >= 4) && (ml_score_writes <= 1) && (dut.test_status != TEST_FAIL)) begin
             $display("FAIL: serviced ML IRQ %0d times without any non-init ML_SCORE write", irq_claim_reads);
-            $display("  code=0x%08x score=0x%08x out=%08x %08x test_code_writes=%0d claim_writes=%0d complete_writes=%0d",
-                     dut.test_code, dut.ml_score_hw, dut.u_weight_ram.mem[1376],
-                     dut.u_weight_ram.mem[1377], test_code_writes, irq_claim_writes, irq_complete_writes);
+            $display("  code=0x%08x score=0x%08x logits=(%0d,%0d) test_code_writes=%0d claim_writes=%0d complete_writes=%0d",
+                     dut.test_code, dut.ml_score_hw, $signed(logit0), $signed(logit1),
+                     test_code_writes, irq_claim_writes, irq_complete_writes);
             $fatal(1);
         end
 
@@ -932,7 +923,7 @@ initial begin
             saw_start_write && (ml_score_writes > 1) &&
             (dut.test_code[15:0] == dut.ml_score_hw[15:0]) &&
             (dut.ml_score_hw >= 32'h0000_0001) &&
-            (dut.u_weight_ram.mem[1376] !== 32'hA5A55A5A)) begin
+            ((logit0 !== 16'sd0) || (logit1 !== 16'sd0))) begin
             host_observed_score = 1'b1;
             printed_first_coherent_score = 1'b1;
             iter_tracking = 1'b0;
@@ -981,7 +972,7 @@ initial begin
             expected_host_logit0 = dut.u_host_i2c_bridge_regs.score_proxy0;
 
 
-            sampled_logit_word = dut.u_weight_ram.mem[1376];
+            sampled_logit_word = {logit1[15:0], logit0[15:0]};
             raw_logit_word = sampled_logit_word;
             log0_s = $signed(sampled_logit_word[15:0]);
             log1_s = $signed(sampled_logit_word[31:16]);
@@ -1029,14 +1020,7 @@ initial begin
                 failures = failures + 1;
             end
             if (!boot_done) begin
-                $display("FAIL: never observed bench boot_done before result check");
-                failures = failures + 1;
-            end
-            if (dut.u_weight_ram.mem[32] !== u_flash.mem[0] ||
-                dut.u_weight_ram.mem[33] !== u_flash.mem[1] ||
-                dut.u_weight_ram.mem[34] !== u_flash.mem[2] ||
-                dut.u_weight_ram.mem[35] !== u_flash.mem[3]) begin
-                $display("FAIL: WRAM leading words do not match SPI flash image");
+                $display("FAIL: never observed weight_boot_done before result check");
                 failures = failures + 1;
             end
             if (!saw_global_base_write) begin

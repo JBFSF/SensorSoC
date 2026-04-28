@@ -57,6 +57,10 @@ wire        ppg_sim_err;
 
 wire        host_i2c_scl;
 tri1        host_i2c_sda;
+wire        boot_spi_clk;
+wire        boot_spi_mosi;
+wire        boot_spi_miso;
+wire        boot_spi_cs_n;
 
 localparam [6:0] ACC_ADDR = 7'h19;
 localparam [6:0] PPG_ADDR = 7'h64;
@@ -145,12 +149,13 @@ top #(
     .spi_mosi_o(),
     .spi_miso_i(1'b1),
     .spi_cs_n_o(),
-    .boot_spi_clk_o(),
-    .boot_spi_mosi_o(),
-    .boot_spi_miso_i(1'b1),
-    .boot_spi_cs_n_o(),
+    .boot_spi_clk_o(boot_spi_clk),
+    .boot_spi_mosi_o(boot_spi_mosi),
+    .boot_spi_miso_i(boot_spi_miso),
+    .boot_spi_cs_n_o(boot_spi_cs_n),
     .epoch_end_o(),
     .alarm_o(),
+    .test_mode_i(4'b0101),
     .test_force_irq_i(1'b0),
     .test_force_wake_i(1'b0),
     .test_irq_src_i(3'b000),
@@ -192,6 +197,16 @@ i2c_slave_adpd144ri #(
     .sim_rvalid(ppg_sim_rvalid),
     .sim_rlast(ppg_sim_rlast),
     .sim_err(ppg_sim_err)
+);
+
+spi_flash_model #(
+    .FLASH_WORDS(512),
+    .FLASH_INIT_HEX("firmware/build/test_top_ml_control_unified/firmware.hex")
+) u_boot_flash (
+    .spi_clk(boot_spi_clk),
+    .spi_cs_n(boot_spi_cs_n),
+    .spi_mosi(boot_spi_mosi),
+    .spi_miso(boot_spi_miso)
 );
 
 always #10 clk = ~clk;
