@@ -200,6 +200,7 @@ SOC_RTL_SRCS := \
 
 UNIFIED_TOP_RTL_SRCS := \
   $(RTL_DIR)/top.sv \
+  $(RTL_DIR)/top_fsm.v \
   $(RTL_DIR)/host_i2c_target.v \
   $(RTL_DIR)/host_i2c_bridge_regs.v \
   $(RTL_DIR)/spi_master_mmio.v \
@@ -456,6 +457,7 @@ TOP_FEATURE_ML_CPU_VVP     := $(BUILD_DIR)/$(TOP_FEATURE_ML_CPU_TOP).vvp
 TOP_FEATURE_ML_CPU_SOURCES := \
 	$(TB_DIR)/tb_top_feature_ml_cpu.sv \
 	$(RTL_DIR)/top.sv \
+	$(RTL_DIR)/top_fsm.v \
 	$(RTL_DIR)/host_i2c_target.v \
 	$(RTL_DIR)/host_i2c_bridge_regs.v \
 	$(RTL_DIR)/i2c_master.sv \
@@ -484,7 +486,7 @@ TOP_FEATURE_ML_CPU_SOURCES := \
 	sensors/i2c_slave_adpd144ri.sv
 
 $(TOP_FEATURE_ML_CPU_VVP): $(TOP_FEATURE_ML_CPU_SOURCES)
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_FEATURE_ML_CPU_TOP) -o $@ \
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) -s $(TOP_FEATURE_ML_CPU_TOP) -o $@ \
 	  $(TOP_FEATURE_ML_CPU_SOURCES)
 
 .PHONY: sim-top-feature-ml-cpu
@@ -500,6 +502,7 @@ TOP_FEATURE_ML_CPU_SPI_FLASH_SOURCES := \
 	$(TB_DIR)/tb_top_feature_ml_cpu_spi_flash.sv \
 	$(TB_DIR)/spi_flash_model.v \
 	$(RTL_DIR)/top.sv \
+	$(RTL_DIR)/top_fsm.v \
 	$(RTL_DIR)/host_i2c_target.v \
 	$(RTL_DIR)/host_i2c_bridge_regs.v \
 	$(RTL_DIR)/i2c_master.sv \
@@ -528,7 +531,7 @@ TOP_FEATURE_ML_CPU_SPI_FLASH_SOURCES := \
 	sensors/i2c_slave_adpd144ri.sv
 
 $(TOP_FEATURE_ML_CPU_SPI_FLASH_VVP): $(TOP_FEATURE_ML_CPU_SPI_FLASH_SOURCES)
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_FEATURE_ML_CPU_SPI_FLASH_TOP) -o $@ \
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) -s $(TOP_FEATURE_ML_CPU_SPI_FLASH_TOP) -o $@ \
 	  $(TOP_FEATURE_ML_CPU_SPI_FLASH_SOURCES)
 
 .PHONY: sim-top-feature-ml-cpu-spi-flash
@@ -548,6 +551,7 @@ TOP_SPI_INIT_UNIFIED_SOURCES := \
 	$(TB_DIR)/tb_top_spi_init_unified.sv \
 	$(TB_DIR)/spi_flash_model.v \
 	$(RTL_DIR)/top.sv \
+	$(RTL_DIR)/top_fsm.v \
 	$(RTL_DIR)/host_i2c_target.v \
 	$(RTL_DIR)/host_i2c_bridge_regs.v \
 	$(RTL_DIR)/i2c_master.sv \
@@ -576,7 +580,7 @@ TOP_SPI_INIT_UNIFIED_SOURCES := \
 	sensors/i2c_slave_adpd144ri.sv
 
 $(TOP_SPI_INIT_UNIFIED_VVP): $(TOP_SPI_INIT_UNIFIED_SOURCES)
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_SPI_INIT_UNIFIED_TOP) -o $@ \
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) -s $(TOP_SPI_INIT_UNIFIED_TOP) -o $@ \
 	  $(TOP_SPI_INIT_UNIFIED_SOURCES)
 
 .PHONY: sim-top-spi-init-unified
@@ -602,7 +606,7 @@ TOP_SPI_BOOT_WEIGHTS_SOURCES := \
 	sensors/i2c_slave_adpd144ri.sv
 
 $(TOP_SPI_BOOT_WEIGHTS_VVP): $(TOP_SPI_BOOT_WEIGHTS_SOURCES)
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) \
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) \
 	  -s $(TOP_SPI_BOOT_WEIGHTS_TOP) -o $@ $(TOP_SPI_BOOT_WEIGHTS_SOURCES)
 
 .PHONY: sim-top-spi-boot
@@ -626,7 +630,7 @@ TOP_SPI_WEIGHTS_SOURCES := \
 	sensors/i2c_slave_adpd144ri.sv
 
 $(TOP_SPI_WEIGHTS_VVP): $(TOP_SPI_WEIGHTS_SOURCES)
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) \
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) \
 	  -s $(TOP_SPI_WEIGHTS_TOP) -o $@ $(TOP_SPI_WEIGHTS_SOURCES)
 
 .PHONY: sim-top-spi-weights
@@ -648,12 +652,11 @@ WEIGHT_BOOT_SOURCES := \
 	$(TB_DIR)/tb_weight_boot.sv \
 	$(TB_DIR)/spi_flash_model.v \
 	$(UNIFIED_TOP_RTL_SRCS) \
-	$(RTL_DIR)/top_fsm.v \
 	sensors/i2c_slave_lis2dw12.sv \
 	sensors/i2c_slave_adpd144ri.sv
 
 $(WEIGHT_BOOT_VVP): $(WEIGHT_BOOT_SOURCES)
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) \
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) \
 	  -s $(WEIGHT_BOOT_TOP) -o $@ $(WEIGHT_BOOT_SOURCES)
 
 .PHONY: sim-weight-boot
@@ -671,6 +674,7 @@ TOP_ML_CONTROL_UNIFIED_VVP     := $(BUILD_DIR)/$(TOP_ML_CONTROL_UNIFIED_TOP).vvp
 TOP_ML_CONTROL_UNIFIED_SOURCES := \
 	$(TB_DIR)/tb_top_ml_control_unified.sv \
 	$(RTL_DIR)/top.sv \
+	$(RTL_DIR)/top_fsm.v \
 	$(RTL_DIR)/host_i2c_target.v \
 	$(RTL_DIR)/host_i2c_bridge_regs.v \
 	$(RTL_DIR)/i2c_master.sv \
@@ -699,7 +703,7 @@ TOP_ML_CONTROL_UNIFIED_SOURCES := \
 	sensors/i2c_slave_adpd144ri.sv
 
 $(TOP_ML_CONTROL_UNIFIED_VVP): $(TOP_ML_CONTROL_UNIFIED_SOURCES)
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_ML_CONTROL_UNIFIED_TOP) -o $@ \
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) -s $(TOP_ML_CONTROL_UNIFIED_TOP) -o $@ \
 	  $(TOP_ML_CONTROL_UNIFIED_SOURCES)
 
 .PHONY: sim-top-ml-control-unified
@@ -715,6 +719,7 @@ TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES := \
 	$(TB_DIR)/tb_top_feature_ml_prod_main_host_i2c.sv \
 	$(TB_DIR)/spi_flash_model.v \
 	$(RTL_DIR)/top.sv \
+	$(RTL_DIR)/top_fsm.v \
 	$(RTL_DIR)/host_i2c_target.v \
 	$(RTL_DIR)/host_i2c_bridge_regs.v \
 	$(RTL_DIR)/i2c_master.sv \
@@ -743,7 +748,7 @@ TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES := \
 	sensors/i2c_slave_adpd144ri.sv
 
 $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP): $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES)
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP) -o $@ \
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) -s $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP) -o $@ \
 	  $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES)
 
 .PHONY: sim-top-feature-ml-prod-main-host-i2c
@@ -762,6 +767,7 @@ TOP_SLEEP_WAKE_UNIFIED_VVP     := $(BUILD_DIR)/$(TOP_SLEEP_WAKE_UNIFIED_TOP).vvp
 TOP_SLEEP_WAKE_UNIFIED_SOURCES := \
 	$(TB_DIR)/tb_top_sleep_wake_unified.sv \
 	$(RTL_DIR)/top.sv \
+	$(RTL_DIR)/top_fsm.v \
 	$(RTL_DIR)/host_i2c_target.v \
 	$(RTL_DIR)/host_i2c_bridge_regs.v \
 	$(RTL_DIR)/i2c_master.sv \
@@ -790,7 +796,7 @@ TOP_SLEEP_WAKE_UNIFIED_SOURCES := \
 	sensors/i2c_slave_adpd144ri.sv
 
 $(TOP_SLEEP_WAKE_UNIFIED_VVP): $(TOP_SLEEP_WAKE_UNIFIED_SOURCES)
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_SLEEP_WAKE_UNIFIED_TOP) -o $@ \
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) -s $(TOP_SLEEP_WAKE_UNIFIED_TOP) -o $@ \
 	  $(TOP_SLEEP_WAKE_UNIFIED_SOURCES)
 
 .PHONY: sim-top-sleep-wake-unified
@@ -1223,7 +1229,7 @@ TOP_UNIFIED_ENV_SRCS   := \
 
 $(TOP_UNIFIED_ENV_VVP): $(TOP_UNIFIED_ENV_SRCS)
 	@echo "[COCOTB] Building $@"
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_UNIFIED_ENV_TOP) -o $@ $(TOP_UNIFIED_ENV_SRCS)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) -s $(TOP_UNIFIED_ENV_TOP) -o $@ $(TOP_UNIFIED_ENV_SRCS)
 
 .PHONY: test-top-unified-reset-init
 test-top-unified-reset-init: $(TOP_UNIFIED_ENV_VVP)
@@ -1290,7 +1296,7 @@ TOP_ML_GOLDEN_ENV_SRCS   := \
 
 $(TOP_ML_GOLDEN_ENV_VVP): $(TOP_ML_GOLDEN_ENV_SRCS)
 	@echo "[COCOTB] Building $@"
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_ML_GOLDEN_ENV_TOP) -o $@ $(TOP_ML_GOLDEN_ENV_SRCS)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) -s $(TOP_ML_GOLDEN_ENV_TOP) -o $@ $(TOP_ML_GOLDEN_ENV_SRCS)
 
 .PHONY: test-top-ml-golden-vector-unified
 test-top-ml-golden-vector-unified: $(TOP_ML_GOLDEN_ENV_VVP)
@@ -1317,7 +1323,7 @@ TOP_FEATURE_MMIO_SRCS   := \
 
 $(TOP_FEATURE_MMIO_VVP): $(TOP_FEATURE_MMIO_SRCS)
 	@echo "[COCOTB] Building $@"
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_FEATURE_MMIO_TOP) -o $@ $(TOP_FEATURE_MMIO_SRCS)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) -s $(TOP_FEATURE_MMIO_TOP) -o $@ $(TOP_FEATURE_MMIO_SRCS)
 
 .PHONY: test-top-feature-mmio-unified
 test-top-feature-mmio-unified: $(TOP_FEATURE_MMIO_VVP)
@@ -1343,7 +1349,7 @@ CHIP_CORE_DEBUG_SRCS   := \
 
 $(CHIP_CORE_DEBUG_VVP): $(CHIP_CORE_DEBUG_SRCS)
 	@echo "[COCOTB] Building $@"
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(CHIP_CORE_DEBUG_TOP) -o $@ $(CHIP_CORE_DEBUG_SRCS)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) -s $(CHIP_CORE_DEBUG_TOP) -o $@ $(CHIP_CORE_DEBUG_SRCS)
 
 .PHONY: test-chip-core-debug-modes
 test-chip-core-debug-modes: $(CHIP_CORE_DEBUG_VVP)
@@ -1368,7 +1374,7 @@ TOP_SENSOR_PIPELINE_SRCS   := \
 
 $(TOP_SENSOR_PIPELINE_VVP): $(TOP_SENSOR_PIPELINE_SRCS)
 	@echo "[COCOTB] Building $@"
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_SENSOR_PIPELINE_TOP) -o $@ $(TOP_SENSOR_PIPELINE_SRCS)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) -s $(TOP_SENSOR_PIPELINE_TOP) -o $@ $(TOP_SENSOR_PIPELINE_SRCS)
 
 .PHONY: test-top-sensor-pipeline
 test-top-sensor-pipeline: $(TOP_SENSOR_PIPELINE_VVP)
