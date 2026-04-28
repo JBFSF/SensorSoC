@@ -71,15 +71,31 @@ def _debug_bit(dut, bit_index: int) -> int:
     return int(value[DEBUG_BUS_LO + bit_index])
 
 
+def _assert_mode_enables(dut, *, feat_en: int, ml_en: int, cpu_en: int, sleeping: int) -> None:
+    assert int(dut.u_top.feat_en.value) == feat_en, (
+        f"expected feat_en={feat_en}, got {int(dut.u_top.feat_en.value)}"
+    )
+    assert int(dut.u_top.ml_en.value) == ml_en, (
+        f"expected ml_en={ml_en}, got {int(dut.u_top.ml_en.value)}"
+    )
+    assert int(dut.u_top.cpu_clk_en.value) == cpu_en, (
+        f"expected cpu_clk_en={cpu_en}, got {int(dut.u_top.cpu_clk_en.value)}"
+    )
+    assert int(dut.u_top.sleeping_r.value) == sleeping, (
+        f"expected sleeping_r={sleeping}, got {int(dut.u_top.sleeping_r.value)}"
+    )
+
+
 @cocotb.test()
 async def test_mode_00000_debug_bus_disabled(dut):
     """Normal mode should keep the debug bus disabled and drive zeros."""
     await _start_up(dut)
     _set_test_mode(dut, 0b00000)
-    await ClockCycles(dut.clk, 2)
+    await ClockCycles(dut.clk, 4)
 
     assert _debug_oe(dut) == 0, f"expected debug OE=0, got 0x{_debug_oe(dut):04x}"
     assert _debug_bus(dut) == 0, f"expected debug bus=0, got 0x{_debug_bus(dut):04x}"
+    _assert_mode_enables(dut, feat_en=0, ml_en=0, cpu_en=0, sleeping=1)
 
 
 @cocotb.test()
@@ -87,9 +103,10 @@ async def test_mode_01010_force_irq_reflects_pad(dut):
     """Force-IRQ mode should enable the debug bus and mirror bidir_in[37] in bit 15."""
     await _start_up(dut)
     _set_test_mode(dut, 0b01010)
-    await ClockCycles(dut.clk, 2)
+    await ClockCycles(dut.clk, 4)
 
     assert _debug_oe(dut) == 0xFFFF, f"expected debug OE enabled, got 0x{_debug_oe(dut):04x}"
+    _assert_mode_enables(dut, feat_en=0, ml_en=0, cpu_en=1, sleeping=0)
 
     _drive_bidir_input(dut, FORCE_IRQ_PAD, 0)
     await ClockCycles(dut.clk, 2)
@@ -109,9 +126,10 @@ async def test_mode_01011_force_wake_reflects_pad(dut):
     """Force-wake mode should enable the debug bus and mirror bidir_in[38] in bit 15."""
     await _start_up(dut)
     _set_test_mode(dut, 0b01011)
-    await ClockCycles(dut.clk, 2)
+    await ClockCycles(dut.clk, 4)
 
     assert _debug_oe(dut) == 0xFFFF, f"expected debug OE enabled, got 0x{_debug_oe(dut):04x}"
+    _assert_mode_enables(dut, feat_en=0, ml_en=0, cpu_en=1, sleeping=0)
 
     _drive_bidir_input(dut, FORCE_WAKE_PAD, 0)
     await ClockCycles(dut.clk, 2)

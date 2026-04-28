@@ -50,13 +50,29 @@ Currently covered modes:
 
 - `00000`
   - checks that the debug bus is disabled / zero in normal mode
+  - checks that the system settles into the expected idle/sleep posture in this
+    no-stimulus environment:
+    - `feat_en = 0`
+    - `ml_en = 0`
+    - `cpu_en = 0`
+    - `sleeping = 1`
 - `01010`
   - checks that the debug bus is enabled
   - checks that bit 15 reflects the forced IRQ input on `bidir[37]`
+  - checks that the expected CPU-only mode posture is active:
+    - `feat_en = 0`
+    - `ml_en = 0`
+    - `cpu_en = 1`
+    - `sleeping = 0`
 - `01011`
   - checks that the debug bus is enabled
   - checks that bit 15 reflects the forced wake input on `bidir[38]`
   - checks that the low 12 bits remain zero as expected for this summary mode
+  - checks that the expected CPU-only mode posture is active:
+    - `feat_en = 0`
+    - `ml_en = 0`
+    - `cpu_en = 1`
+    - `sleeping = 0`
 
 Current coverage note:
 

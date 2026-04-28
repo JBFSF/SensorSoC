@@ -118,6 +118,7 @@ module top #(
     output logic signed [15:0] logit0,
     output logic signed [15:0] logit1,
     // Signals used for test modes.
+    input  logic [3:0]  test_mode_i,
     input  logic        test_force_irq_i,
     input  logic        test_force_wake_i,
     input  logic [2:0]  test_irq_src_i,
@@ -1157,6 +1158,7 @@ module top #(
     top_fsm fsm (
         .resetn_i(~reset_i),
         .clk_i(clk_i),
+        .test_mode_i(test_mode_i),
         
         // .watchdog_i(timer_event),       // when the watchdog timer goes off
         .feat_valid_i(feat_valid_o),    // one-cycle strobe: feature vector ready (FEAT_ONLY -> ALL)

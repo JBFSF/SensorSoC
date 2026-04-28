@@ -453,6 +453,7 @@ module chip_core #(
 
         .logit0                (logit0_w),
         .logit1                (logit1_w),
+        .test_mode_i           (test_mode_w[3:0]),
         
         .test_force_irq_i      (test_force_irq_w),
         .test_force_wake_i     (test_force_wake_w),
