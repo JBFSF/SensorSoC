@@ -57,32 +57,28 @@ async def start_up(dut):
 
 
 @cocotb.test()
-async def test_counter(dut):
-    """Run the counter test"""
+async def test_chip_top_smoke(dut):
+    """Basic chip-top smoke test: clock, reset, and normal-mode startup."""
 
-    # Create a logger for this testbench
-    logger = logging.getLogger("my_testbench")
+    logger = logging.getLogger("chip_top_smoke")
 
     logger.info("Startup sequence...")
-
-    # Start up
     await start_up(dut)
 
-    logger.info("Running the test...")
+    # Keep the chip in normal mode and allow a few cycles for reset release.
+    dut.input_PAD.value = 0
+    await ClockCycles(dut.clk_PAD, 20)
 
-    # Wait for some time...
-    await ClockCycles(dut.clk_PAD, 10)
+    logger.info("Checking normal-mode wiring...")
 
-    # Start the counter by setting all inputs to 1
-    dut.input_PAD.value = -1
+    assert dut.rst_n_PAD.value == 1, "reset should be deasserted after startup"
+    assert dut.i_chip_core.test_mode_w.value.integer == 0, "chip should remain in normal mode"
+    assert dut.i_chip_core.core_clk_w.value == dut.i_chip_core.clk.value, \
+        "normal mode should use the onboard clock"
+    assert dut.i_chip_core.bidir_oe.value[22:7].integer == 0, \
+        "debug bus should be disabled in normal mode"
 
-    # Wait for a number of clock cycles
-    await ClockCycles(dut.clk_PAD, 100)
-
-    # Check the end result of the counter
-    assert dut.bidir_PAD.value == 100 - 1
-
-    logger.info("Done!")
+    logger.info("Smoke test passed.")
 
 
 def chip_top_runner():
