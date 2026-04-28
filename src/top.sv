@@ -3,45 +3,49 @@
 `include "taketwo_feature_bridge.sv"
 
 module top #(
-    parameter int unsigned MEM_WORDS    = 1024,
-    parameter int unsigned BOOT_WORDS   = 1024,
-    parameter string       FIRMWARE_HEX = "",
-    parameter string       WEIGHT_INIT_HEX = "",
+    parameter integer MEM_WORDS    = 1024,
+    parameter integer BOOT_WORDS   = 1024,
+    parameter         FIRMWARE_HEX = "",
+    parameter         WEIGHT_INIT_HEX = "",
 
-    parameter logic [31:0] PWR_BASE    = 32'h0300_1000,
-    parameter logic [31:0] TIMER_BASE  = 32'h0300_2000,
-    parameter logic [31:0] ML_BASE     = 32'h0300_3000,
-    parameter logic [31:0] FEATURE_BASE= 32'h0300_4000,
-    parameter logic [31:0] IRQC_BASE   = 32'h0300_5000,
-    parameter logic [31:0] WEIGHT_BASE = 32'h0300_6000,
-    parameter logic [31:0] SPI_BASE    = 32'h0300_A000,
-    parameter logic [31:0] TEST_BASE   = 32'h0300_F000,
+    parameter PWR_BASE     = 32'h0300_1000,
+    parameter TIMER_BASE   = 32'h0300_2000,
+    parameter ML_BASE      = 32'h0300_3000,
+    parameter FEATURE_BASE = 32'h0300_4000,
+    parameter IRQC_BASE    = 32'h0300_5000,
+    parameter WEIGHT_BASE  = 32'h0300_6000,
+    parameter SPI_BASE     = 32'h0300_A000,
+    parameter TEST_BASE    = 32'h0300_F000,
 
-    parameter int unsigned CLK_HZ = 10_000_000,
-    parameter int unsigned GT_CLK_HZ = 10_000_000,
-    parameter int unsigned GT_EPOCH_HZ = 100,
-    parameter int unsigned GT_EPOCH_COUNT_MAX = 1000,
+    parameter integer CLK_HZ = 10_000_000,
+    parameter integer GT_CLK_HZ = 10_000_000,
+    parameter integer GT_EPOCH_HZ = 100,
+    parameter integer GT_EPOCH_COUNT_MAX = 1000,
 
-    parameter int unsigned ACC_POLL_PERIOD_TICKS = 50_000,
-    parameter int unsigned PPG_POLL_PERIOD_TICKS = 100,
-    parameter int unsigned PPG_WATERMARK = 8,
-    parameter int unsigned PPG_MAX_BURST_SAMPLES = 32,
+    parameter integer ACC_POLL_PERIOD_TICKS = 50_000,
+    parameter integer PPG_POLL_PERIOD_TICKS = 100,
+    parameter integer PPG_WATERMARK = 8,
+    parameter integer PPG_MAX_BURST_SAMPLES = 32,
 
-    parameter logic [31:0] CFG_REFRACT_MS = 32'd250,
-    parameter logic [31:0] CFG_RR_MIN_MS = 32'd300,
-    parameter logic [31:0] CFG_RR_MAX_MS = 32'd2000,
+    parameter CFG_REFRACT_MS = 32'd250,
+    parameter CFG_RR_MIN_MS = 32'd300,
+    parameter CFG_RR_MAX_MS = 32'd2000,
 
-    parameter logic [7:0] CFG_Q_MIN_ACCEPT = 8'd10,
+    parameter CFG_Q_MIN_ACCEPT = 8'd10,
 
-    parameter logic [7:0] CFG_BEAT_Q_MIN = 8'd16,
-    parameter logic [7:0] CFG_MIN_VALID_FRAC = 8'd96,
-    parameter logic [7:0] CFG_MAX_DOUBLE = 8'd4,
-    parameter logic [7:0] CFG_MAX_MISSED = 8'd3,
-    parameter logic [15:0] CFG_MOTION_HI_TH = 16'd2000,
-    parameter logic [15:0] CFG_MAX_MOTION_HI = 16'd3,
+    parameter CFG_BEAT_Q_MIN = 8'd16,
+    parameter CFG_MIN_VALID_FRAC = 8'd96,
+    parameter CFG_MAX_DOUBLE = 8'd4,
+    parameter CFG_MAX_MISSED = 8'd3,
+    parameter CFG_MOTION_HI_TH = 16'd2000,
+    parameter CFG_MAX_MOTION_HI = 16'd3,
 
-    parameter int unsigned MSSD_MIN_RR_COUNT = 1
+    parameter integer MSSD_MIN_RR_COUNT = 1
 ) (
+    `ifdef USE_POWER_PINS
+    inout  wire VDD,
+    inout  wire VSS,
+    `endif
     input  logic clk_i,
     input  logic reset_i,
     input  logic i2c_scl_i,
@@ -232,6 +236,37 @@ module top #(
     logic       ml_en;                   // ML enable wire
     logic       cpu_clk_en;                  // CPU clock enable wire
     logic       sleeping_r;
+    logic       sim_req_w;
+    logic [6:0] sim_addr_w;
+    logic [7:0] sim_reg_w;
+    logic [7:0] sim_len_w;
+    logic       sim_write_w;
+    logic [7:0] sim_wdata_w;
+    logic       sim_ack_w;
+    logic [7:0] sim_rdata_w;
+    logic       sim_rvalid_w;
+    logic       sim_rlast_w;
+    logic       sim_err_w;
+
+`ifdef SIM
+    assign sim_req_o = sim_req_w;
+    assign sim_addr_o = sim_addr_w;
+    assign sim_reg_o = sim_reg_w;
+    assign sim_len_o = sim_len_w;
+    assign sim_write_o = sim_write_w;
+    assign sim_wdata_o = sim_wdata_w;
+    assign sim_ack_w = sim_ack_i;
+    assign sim_rdata_w = sim_rdata_i;
+    assign sim_rvalid_w = sim_rvalid_i;
+    assign sim_rlast_w = sim_rlast_i;
+    assign sim_err_w = sim_err_i;
+`else
+    assign sim_ack_w = 1'b0;
+    assign sim_rdata_w = 8'h00;
+    assign sim_rvalid_w = 1'b0;
+    assign sim_rlast_w = 1'b0;
+    assign sim_err_w = 1'b0;
+`endif
 
     // ---------------------------------------------------------------------
     // Unified SoC/CPU/ML path
@@ -504,6 +539,10 @@ module top #(
         .WORDS(MEM_WORDS),
         .INIT_HEX("")
     ) sram (
+        `ifdef USE_POWER_PINS
+        .VDD   (VDD),
+        .VSS   (VSS),
+        `endif
         .clk   (clk_i),
         .resetn(~reset_i),
         .valid (boot_done ? sram_sel          : boot_sram_valid_w),
@@ -562,17 +601,17 @@ module top #(
         .ppg_rsp_done_o(ppg_i2c_rsp_done_w),       // PPG transaction done
         .ppg_rsp_err_o(ppg_i2c_rsp_err_w),         // PPG transaction error
         .ppg_rsp_ready_i(ppg_i2c_rsp_ready_w),     // backpressure from ppg_fifo_reader during bursts
-        .sim_req(sim_req_o),                       // drive sim sensor-bus request (to TB sensor models)
-        .sim_addr(sim_addr_o),                     // drive sim sensor-bus device address
-        .sim_reg(sim_reg_o),                       // drive sim sensor-bus register address
-        .sim_len(sim_len_o),                       // drive sim sensor-bus transfer length
-        .sim_write(sim_write_o),                   // drive sim sensor-bus direction
-        .sim_wdata(sim_wdata_o),                   // drive sim sensor-bus write data
-        .sim_ack(sim_ack_i),                       // receive sim sensor-bus ack from model
-        .sim_rdata(sim_rdata_i),                   // receive sim sensor-bus read data from model
-        .sim_rvalid(sim_rvalid_i),                 // receive sim sensor-bus read valid strobe
-        .sim_rlast(sim_rlast_i),                   // receive sim sensor-bus last-byte marker
-        .sim_err(sim_err_i)                        // receive sim sensor-bus error indication
+        .sim_req(sim_req_w),                       // drive sim sensor-bus request (to TB sensor models)
+        .sim_addr(sim_addr_w),                     // drive sim sensor-bus device address
+        .sim_reg(sim_reg_w),                       // drive sim sensor-bus register address
+        .sim_len(sim_len_w),                       // drive sim sensor-bus transfer length
+        .sim_write(sim_write_w),                   // drive sim sensor-bus direction
+        .sim_wdata(sim_wdata_w),                   // drive sim sensor-bus write data
+        .sim_ack(sim_ack_w),                       // receive sim sensor-bus ack from model
+        .sim_rdata(sim_rdata_w),                   // receive sim sensor-bus read data from model
+        .sim_rvalid(sim_rvalid_w),                 // receive sim sensor-bus read valid strobe
+        .sim_rlast(sim_rlast_w),                   // receive sim sensor-bus last-byte marker
+        .sim_err(sim_err_w)                        // receive sim sensor-bus error indication
     );
 
     //JF: Feat Pipline, sleep until watchdog
@@ -863,6 +902,10 @@ module top #(
     //JF: ML, Sleep until features are ready
     //      figure out how to sleep rest of chip BESIDES ram within, also expose interfaces
     taketwo_wrap u_taketwo_wrap (
+        `ifdef USE_POWER_PINS
+        .VDD   (VDD),
+        .VSS   (VSS),
+        `endif
         .CLK   (clk_i),
         .RESETN(~reset_i),
         .en_i  (ml_en),

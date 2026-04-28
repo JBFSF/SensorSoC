@@ -159,6 +159,30 @@ module chip_core #(
     logic        ml_irq_w;
     logic        timer_event_w;
 
+    logic       sim_req_w;
+    logic [6:0] sim_addr_w;
+    logic [7:0] sim_reg_w;
+    logic [7:0] sim_len_w;
+    logic       sim_write_w;
+    logic [7:0] sim_wdata_w;
+
+    assign sim_req_o   = sim_req_w;
+    assign sim_addr_o  = sim_addr_w;
+    assign sim_reg_o   = sim_reg_w;
+    assign sim_len_o   = sim_len_w;
+    assign sim_write_o = sim_write_w;
+    assign sim_wdata_o = sim_wdata_w;
+
+    `ifndef SIM
+        assign sim_req_w   = 1'b0;
+        assign sim_addr_w  = 7'b0;
+        assign sim_reg_w   = 8'b0;
+        assign sim_len_w   = 8'b0;
+        assign sim_write_w = 1'b0;
+        assign sim_wdata_w = 8'b0;
+    `endif
+
+
     assign input_pu = '0;
     assign input_pd = '0;
 
@@ -410,6 +434,10 @@ module chip_core #(
         .CFG_MAX_MOTION_HI(CFG_MAX_MOTION_HI),
         .MSSD_MIN_RR_COUNT(MSSD_MIN_RR_COUNT)
     ) u_top (
+        `ifdef USE_POWER_PINS
+        .VDD                   (VDD),
+        .VSS                   (VSS),
+        `endif
         .clk_i                 (core_clk_w),
         .reset_i               (~rst_n),
 
@@ -418,18 +446,19 @@ module chip_core #(
         .i2c_sda_i             (bidir_in[6]),
         .i2c_sda_drive_low_o   (i2c_sda_drive_low_w),
 
-        // .sim_req_o             (sim_req_o),
-        // .sim_addr_o            (sim_addr_o),
-        // .sim_reg_o             (sim_reg_o),
-        // .sim_len_o             (sim_len_o),
-        // .sim_write_o           (sim_write_o),
-        // .sim_wdata_o           (sim_wdata_o),
-        // .sim_ack_i             (sim_ack_i),
-        // .sim_rdata_i           (sim_rdata_i),
-        // .sim_rvalid_i          (sim_rvalid_i),
-        // .sim_rlast_i           (sim_rlast_i),
-        // .sim_err_i             (sim_err_i),
-
+        `ifdef SIM
+            .sim_req_o    (sim_req_w),
+            .sim_addr_o   (sim_addr_w),
+            .sim_reg_o    (sim_reg_w),
+            .sim_len_o    (sim_len_w),
+            .sim_write_o  (sim_write_w),
+            .sim_wdata_o  (sim_wdata_w),
+            .sim_ack_i    (sim_ack_i),
+            .sim_rdata_i  (sim_rdata_i),
+            .sim_rvalid_i (sim_rvalid_i),
+            .sim_rlast_i  (sim_rlast_i),
+            .sim_err_i    (sim_err_i),
+        `endif
         .feat_valid_o          (feat_valid_w),
         .time_feat_o           (time_feat_top_w),
         .motion_feat_o         (motion_feat_top_w),
