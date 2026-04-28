@@ -103,6 +103,12 @@ def chip_top_runner():
         # sources.append(proj_path / "../src/chip_top.sv")
         # sources.append(proj_path / "../src/chip_core.sv")
         src_dir = proj_path / "../src"
+        
+        skip = {
+            "gf180mcu_fd_ip_sram__sram512x8m8wm1.v",
+            "dummy_top.sv",
+            "soc_top.v",
+        }
         sources += sorted(src_dir.glob("*.sv"))
         sources += sorted(src_dir.glob("*.v"))
         
