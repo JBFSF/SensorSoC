@@ -75,6 +75,14 @@ int main(void) {
     TIMER_EVENT = 1u;
     IRQC_PENDING = IRQ_TIMER_BIT;
 
+    // Program taketwo WRAM base and field offsets before starting inference.
+    // Without this, taketwo's AXI4 master defaults to address 0, which is
+    // outside weight_ram_axi's window and causes the AXI4 bus to hang.
+    ML_REG(0x80u) = 0x03006000u;  // global WRAM base (soc_top WEIGHT_BASE)
+    ML_REG(0x88u) = 5504u;         // output logit offset
+    ML_REG(0x8Cu) = 64u;           // input (x) offset
+    ML_REG(0x90u) = 128u;          // weight/var offset
+
     // Prepare ML completion IRQ generation in taketwo.
     ML_IRQ_EN = 1u;
     ML_IRQ_CLR = 1u;

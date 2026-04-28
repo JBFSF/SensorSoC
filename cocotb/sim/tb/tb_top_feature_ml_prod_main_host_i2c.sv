@@ -276,6 +276,7 @@ top #(
     .boot_spi_cs_n_o(boot_spi_cs_n),
     .epoch_end_o(),
     .alarm_o(),
+    .test_mode_i(4'b0101),
     .test_force_irq_i(1'b0),
     .test_force_wake_i(1'b0),
     .test_irq_src_i(3'b000),
