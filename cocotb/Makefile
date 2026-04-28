@@ -636,6 +636,32 @@ sim-top-spi-weights: $(TOP_SPI_WEIGHTS_VVP) | $(SIM_BUILD)
 	@echo "== Running $(TOP_SPI_WEIGHTS_TOP) (FW=$(FW_DIR)/build/test_top_spi_boot_weights/firmware.hex FLASH=$(TAKETWO_PARAMS_HEX)) =="
 	$(VVP) $(TOP_SPI_WEIGHTS_VVP)
 
+# ============================================================
+# Hardware weight boot: SPI flash -> weight_ram_axi -> taketwo SRAMs
+# No firmware required. tb drives taketwo's saxi directly via
+# force/release after weight_boot_done asserts.
+# ============================================================
+
+WEIGHT_BOOT_TOP     := tb_weight_boot
+WEIGHT_BOOT_VVP     := $(BUILD_DIR)/$(WEIGHT_BOOT_TOP).vvp
+WEIGHT_BOOT_SOURCES := \
+	$(TB_DIR)/tb_weight_boot.sv \
+	$(TB_DIR)/spi_flash_model.v \
+	$(UNIFIED_TOP_RTL_SRCS) \
+	$(RTL_DIR)/top_fsm.v \
+	sensors/i2c_slave_lis2dw12.sv \
+	sensors/i2c_slave_adpd144ri.sv
+
+$(WEIGHT_BOOT_VVP): $(WEIGHT_BOOT_SOURCES)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) \
+	  -s $(WEIGHT_BOOT_TOP) -o $@ $(WEIGHT_BOOT_SOURCES)
+
+.PHONY: sim-weight-boot
+sim-weight-boot: $(WEIGHT_BOOT_VVP) | $(SIM_BUILD)
+	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
+	@echo "== Running $(WEIGHT_BOOT_TOP) (FLASH=$(TAKETWO_PARAMS_HEX)) =="
+	$(VVP) $(WEIGHT_BOOT_VVP)
+
 # Unified top: short ML-control-only regression. This isolates the CPU-owned
 # taketwo control path from the feature and SPI flows:
 #   WRAM input writes -> ML base-register programming -> START/BUSY/IRQ

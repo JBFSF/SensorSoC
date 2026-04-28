@@ -111,6 +111,14 @@ module top #(
     input  logic                      boot_spi_miso_i,
     output logic                      boot_spi_cs_n_o,
 
+    // Dedicated SPI interface for hardware weight boot controller (ML weight load).
+    output logic                      weight_spi_clk_o,
+    output logic                      weight_spi_mosi_o,
+    input  logic                      weight_spi_miso_i,
+    output logic                      weight_spi_cs_n_o,
+
+    output logic                      weight_boot_done_o,
+
     // Epoch pulse for TB orchestration
 
     output logic                      alarm_o,          // placeholder alarm output (unused in current RTL)
@@ -272,6 +280,12 @@ module top #(
     wire [3:0]  boot_sram_wstrb_w;
     wire [31:0] boot_sram_addr_w;
     wire [31:0] boot_sram_wdata_w;
+
+    wire        weight_boot_done;
+    wire        weight_boot_sram_valid_w;
+    wire [3:0]  weight_boot_sram_wstrb_w;
+    wire [31:0] weight_boot_sram_addr_w;
+    wire [31:0] weight_boot_sram_wdata_w;
 
     wire        timer_ready;
     wire [31:0] timer_rdata;
@@ -925,10 +939,13 @@ module top #(
     ) u_weight_ram (
         .clk         (clk_i),
         .resetn      (~reset_i),
-        .mem_valid   (mmio_sel),
-        .mem_addr    (mem_addr),
-        .mem_wdata   (mem_wdata),
-        .mem_wstrb   (mem_wstrb),
+
+        // During weight boot, hardware controller owns this port; CPU takes
+        // over after weight_boot_done (mirrors the firmware SRAM mux pattern).
+        .mem_valid   (weight_boot_done ? mmio_sel : weight_boot_sram_valid_w),
+        .mem_addr    (weight_boot_done ? mem_addr : weight_boot_sram_addr_w + WEIGHT_BASE),
+        .mem_wdata   (weight_boot_done ? mem_wdata : weight_boot_sram_wdata_w),
+        .mem_wstrb   (weight_boot_done ? mem_wstrb : weight_boot_sram_wstrb_w),
         .mem_ready   (weight_ready),
         .mem_rdata   (weight_rdata),
         .saxi_awid   (wram_awid),
@@ -1009,6 +1026,26 @@ module top #(
         .sram_addr_o (boot_sram_addr_w),
         .sram_wdata_o(boot_sram_wdata_w),
         .boot_done   (boot_done)
+    );
+
+    // Hardware weight boot controller: loads 16 weight words from external SPI
+    // flash into weight_ram_axi before handing the port back to the CPU.
+    spi_boot_ctrl #(
+        .WORDS     (16),
+        .CLK_DIV   (2),
+        .FLASH_ADDR(24'h000000)
+    ) u_weight_boot_ctrl (
+        .clk         (clk_i),
+        .resetn      (~reset_i),
+        .spi_clk_o   (weight_spi_clk_o),
+        .spi_mosi_o  (weight_spi_mosi_o),
+        .spi_miso_i  (weight_spi_miso_i),
+        .spi_cs_n_o  (weight_spi_cs_n_o),
+        .sram_valid_o(weight_boot_sram_valid_w),
+        .sram_wstrb_o(weight_boot_sram_wstrb_w),
+        .sram_addr_o (weight_boot_sram_addr_w),
+        .sram_wdata_o(weight_boot_sram_wdata_w),
+        .boot_done   (weight_boot_done)
     );
 
     // Off-chip host I2C target bridge in the always-on domain. This mirrors
@@ -1192,5 +1229,6 @@ module top #(
 
     assign epoch_end_o = epoch_end_w;
     assign alarm_o = 1'b0;
+    assign weight_boot_done_o = weight_boot_done;
 
 endmodule
