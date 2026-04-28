@@ -931,7 +931,6 @@ module top #(
 
     // Shared ML memory. Firmware writes inputs/weights through MMIO, while
     // taketwo accesses the same storage through its AXI master interface.
-    //JF: work with Rishi to make sure this works with the reduced size, 16 words probably fine? maybe less
     weight_ram_axi #(
         .WORDS          (16),
         .BASE_ADDR      (WEIGHT_BASE),

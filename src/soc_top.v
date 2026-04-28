@@ -235,6 +235,7 @@ module soc_top #(
     ml_axil_bridge_mmio #(.BASE_ADDR(ML_BASE)) u_ml (
         .clk         (clk),
         .resetn      (resetn),
+        .en_i        (1'b1),
         .mem_valid   (mmio_sel),
         .mem_addr    (mem_addr),
         .mem_wdata   (mem_wdata),
@@ -261,15 +262,15 @@ module soc_top #(
         .saxi_rdata  (ml_saxi_rdata),
         .saxi_rresp  (ml_saxi_rresp),
         .saxi_rvalid (ml_saxi_rvalid),
-        .saxi_rready (ml_saxi_rready),
-        .dbg_logit0  (ml_dbg_logit0),
-        .dbg_logit1  (ml_dbg_logit1)
+        .saxi_rready (ml_saxi_rready)
     );
 
     taketwo_wrap u_taketwo (
-        .CLK   (clk),
-        .RESETN(resetn),
-        .irq   (ml_irq),
+        .CLK        (clk),
+        .RESETN     (resetn),
+        .irq        (ml_irq),
+        .dbg_logit0 (ml_dbg_logit0),
+        .dbg_logit1 (ml_dbg_logit1),
         // AXI4 master → weight RAM
         .maxi_awid   (wram_awid),
         .maxi_awaddr (wram_awaddr),
