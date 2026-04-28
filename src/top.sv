@@ -63,41 +63,41 @@ module top #(
         input  logic        sim_rlast_i,   // marks last read byte of the transaction from simulated sensor
         input  logic        sim_err_i,     // error indicator from simulated sensor (e.g., NACK/invalid access)
 
-    
-        // Signals used for test modes.
-        input  logic        test_force_irq_i,
-        input  logic        test_force_wake_i,
-        input  logic [2:0]  test_irq_src_i,
-        output logic [2:0]  irq_eoi_o,
-        output logic        boot_done_o,
-        output logic        pico_trap_o,
-        output logic        pico_cpu_clk_en_o,
-        output logic        pico_mem_valid_o,
-        output logic        pico_mem_instr_o,
-        output logic        pico_mem_ready_o,
-        output logic [3:0]  pico_mem_wstrb_o,
-        output logic [31:0] pico_mem_addr_o,
-        output logic [31:0] pico_mem_wdata_o,
-        output logic [31:0] pico_irq_o,
-        output logic        pico_sleeping_o,
-        output logic        host_i2c_irq_event_o,
-        output logic        ml_irq_o,
-        output logic        timer_event_o
-
-        // Pipeline outputs toward ML
-        output logic                      feat_valid_o,     // one-cycle strobe: feature vector is ready for ML consumption
-        output logic signed [15:0]        time_feat_o,      // time-of-night feature (raw seconds)
-        output logic signed [15:0]        motion_feat_o,    // motion feature (per-epoch motion energy)
-        output logic signed [15:0]        delta_hr_feat_o,  // delta heart-rate feature derived from RR intervals
-        output logic signed [15:0]        mssd_feat_o,     // HRV feature (MSSD) for the epoch
-
-        output logic                      epoch_end_o,      // epoch boundary pulse (from globaltimer)
-    
-
-        // Signal quality outputs
-        output logic                      ml_update_gate_o,  // gate: only update ML when signal-quality checks pass
-        output logic [7:0]                invalid_reason_o,  // reason code when ML update is gated off
     `endif
+    
+    // Signals used for test modes.
+    // input  logic        test_force_irq_i,
+    // input  logic        test_force_wake_i,
+    // input  logic [2:0]  test_irq_src_i,
+    // output logic [2:0]  irq_eoi_o,
+    // output logic        boot_done_o,
+    // output logic        pico_trap_o,
+    // output logic        pico_cpu_clk_en_o,
+    // output logic        pico_mem_valid_o,
+    // output logic        pico_mem_instr_o,
+    // output logic        pico_mem_ready_o,
+    // output logic [3:0]  pico_mem_wstrb_o,
+    // output logic [31:0] pico_mem_addr_o,
+    // output logic [31:0] pico_mem_wdata_o,
+    // output logic [31:0] pico_irq_o,
+    // output logic        pico_sleeping_o,
+    // output logic        host_i2c_irq_event_o,
+    // output logic        ml_irq_o,
+    // output logic        timer_event_o,
+
+    // Pipeline outputs toward ML
+    output logic                      feat_valid_o,     // one-cycle strobe: feature vector is ready for ML consumption
+    output logic signed [15:0]        time_feat_o,      // time-of-night feature (raw seconds)
+    output logic signed [15:0]        motion_feat_o,    // motion feature (per-epoch motion energy)
+    output logic signed [15:0]        delta_hr_feat_o,  // delta heart-rate feature derived from RR intervals
+    output logic signed [15:0]        mssd_feat_o,     // HRV feature (MSSD) for the epoch
+
+    output logic                      epoch_end_o,      // epoch boundary pulse (from globaltimer)
+
+
+    // Signal quality outputs
+    output logic                      ml_update_gate_o,  // gate: only update ML when signal-quality checks pass
+    output logic [7:0]                invalid_reason_o,  // reason code when ML update is gated off    
 
     // SPI flash interface used by the simulation boot stub.
     output logic                      spi_clk_o,
@@ -1155,23 +1155,23 @@ module top #(
     // Sleep/wake control copied from soc_top.
     //JF: move this to top_fsm.v?
     top_fsm fsm (
-        resetn_i(~reset_i),
-        clk_i(clk_i),
+        .resetn_i(~reset_i),
+        .clk_i(clk_i),
         
-        watchdog_i(timer_event),       // when the watchdog timer goes off
-        feat_valid_i(feat_valid_o),    // one-cycle strobe: feature vector ready (FEAT_ONLY -> ALL)
-        ml_irq_i(ml_irq),        // ML inference complete (ALL -> CPU_FEAT)
+        // .watchdog_i(timer_event),       // when the watchdog timer goes off
+        .feat_valid_i(feat_valid_o),    // one-cycle strobe: feature vector ready (FEAT_ONLY -> ALL)
+        .ml_irq_i(ml_irq),        // ML inference complete (ALL -> CPU_FEAT)
 
         // CPU sleep/wake inputs
-        wake_sources_i(wake_sources),
-        sleep_req_i(sleep_req),     // CPU requests sleep (from pwrctrl MMIO)
-        mem_valid_i(mem_valid),     // CPU memory-access valid (for idle detection)
-        irqc_wake_req_i(irqc_wake_req), // interrupt controller forces wake
+        .wake_sources_i(wake_sources),
+        .sleep_req_i(sleep_req),     // CPU requests sleep (from pwrctrl MMIO)
+        .mem_valid_i(mem_valid),     // CPU memory-access valid (for idle detection)
+        .irqc_wake_req_i(irqc_wake_req), // interrupt controller forces wake
 
-        feat_en_o(feat_en),
-        ml_en_o(ml_en),
-        cpu_en_o(cpu_clk_en),
-        sleeping_o(sleeping_r)
+        .feat_en_o(feat_en),
+        .ml_en_o(ml_en),
+        .cpu_en_o(cpu_clk_en),
+        .sleeping_o(sleeping_r)
     );
     
     assign pico_trap_o       = trap;

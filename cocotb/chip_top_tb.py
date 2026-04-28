@@ -112,8 +112,8 @@ def chip_top_runner():
             "dummy_top.sv",
             "soc_top.v",
         }
-        sources += sorted(src_dir.glob("*.sv"))
-        sources += sorted(src_dir.glob("*.v"))
+        sources += sorted(p for p in src_dir.glob("*.sv") if p.name not in skip)
+        sources += sorted(p for p in src_dir.glob("*.v") if p.name not in skip)
         sources.append(proj_path / "../ip/picorv32.v")
         
     if hdl_toplevel == "chip_top":
