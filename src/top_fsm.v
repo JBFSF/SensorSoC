@@ -35,7 +35,7 @@ module top_fsm
     localparam FEAT_ONLY = 3'd2;
     localparam ALL       = 3'd3;
     localparam CPU_FEAT  = 3'd4;
-    localparam ML_ONLY  = 3'd5;
+    localparam FEAT_ML   = 3'd5;
     localparam CPU_ONLY  = 3'd6;
 
     reg [2:0] state_d, state_q, state_debug_q;
@@ -75,17 +75,17 @@ module top_fsm
         endcase
 
         case (test_mode_i)
-            4'b0001, 4'b0010, 4'b0011, 4'b0100: state_d = FEAT_ONLY;//just feat_pl
-            4'b0110: state_d = ML_ONLY;//just ml
-            4'b0111, 4'b1000, 4'b1001, 4'b1010, 4'b1011: state_d = CPU_ONLY;//just cpu?
-            4'b0101: state_d = ALL;//all 
+            4'b0001, 4'b0010, 4'b0011, 4'b0100: state_d = FEAT_ONLY; //just feat_pl
+            4'b0110, 4'b1100, 4'b1101: state_d = FEAT_ML; //feat and ML
+            4'b0111, 4'b1000, 4'b1001, 4'b1010, 4'b1011: state_d = CPU_ONLY; //just cpu?
+            4'b0101: state_d = ALL; //all 
         endcase
     end
 
 
     // Output enables (combinational from state)
-    assign feat_en_o  = (state_q == FEAT_ONLY) || (state_q == ALL) || (state_q == CPU_FEAT);
-    assign ml_en_o    = (state_q == ALL) || (state_q == ML_ONLY);
+    assign feat_en_o  = (state_q == FEAT_ONLY) || (state_q == ALL) || (state_q == CPU_FEAT) || (state_q == FEAT_ML);
+    assign ml_en_o    = (state_q == ALL) || (state_q == FEAT_ML);
     assign cpu_en_o   = cpu_clk_en_r;
     assign sleeping_o = (state_q == SLEEP);
 

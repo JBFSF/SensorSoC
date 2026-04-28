@@ -206,7 +206,19 @@ async def test_modes_test(dut):
 
     dut.test_mode_i.value = 6 & 0xF #ML test
     await ClockCycles(dut.clk_i, 2)
-    assert dut.feat_en_o.value  == 0
+    assert dut.feat_en_o.value  == 1
+    assert dut.ml_en_o.value    == 1
+    assert dut.cpu_en_o.value == 0
+    
+    dut.test_mode_i.value = 12 & 0xF #ML test
+    await ClockCycles(dut.clk_i, 2)
+    assert dut.feat_en_o.value  == 1
+    assert dut.ml_en_o.value    == 1
+    assert dut.cpu_en_o.value == 0
+    
+    dut.test_mode_i.value = 13 & 0xF #ML test
+    await ClockCycles(dut.clk_i, 2)
+    assert dut.feat_en_o.value  == 1
     assert dut.ml_en_o.value    == 1
     assert dut.cpu_en_o.value == 0
     
