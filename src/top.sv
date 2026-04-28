@@ -1194,7 +1194,7 @@ module top #(
     top_fsm fsm (
         .resetn_i(~reset_i),
         .clk_i(clk_i),
-        .test_mode_i(test_mode_i),
+        .test_mode_i(test_mode_i[3:0]),
         
         // .watchdog_i(timer_event),       // when the watchdog timer goes off
         .feat_valid_i(feat_valid_o),    // one-cycle strobe: feature vector ready (FEAT_ONLY -> ALL)
