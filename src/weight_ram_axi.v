@@ -12,8 +12,8 @@
 // CPU takes priority in IDLE; AXI holds the RAM during active bursts.
 
 module weight_ram_axi #(
-    parameter integer WORDS           = 2048,          // 16 KB (4096 x 32-bit) CHANGE THIS TO 8KB, 6 IF POSSIBLE
-    parameter [31:0]  BASE_ADDR       = 32'h0300_6000,
+    parameter integer WORDS           = 16,          //This is just for feature and logit visibilty for the CPU, will be just registers and can be super small. 
+    parameter [31:0]  BASE_ADDR       = 32'h0000_0000,
     parameter         WEIGHT_INIT_HEX = ""
 )(
     input  wire        clk,

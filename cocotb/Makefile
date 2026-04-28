@@ -1042,6 +1042,32 @@ clean-simple-sram:
 	rm -f $(SIMPLE_SRAM_VVP)
 
 # ============================================================
+# TOP FSM COCOTB TEST (tb_top_fsm + test_top_fsm.py)
+# ============================================================
+
+TOP_FSM_TOP     := tb_top_fsm
+TOP_FSM_VVP     := $(BUILD_DIR)/$(TOP_FSM_TOP).vvp
+TOP_FSM_PYMOD   := test_top_fsm
+TOP_FSM_SOURCES := $(TB_DIR)/tb_top_fsm.sv \
+                   $(RTL_DIR)/top_fsm.v
+
+$(TOP_FSM_VVP): $(TOP_FSM_SOURCES) | $(BUILD_DIR)
+	@echo "[COCOTB] Building $@"
+	$(IVERILOG) -g2012 -o $@ $^
+
+.PHONY: test-top-fsm
+test-top-fsm: $(TOP_FSM_VVP)
+	@echo "[COCOTB] Running $(TOP_FSM_PYMOD) on $(TOP_FSM_TOP)"
+	@mkdir -p $(WAVE_DIR)
+	@export COCOTB_TOPLEVEL=$(TOP_FSM_TOP); \
+	export COCOTB_TEST_MODULES=$(TOP_FSM_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(TOP_FSM_VVP))
+
+.PHONY: clean-top-fsm
+clean-top-fsm:
+	rm -f $(TOP_FSM_VVP)
+
+# ============================================================
 # MOTION PREPROCESS
 # ============================================================
 

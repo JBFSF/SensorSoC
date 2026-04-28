@@ -18,6 +18,7 @@ module ppg_fifo_reader #(
 )(
     input  logic                  clk_i,
     input  logic                  rst_i,
+    input  logic                  en_i,
 
     input  logic [31:0]           t_now,
 
@@ -153,7 +154,7 @@ module ppg_fifo_reader #(
             fifo_overflow_flag <= 1'b0;
             fifo_empty_flag <= 1'b0;
             i2c_error_flag <= 1'b0;
-        end else begin
+        end else if (en_i) begin
             ppg_sample_valid <= 1'b0;
             i2c_cmd_valid <= 1'b0;
             i2c_cmd_write <= 1'b0;

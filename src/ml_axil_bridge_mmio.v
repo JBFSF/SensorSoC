@@ -5,6 +5,7 @@ module ml_axil_bridge_mmio #(
 )(
     input  wire        clk,
     input  wire        resetn,
+    input  wire        en_i,
 
     // PicoRV32 MMIO side
     input  wire        mem_valid,
@@ -79,7 +80,7 @@ module ml_axil_bridge_mmio #(
         if (!resetn) begin
             event_o <= 1'b0;
             score_o <= 32'h0;
-        end else begin
+        end else if (en_i) begin
             // default: no event
             event_o <= 1'b0;
 
@@ -128,7 +129,7 @@ module ml_axil_bridge_mmio #(
             req_wstrb    <= 4'h0;
             req_is_write <= 1'b0;
 
-        end else begin
+        end else if (en_i) begin
             // defaults each cycle
             mem_ready <= 1'b0;
 

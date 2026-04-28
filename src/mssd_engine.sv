@@ -9,6 +9,7 @@ module mssd_engine #(
 ) (
     input  logic                         clk_i,
     input  logic                         rst_i,
+    input  logic                         en_i,
 
     input  logic [RR_W-1:0]              rr_interval_i,
     input  logic                         rr_valid_i,
@@ -39,7 +40,7 @@ module mssd_engine #(
             mssd_epoch_o   <= {RR_W{1'b0}};
             mssd_valid_o   <= 1'b0;
             rr_diff_count_o <= {CNT_W{1'b0}};
-        end else begin
+        end else if (en_i) begin
             mssd_valid_o <= 1'b0;
 
             if (rr_valid_i && rr_accepted_i) begin

@@ -48,29 +48,56 @@ module top #(
     inout  wire  i2c_sda_io,
     input  logic i2c_sda_i,
     output logic i2c_sda_drive_low_o,
-    // Functional simulation bus to sensor models (through i2c_master).
-    output logic        sim_req_o,     // request strobe from i2c_master into simulated sensor bus
-    output logic [6:0]  sim_addr_o,    // 7-bit I2C address for the active simulated sensor transaction
-    output logic [7:0]  sim_reg_o,     // I2C register address for the active simulated sensor transaction
-    output logic [7:0]  sim_len_o,     // number of bytes to read/write for the active simulated sensor transaction
-    output logic        sim_write_o,   // 1: write transaction, 0: read transaction
-    output logic [7:0]  sim_wdata_o,   // write data byte for the active simulated sensor transaction
-    input  logic        sim_ack_i,     // simulated sensor acknowledges/accepts the requested transaction
-    input  logic [7:0]  sim_rdata_i,   // read data byte returned by simulated sensor
-    input  logic        sim_rvalid_i,  // read data valid strobe from simulated sensor
-    input  logic        sim_rlast_i,   // marks last read byte of the transaction from simulated sensor
-    input  logic        sim_err_i,     // error indicator from simulated sensor (e.g., NACK/invalid access)
 
-    // Pipeline outputs toward ML
-    output logic                      feat_valid_o,     // one-cycle strobe: feature vector is ready for ML consumption
-    output logic signed [15:0]        time_feat_o,      // time-of-night feature (raw seconds)
-    output logic signed [15:0]        motion_feat_o,    // motion feature (per-epoch motion energy)
-    output logic signed [15:0]        delta_hr_feat_o,  // delta heart-rate feature derived from RR intervals
-    output logic signed [15:0]        mssd_feat_o,     // HRV feature (MSSD) for the epoch
+    `ifdef SIM 
+        // Functional simulation bus to sensor models (through i2c_master).
+        output logic        sim_req_o,     // request strobe from i2c_master into simulated sensor bus
+        output logic [6:0]  sim_addr_o,    // 7-bit I2C address for the active simulated sensor transaction
+        output logic [7:0]  sim_reg_o,     // I2C register address for the active simulated sensor transaction
+        output logic [7:0]  sim_len_o,     // number of bytes to read/write for the active simulated sensor transaction
+        output logic        sim_write_o,   // 1: write transaction, 0: read transaction
+        output logic [7:0]  sim_wdata_o,   // write data byte for the active simulated sensor transaction
+        input  logic        sim_ack_i,     // simulated sensor acknowledges/accepts the requested transaction
+        input  logic [7:0]  sim_rdata_i,   // read data byte returned by simulated sensor
+        input  logic        sim_rvalid_i,  // read data valid strobe from simulated sensor
+        input  logic        sim_rlast_i,   // marks last read byte of the transaction from simulated sensor
+        input  logic        sim_err_i,     // error indicator from simulated sensor (e.g., NACK/invalid access)
 
-    // Signal quality outputs
-    output logic                      ml_update_gate_o,  // gate: only update ML when signal-quality checks pass
-    output logic [7:0]                invalid_reason_o,  // reason code when ML update is gated off
+    
+        // Signals used for test modes.
+        input  logic        test_force_irq_i,
+        input  logic        test_force_wake_i,
+        input  logic [2:0]  test_irq_src_i,
+        output logic [2:0]  irq_eoi_o,
+        output logic        boot_done_o,
+        output logic        pico_trap_o,
+        output logic        pico_cpu_clk_en_o,
+        output logic        pico_mem_valid_o,
+        output logic        pico_mem_instr_o,
+        output logic        pico_mem_ready_o,
+        output logic [3:0]  pico_mem_wstrb_o,
+        output logic [31:0] pico_mem_addr_o,
+        output logic [31:0] pico_mem_wdata_o,
+        output logic [31:0] pico_irq_o,
+        output logic        pico_sleeping_o,
+        output logic        host_i2c_irq_event_o,
+        output logic        ml_irq_o,
+        output logic        timer_event_o
+
+        // Pipeline outputs toward ML
+        output logic                      feat_valid_o,     // one-cycle strobe: feature vector is ready for ML consumption
+        output logic signed [15:0]        time_feat_o,      // time-of-night feature (raw seconds)
+        output logic signed [15:0]        motion_feat_o,    // motion feature (per-epoch motion energy)
+        output logic signed [15:0]        delta_hr_feat_o,  // delta heart-rate feature derived from RR intervals
+        output logic signed [15:0]        mssd_feat_o,     // HRV feature (MSSD) for the epoch
+
+        output logic                      epoch_end_o,      // epoch boundary pulse (from globaltimer)
+    
+
+        // Signal quality outputs
+        output logic                      ml_update_gate_o,  // gate: only update ML when signal-quality checks pass
+        output logic [7:0]                invalid_reason_o,  // reason code when ML update is gated off
+    `endif
 
     // SPI flash interface used by the simulation boot stub.
     output logic                      spi_clk_o,
@@ -85,29 +112,10 @@ module top #(
     output logic                      boot_spi_cs_n_o,
 
     // Epoch pulse for TB orchestration
-    output logic                      epoch_end_o,      // epoch boundary pulse (from globaltimer)
 
     output logic                      alarm_o,          // placeholder alarm output (unused in current RTL)
 
-    // Signals used for test modes.
-    input  logic        test_force_irq_i,
-    input  logic        test_force_wake_i,
-    input  logic [2:0]  test_irq_src_i,
-    output logic [2:0]  irq_eoi_o,
-    output logic        boot_done_o,
-    output logic        pico_trap_o,
-    output logic        pico_cpu_clk_en_o,
-    output logic        pico_mem_valid_o,
-    output logic        pico_mem_instr_o,
-    output logic        pico_mem_ready_o,
-    output logic [3:0]  pico_mem_wstrb_o,
-    output logic [31:0] pico_mem_addr_o,
-    output logic [31:0] pico_mem_wdata_o,
-    output logic [31:0] pico_irq_o,
-    output logic        pico_sleeping_o,
-    output logic        host_i2c_irq_event_o,
-    output logic        ml_irq_o,
-    output logic        timer_event_o
+    
 );
 
     localparam logic [11:0] CFG_LP_BETA_Q10      = 12'd128;
@@ -191,6 +199,11 @@ module top #(
     logic       ppg_i2c_rsp_err_w;       // i2c_master -> ppg_fifo_reader: transaction error (e.g., NACK)
     logic       ppg_i2c_rsp_ready_w;     // ppg_fifo_reader -> i2c_master: ready to accept response stream
 
+    logic       feat_en;                 // Feature pipeline enable wire
+    logic       ml_en;                   // ML enable wire
+    logic       cpu_clk_en;                  // CPU clock enable wire
+    logic       sleeping_r;
+
     // ---------------------------------------------------------------------
     // Unified SoC/CPU/ML path
     // ---------------------------------------------------------------------
@@ -198,7 +211,7 @@ module top #(
     // produces epoch features, while the logic below provides the CPU-owned
     // SoC path that reads those features, writes them into shared ML memory,
     // and starts the taketwo accelerator.
-    reg cpu_clk_en;
+    //reg cpu_clk_en;
     reg cpu_clk_en_lat;
     wire cpu_clk;
 
@@ -403,6 +416,7 @@ module top #(
     assign cpu_clk = clk_i & cpu_clk_en_lat;
 
     // PicoRV32 remains the owner of ML orchestration in the unified top.
+    //JF: Wait on this for now, look more into pwrctrl_mmio
     picorv32 #(
         .STACKADDR(STACKADDR),
         .PROGADDR_RESET(PROGADDR_RESET),
@@ -449,6 +463,7 @@ module top #(
 
     // Temporary CPU memory backing store for simulation. This is the block
     // planned to be replaced by macro-backed SRAM plus a flash boot path later.
+    //JF: always on domain
     simple_sram #(
         .WORDS(MEM_WORDS),
         .INIT_HEX("")
@@ -463,6 +478,7 @@ module top #(
         .rdata (sram_rdata)
     );
 
+    //JF: always on domain
     globaltimer #(
         .clk_speed_hz(GT_CLK_HZ),
         .epoch_hz(GT_EPOCH_HZ),
@@ -478,9 +494,12 @@ module top #(
 
     assign time_value_w = seconds_w;
 
+
+    //JF: Feat Pipline, sleep until watchdog
     i2c_master u_i2c_master (
         .clk(clk_i),
         .resetn(~reset_i),
+        .en_i(feat_en),
         .accel_cmd_valid_i(acc_i2c_cmd_valid_w),   // accel_reader command valid -> I2C master
         .accel_cmd_ready_o(acc_i2c_cmd_ready_w),   // I2C master ready/accept -> accel_reader
         .accel_cmd_addr_i(acc_i2c_cmd_addr_w),     // accel target 7-bit I2C address
@@ -520,9 +539,11 @@ module top #(
         .sim_err(sim_err_i)                        // receive sim sensor-bus error indication
     );
 
+    //JF: Feat Pipline, sleep until watchdog
     accel_reader u_accel_reader (
         .clk(clk_i),
         .rst_i(reset_i),
+        .en_i(feat_en),
         .cfg_enable_i(1'b1),                     // enables accel polling/reads (always on in this top)
         .cfg_init_en_i(1'b1),                    // enables accel init writes before polling
         .cfg_poll_period_ticks_i(ACC_POLL_PERIOD_TICKS), // poll interval in clk ticks
@@ -549,11 +570,13 @@ module top #(
         .nack_seen_o()                           // unused: NACK-seen flag
     );
 
+    //JF: Feat Pipeline: sleep until watchdog
     motion_process #(
         .AX_W(16)
     ) u_motion_process (
         .clk(clk_i),
         .rst_i(reset_i),
+        .en_i(feat_en),
         .sample_valid_i(accel_valid_w),     // drive motion accumulation with each valid accel sample
         // accel_valid_o already indicates a completed good read.
         .ax_i(ax_w),                        // accel X input for motion energy
@@ -570,6 +593,7 @@ module top #(
         (ay_w[15] ? (~ay_w + 16'd1) : ay_w) +
         (az_w[15] ? (~az_w + 16'd1) : az_w);
 
+    //JF: Feat Pipeline: sleep until watchdog
     ppg_fifo_reader #(
         .POLL_PERIOD(PPG_POLL_PERIOD_TICKS),
         .WATERMARK(PPG_WATERMARK),
@@ -577,6 +601,7 @@ module top #(
     ) u_ppg_fifo_reader (
         .clk_i(clk_i),
         .rst_i(reset_i),
+        .en_i(feat_en),
         .t_now(time_ms_w),                      // current timebase (ms) used to timestamp samples
         .i2c_cmd_valid(ppg_i2c_cmd_valid_w),    // command stream to i2c_master (PPG)
         .i2c_cmd_ready(ppg_i2c_cmd_ready_w),    // ready/accept from i2c_master (PPG)
@@ -598,9 +623,11 @@ module top #(
         .i2c_error_flag(ppg_i2c_err_w)          // sticky I2C error flag on PPG path
     );
 
+    //JF: Feat Pipeline, sleep pipeline
     ppg_process u_beat_detect (
         .clk_i(clk_i),
         .rst_i(reset_i),
+        .en_i(feat_en),
         .ppg_sample_i(ppg_sample_w),            // raw PPG sample stream input
         .ppg_valid_i(ppg_sample_valid_w),       // strobe: PPG sample input valid
         .ppg_sample_time_i(ppg_sample_time_w),  // timestamp for RR interval computation
@@ -631,11 +658,13 @@ module top #(
         .ppg_invalid_o(ppg_invalid_w)           // invalid PPG indicator output
     );
 
+    //JF: Feat Pipeline, sleep until watchdog
     mssd_engine #(
         .MIN_RR_COUNT(MSSD_MIN_RR_COUNT)
     ) u_mssd (
         .clk_i(clk_i),
         .rst_i(reset_i),
+        .en_i(feat_en),
         .rr_interval_i(rr_interval_w[15:0]),  // RR interval input for HRV calculation
         .rr_valid_i(rr_valid_w),        // strobe: RR interval input valid
         .rr_accepted_i(rr_accepted_w),  // only include accepted RR intervals
@@ -645,9 +674,11 @@ module top #(
         .rr_diff_count_o()              // unused: number of RR diffs included
     );
 
+    //JF: Feat Pipeline, sleep until watchdog
     signal_quality u_signal_quality (
         .clk_i(clk_i),
         .rst_i(reset_i),
+        .en_i(feat_en),
         .epoch_end_i(epoch_end_w),              // epoch boundary: evaluate signal quality for that epoch
         .beat_event_i(beat_pulse_w),            // beat events counted for valid fraction and anomalies
         .beat_quality_i(beat_quality_w),        // beat-quality score for "good beat" counting
@@ -667,9 +698,11 @@ module top #(
         .ml_update_gate_o(ml_update_gate_o)     // outputs gate controlling ML update at epoch end
     );
 
+    //Feat Pipeline, sleep until watchdog
     feature_engine u_feature_engine (
         .clk_i(clk_i),
         .rst_i(reset_i),
+        .en_i(feat_en),
         .enable_i(epoch_end_d),                 // epoch strobe (delayed) to emit a consolidated feature vector
         .seconds_valid_i(1'b1),                 // time feature treated as always valid here
         .time_value_i(time_value_w),            // raw time feature input
@@ -740,6 +773,7 @@ module top #(
     assign feat_mmio_ready = feat_sel;
 
     // Always-on watchdog timer used by firmware for wake/scheduling.
+    //JF: This is watchdog, look for timer event(?)
     timer_mmio #(.BASE_ADDR(TIMER_BASE)) u_timer (
         .clk      (clk_i),
         .resetn   (~reset_i),
@@ -754,9 +788,11 @@ module top #(
     );
 
     // CPU MMIO -> AXI-Lite bridge into the taketwo control/status port.
+    //JF: Feat Pipeline, sleep until watchdog
     ml_axil_bridge_mmio #(.BASE_ADDR(ML_BASE)) u_ml (
         .clk         (clk_i),
         .resetn      (~reset_i),
+        .en_i        (ml_en),
         .mem_valid   (mmio_sel),
         .mem_addr    (mem_addr),
         .mem_wdata   (mem_wdata),
@@ -788,9 +824,12 @@ module top #(
 
     // ML accelerator instance. Firmware talks to it through u_ml above,
     // and the core reads/writes its working set through weight_ram_axi below.
+    //JF: ML, Sleep until features are ready
+    //      figure out how to sleep rest of chip BESIDES ram within, also expose interfaces
     taketwo_wrap u_taketwo_wrap (
         .CLK   (clk_i),
         .RESETN(~reset_i),
+        .en_i  (ml_en),
         .irq   (ml_irq),
         .maxi_awid   (wram_awid),
         .maxi_awaddr (wram_awaddr),
@@ -854,8 +893,9 @@ module top #(
 
     // Shared ML memory. Firmware writes inputs/weights through MMIO, while
     // taketwo accesses the same storage through its AXI master interface.
+    //JF: work with Rishi to make sure this works with the reduced size, 16 words probably fine? maybe less
     weight_ram_axi #(
-        .WORDS          (4096),
+        .WORDS          (16),
         .BASE_ADDR      (WEIGHT_BASE),
         .WEIGHT_INIT_HEX(WEIGHT_INIT_HEX)
     ) u_weight_ram (
@@ -910,6 +950,7 @@ module top #(
 
     // CPU-driven SPI master used by the simulation boot stub to stream
     // taketwo weights from external flash into shared WRAM.
+    //JF: probably not needed
     spi_master_mmio #(.BASE_ADDR(SPI_BASE)) u_spi (
         .clk       (clk_i),
         .resetn    (~reset_i),
@@ -927,6 +968,7 @@ module top #(
 
     // Hardware SPI boot controller: loads BOOT_WORDS words from external flash
     // into SRAM before releasing the CPU from reset.
+    //JF: probably not needed, SIKE
     spi_boot_ctrl #(
         .WORDS    (BOOT_WORDS),
         .CLK_DIV  (2),
@@ -948,6 +990,7 @@ module top #(
     // Off-chip host I2C target bridge in the always-on domain. This mirrors
     // soc_top so the unified top can participate in end-to-end host config and
     // score visibility tests without changing production firmware.
+    //JF: we can probably remove this
     host_i2c_target #(
         .SLAVE_ADDR(7'h42)
     ) u_host_i2c_target (
@@ -965,6 +1008,7 @@ module top #(
         .proto_err_o        (host_i2c_proto_err)
     );
 
+    //JF: do we need this?
     host_i2c_bridge_regs u_host_i2c_bridge_regs (
         .clk                  (clk_i),
         .resetn               (~reset_i),
@@ -999,6 +1043,7 @@ module top #(
     assign pico_irq = irq | {31'b0, test_force_irq_i};
 
     // Minimal interrupt controller used for CPU-visible pending bits and wake.
+    //JF: if this is in always on domain, just leave this on
     irq_ctrl_mmio #(.BASE_ADDR(IRQC_BASE)) u_irqc (
         .clk        (clk_i),
         .resetn     (~reset_i),
@@ -1020,6 +1065,7 @@ module top #(
     );
 
     // Power/sleep control block.
+    //JF: power sleep controls for CPU, always on Domain
     pwrctrl_mmio #(.BASE_ADDR(PWR_BASE)) u_pwr (
         .clk        (clk_i),
         .resetn     (~reset_i),
@@ -1035,6 +1081,7 @@ module top #(
     );
 
     // Simulation/debug mailbox for firmware-driven status and result reporting.
+    //JF: probably dont need this
     test_mmio #(.BASE_ADDR(TEST_BASE)) u_test (
         .clk(clk_i),
         .resetn(~reset_i),
@@ -1083,50 +1130,26 @@ module top #(
                        32'h0000_0000;
 
     // Sleep/wake control copied from soc_top.
-    reg sleeping_r;
-    reg cpu_idle_seen_r;
-    reg sleep_req_d_r;
-    reg [31:0] wake_sources_d_r;
-    wire [31:0] wake_rise_w = wake_sources & ~wake_sources_d_r;
-    wire        wake_event_w = |wake_rise_w;
-    wire        sleep_req_rise_w = sleep_req & ~sleep_req_d_r;
+    //JF: move this to top_fsm.v?
+    top_fsm fsm (
+        resetn_i(~reset_i),
+        clk_i(clk_i),
+        
+        watchdog_i(timer_event),       // when the watchdog timer goes off
+        feat_valid_i(feat_valid_o),    // one-cycle strobe: feature vector ready (FEAT_ONLY -> ALL)
+        ml_irq_i(ml_irq),        // ML inference complete (ALL -> CPU_FEAT)
 
-    always_ff @(posedge clk_i) begin
-        if (reset_i)
-            wake_sources_d_r <= 32'h0;
-        else
-            wake_sources_d_r <= wake_sources;
-    end
+        // CPU sleep/wake inputs
+        wake_sources_i(wake_sources),
+        sleep_req_i(sleep_req),     // CPU requests sleep (from pwrctrl MMIO)
+        mem_valid_i(mem_valid),     // CPU memory-access valid (for idle detection)
+        irqc_wake_req_i(irqc_wake_req), // interrupt controller forces wake
 
-    always_ff @(posedge clk_i) begin
-        if (reset_i) begin
-            cpu_clk_en    <= 1'b1;
-            sleeping_r    <= 1'b0;
-            cpu_idle_seen_r <= 1'b0;
-            sleep_req_d_r <= 1'b0;
-        end else begin
-            sleep_req_d_r <= sleep_req;
-
-            if (cpu_clk_en && sleep_req_rise_w)
-                cpu_idle_seen_r <= 1'b0;
-            else if (cpu_clk_en)
-                cpu_idle_seen_r <= cpu_idle_seen_r | (~mem_valid);
-
-            if (sleeping_r) begin
-                if (irqc_wake_req || wake_event_w) begin
-                    cpu_clk_en      <= 1'b1;
-                    sleeping_r      <= 1'b0;
-                    cpu_idle_seen_r <= 1'b0;
-                end
-            end else begin
-                if (sleep_req && cpu_idle_seen_r && !(irqc_wake_req || wake_event_w)) begin
-                    cpu_clk_en      <= 1'b0;
-                    sleeping_r      <= 1'b1;
-                    cpu_idle_seen_r <= 1'b0;
-                end
-            end
-        end
-    end
+        feat_en_o(feat_en),
+        ml_en_o(ml_en),
+        cpu_en_o(cpu_clk_en),
+        sleeping_o(sleeping_r)
+    );
     
     assign pico_trap_o       = trap;
     assign pico_cpu_clk_en_o = cpu_clk_en_lat;

@@ -6,6 +6,7 @@ module signal_quality #(
 ) (
     input  logic                     clk_i,
     input  logic                     rst_i,
+    input  logic                     en_i,
 
     input  logic                     epoch_end_i,
 
@@ -51,7 +52,7 @@ module signal_quality #(
 
             invalid_reason_o <= 8'd0;
             ml_update_gate_o <= 1'b0;
-        end else begin
+        end else if (en_i) begin
             if (beat_event_i) begin
                 beat_cnt_r <= beat_cnt_r + 1'b1;
                 if (beat_quality_i >= cfg_beat_q_min_i) begin
