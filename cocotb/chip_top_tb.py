@@ -17,11 +17,14 @@ pdk = os.getenv("PDK", "gf180mcuD")
 scl = os.getenv("SCL", "gf180mcu_fd_sc_mcu7t5v0")
 gl = os.getenv("GL", False)
 slot = os.getenv("SLOT", "1x1")
+test_module = os.getenv("COCOTB_TEST_MODULE", "chip_top_tb")
+toplevel = os.getenv("CHIP_TOPLEVEL", "chip_top")
 
-hdl_toplevel = "chip_top"
+hdl_toplevel = toplevel
 
 async def set_defaults(dut):
     dut.input_PAD.value = 0
+    dut.bidir_PAD.value = 0
 
 async def enable_power(dut):
     dut.VDD.value = 1
@@ -111,19 +114,21 @@ def chip_top_runner():
         }
         sources += sorted(src_dir.glob("*.sv"))
         sources += sorted(src_dir.glob("*.v"))
+        sources.append(proj_path / "../ip/picorv32.v")
         
-    sources += [
-        # IO pad models
-        Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_fd_io.v",
-        Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_ws_io.v",
-        
-        # SRAM macros
-        Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_ip_sram/verilog/gf180mcu_fd_ip_sram__sram512x8m8wm1.v",
-        
-        # Custom IP
-        proj_path / "../ip/gf180mcu_ws_ip__id/vh/gf180mcu_ws_ip__id.v",
-        proj_path / "../ip/gf180mcu_ws_ip__logo/vh/gf180mcu_ws_ip__logo.v",
-    ]
+    if hdl_toplevel == "chip_top":
+        sources += [
+            # IO pad models
+            Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_fd_io.v",
+            Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_ws_io.v",
+            
+            # SRAM macros
+            Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_ip_sram/verilog/gf180mcu_fd_ip_sram__sram512x8m8wm1.v",
+            
+            # Custom IP
+            proj_path / "../ip/gf180mcu_ws_ip__id/vh/gf180mcu_ws_ip__id.v",
+            proj_path / "../ip/gf180mcu_ws_ip__logo/vh/gf180mcu_ws_ip__logo.v",
+        ]
 
     build_args = []
 
@@ -150,7 +155,7 @@ def chip_top_runner():
 
     runner.test(
         hdl_toplevel=hdl_toplevel,
-        test_module="chip_top_tb,",
+        test_module=test_module,
         plusargs=plusargs,
         waves=True,
     )

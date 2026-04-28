@@ -70,6 +70,10 @@ sim: ## Run RTL simulation with cocotb
 	cd cocotb; PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
 .PHONY: sim
 
+sim-dft-smoke: ## Run chip_core DFT smoke tests for normal/force-IRQ/force-wake modes
+	cd cocotb; CHIP_TOPLEVEL=chip_core COCOTB_TEST_MODULE=chip_core_dft_tb PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
+.PHONY: sim-dft-smoke
+
 sim-gl: ## Run gate-level simulation with cocotb (after copy-final)
 	cd cocotb; GL=1 PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
 .PHONY: sim-gl
