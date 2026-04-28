@@ -10,6 +10,8 @@ SLEEP     = 1
 FEAT_ONLY = 2
 ALL       = 3
 CPU_FEAT  = 4
+ML_ONLY   = 5
+CPU_ONLY  = 6
 
 
 async def reset_dut(dut, cycles=5):
@@ -22,6 +24,7 @@ async def reset_dut(dut, cycles=5):
     dut.sleep_req_i.value     = 0
     dut.mem_valid_i.value     = 0
     dut.irqc_wake_req_i.value = 0
+    dut.test_mode_i.value     = 0
     await ClockCycles(dut.clk_i, cycles)
     await FallingEdge(dut.clk_i)
     dut.resetn_i.value = 1
@@ -81,7 +84,7 @@ async def test_irqc_wake(dut): #See if we go into FEAT_ONLY after watchdog goes 
     assert dut.sleeping_o.value == 0, "Should have woken from SLEEP"
     assert dut.feat_en_o.value  == 1, "feat_en_o should be 1 in FEAT_ONLY"
     assert dut.ml_en_o.value    == 0, "ml_en_o should be 0 in FEAT_ONLY"
-    assert dut.cpu_en_o.value   == 1, "cpu_en_o should be 1 after wake"
+    assert dut.cpu_en_o.value   == 0, "cpu_en_o should be 1 after wake"
 
 @cocotb.test()
 async def test_random_reset(dut): #Test for weird behavior on resets
@@ -93,6 +96,7 @@ async def test_random_reset(dut): #Test for weird behavior on resets
     dut.sleep_req_i.value     = 1
     dut.mem_valid_i.value     = 1
     dut.irqc_wake_req_i.value = 1
+    dut.test_mode_i.value     = 0
     await ClockCycles(dut.clk_i, 5)
     await FallingEdge(dut.clk_i)
     dut.resetn_i.value        = 1
@@ -152,7 +156,7 @@ async def test_cpu_feat_can_sleep(dut): #CPU sleep
     # cpu_clk_en_r stays 1 (state_d was FEAT_ONLY, not SLEEP)
     assert dut.feat_en_o.value  == 1, "feat_en_o should be 1 back in FEAT_ONLY"
     assert dut.ml_en_o.value    == 0, "ml_en_o should be 0 in FEAT_ONLY"
-    assert dut.cpu_en_o.value   == 1, "cpu_clk_en_r stays 1 until state_d==SLEEP"
+    assert dut.cpu_en_o.value   == 0, "cpu_clk_en_r stays 1 until state_d==SLEEP"
     assert dut.sleeping_o.value == 0
 
 
@@ -168,11 +172,13 @@ async def test_full_pipeline_cycle(dut):
     await wake_to_feat_only(dut)
     assert dut.feat_en_o.value == 1
     assert dut.ml_en_o.value   == 0
+    assert dut.cpu_en_o.value == 0
 
     # FEAT_ONLY -> ALL
     await advance_to_all(dut)
     assert dut.feat_en_o.value == 1
     assert dut.ml_en_o.value   == 1
+    assert dut.cpu_en_o.value == 1
 
     # ALL -> CPU_FEAT
     await advance_to_cpu_feat(dut)
@@ -185,3 +191,29 @@ async def test_full_pipeline_cycle(dut):
     assert dut.feat_en_o.value  == 1
     assert dut.ml_en_o.value    == 0
     assert dut.sleeping_o.value == 0
+    
+@cocotb.test()
+async def test_modes_test(dut):
+    await reset_dut(dut)
+    
+    for i in range(1,5): #Feats tests
+        dut.test_mode_i.value = i & 0xF
+        await ClockCycles(dut.clk_i, 2)
+        assert dut.feat_en_o.value  == 1
+        assert dut.ml_en_o.value    == 0
+        assert dut.cpu_en_o.value == 0
+        
+
+    dut.test_mode_i.value = 6 & 0xF #ML test
+    await ClockCycles(dut.clk_i, 2)
+    assert dut.feat_en_o.value  == 0
+    assert dut.ml_en_o.value    == 1
+    assert dut.cpu_en_o.value == 0
+    
+    for i in range(7,12): #CPU tests
+        dut.test_mode_i.value = i & 0xF
+        await ClockCycles(dut.clk_i, 2)
+        assert dut.feat_en_o.value  == 0
+        assert dut.ml_en_o.value    == 0
+        assert dut.cpu_en_o.value == 1
+    

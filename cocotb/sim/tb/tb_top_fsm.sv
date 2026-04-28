@@ -7,6 +7,7 @@ module tb_top_fsm;
 
     reg        clk_i           = 1'b0;
     reg        resetn_i        = 1'b0;
+    reg  [3:0] test_mode_i     = 4'b0000;
 
     reg        feat_valid_i    = 1'b0;
     reg        ml_irq_i        = 1'b0;
@@ -24,6 +25,7 @@ module tb_top_fsm;
     top_fsm dut (
         .clk_i           (clk_i),
         .resetn_i        (resetn_i),
+        .test_mode_i     (test_mode_i),
         .feat_valid_i    (feat_valid_i),
         .ml_irq_i        (ml_irq_i),
         .wake_sources_i  (wake_sources_i),

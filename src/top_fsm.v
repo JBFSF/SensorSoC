@@ -11,6 +11,7 @@ module top_fsm
     input         resetn_i,
     input         clk_i,
 
+    input   [3:0] test_mode_i,
     //add input start? 
 
     // Pipeline done signals
@@ -34,8 +35,10 @@ module top_fsm
     localparam FEAT_ONLY = 3'd2;
     localparam ALL       = 3'd3;
     localparam CPU_FEAT  = 3'd4;
+    localparam ML_ONLY  = 3'd5;
+    localparam CPU_ONLY  = 3'd6;
 
-    reg [2:0] state_d, state_q;
+    reg [2:0] state_d, state_q, state_debug_q;
 
     // Rising-edge detection on wake sources
     reg  [31:0] wake_sources_d_r;
@@ -62,20 +65,27 @@ module top_fsm
 
     always @(*) begin
         state_d = state_q;
+
         case (state_q)
             IDLE:     state_d = SLEEP;
             SLEEP:    if (irqc_wake_req_i || wake_event_w) state_d = FEAT_ONLY;
             FEAT_ONLY:if (feat_valid_i)                    state_d = ALL;
             ALL:      if (ml_irq_i)                        state_d = CPU_FEAT;
             CPU_FEAT: if (can_sleep_w)                     state_d = FEAT_ONLY;
-            default:  state_d = IDLE;
+        endcase
+
+        case (test_mode_i)
+            4'b0001, 4'b0010, 4'b0011, 4'b0100: state_d = FEAT_ONLY;//just feat_pl
+            4'b0110: state_d = ML_ONLY;//just ml
+            4'b0111, 4'b1000, 4'b1001, 4'b1010, 4'b1011: state_d = CPU_ONLY;//just cpu?
+            4'b0101: state_d = ALL;//all 
         endcase
     end
 
 
     // Output enables (combinational from state)
     assign feat_en_o  = (state_q == FEAT_ONLY) || (state_q == ALL) || (state_q == CPU_FEAT);
-    assign ml_en_o    = (state_q == ALL);
+    assign ml_en_o    = (state_q == ALL) || (state_q == ML_ONLY);
     assign cpu_en_o   = cpu_clk_en_r;
     assign sleeping_o = (state_q == SLEEP);
 
@@ -95,14 +105,12 @@ module top_fsm
             else if (cpu_clk_en_r)
                 cpu_idle_seen_r <= cpu_idle_seen_r | (~mem_valid_i);
 
-            // Gated clock enable follows FSM state transitions
-            if (state_d == SLEEP) begin
-                cpu_clk_en_r    <= 1'b0;
+            // cpu_clk_en_r follows states where CPU should be active
+            cpu_clk_en_r <= (state_d == ALL) || (state_d == CPU_FEAT) || (state_d == CPU_ONLY);
+            // clear idle tracking when CPU powers on or system enters sleep
+            if (state_d == SLEEP ||
+                    ((state_d == ALL || state_d == CPU_FEAT || state_d == CPU_ONLY) && !cpu_clk_en_r))
                 cpu_idle_seen_r <= 1'b0;
-            end else if (state_q == SLEEP && state_d != SLEEP) begin
-                cpu_clk_en_r    <= 1'b1;
-                cpu_idle_seen_r <= 1'b0;
-            end
         end
     end
 
