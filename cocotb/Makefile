@@ -31,18 +31,19 @@
 #   # Cocotb unit tests (simple_sram_tb.py wrapper)
 #   make test-simple-sram
 #   make sim-logit-confidence
+#   make test-ml-canonical-v1
 #   make sim-top-feature-ml-cpu
 #   make sim-top-feature-ml-cpu-spi-flash
 #   make sim-top-spi-init-unified
 #   make sim-top-ml-control-unified
 #   make sim-top-feature-ml-prod-main-host-i2c
 #   make sim-top-sleep-wake-unified
-#   make sim-top-ml-golden-vector-unified
 #   make test-top-unified-reset-init
 #   make test-top-unified-runtime
 #   make test-top-unified-host-i2c
 #   make test-top-unified-prod-loop
 #   make test-top-unified-forced-wake-irq
+#   make test-top-ml-golden-vector-unified
 #
 #   # Cleanup
 #   make clean
@@ -63,8 +64,8 @@
 #   make sim-top-ml-control-unified
 #     Short ML-control-only proof for unified top.sv.
 #
-#   make sim-top-ml-golden-vector-unified
-#     Unified-top numerical ML check against the frozen single-vector logits.
+#   make test-top-ml-golden-vector-unified
+#     Python/cocotb unified-top golden-vector check importing golden_vectors.py.
 #
 #   make test-top-unified-reset-init
 #     Shared cocotb wrapper smoke test for unified top.sv reset/init state.
@@ -233,19 +234,20 @@ IRQ_VVP      := sim_irq.vvp
 # Cocotb configuration helper (cocotb 2.x via oss-cad-suite)
 # ----------------------------
 # cocotb's Icarus VPI shared library directory:
-COCOTB_LIBDIR := $(shell cocotb-config --lib-dir 2>/dev/null)
+COCOTB_LIBDIR := $(shell $(COCOTB_CONFIG) --lib-dir 2>/dev/null)
 
 # Absolute path + entry point needed by cocotb 2.x GPI loader:
-COCOTB_PYGPI  := $(shell cocotb-config --pygpi-entry-point 2>/dev/null)
+COCOTB_PYGPI  := $(shell $(COCOTB_CONFIG) --pygpi-entry-point 2>/dev/null)
+COCOTB_LIBPYTHON := $(shell $(COCOTB_CONFIG) --libpython 2>/dev/null)
 
 # Use the same python interpreter cocotb will embed
-export PYGPI_PYTHON_BIN := $(shell cocotb-config --python-bin 2>/dev/null)
+export PYGPI_PYTHON_BIN := $(shell $(COCOTB_CONFIG) --python-bin 2>/dev/null)
 
 # Make sure cocotb can import your tests
 export PYTHONPATH := $(abspath $(TB_DIR))
 
 define RUN_COCOTB_ICARUS
-	GPI_USERS="$(COCOTB_PYGPI)" LD_LIBRARY_PATH="$(COCOTB_LIBDIR):$$LD_LIBRARY_PATH" $(VVP) -M "$(COCOTB_LIBDIR)" -m libcocotbvpi_icarus $1
+	GPI_USERS="$(COCOTB_PYGPI)" LD_PRELOAD="$(COCOTB_LIBPYTHON):$$LD_PRELOAD" LD_LIBRARY_PATH="$(COCOTB_LIBDIR):$$LD_LIBRARY_PATH" $(VVP) -M "$(COCOTB_LIBDIR)" -m libcocotbvpi_icarus $1
 endef
 
 # ----------------------------
@@ -681,55 +683,6 @@ sim-top-ml-control-unified: $(TOP_ML_CONTROL_UNIFIED_VVP) | $(SIM_BUILD)
 	@echo "== Running $(TOP_ML_CONTROL_UNIFIED_TOP) (FW=$(FW_DIR)/build/test_top_ml_control_unified/firmware.hex WEIGHTS=$(TAKETWO_PARAMS_HEX)) =="
 	$(VVP) $(TOP_ML_CONTROL_UNIFIED_VVP)
 
-# Unified top: frozen golden-vector numerical ML regression.
-# This uses the same CPU-owned ML path as the short control test, but checks
-# the output logits against the single-vector cocotb probe aligned with
-# misc/ML/writeverilog.py:
-#   x_int = [256, -128, 51, -512] -> logits [-95, 72]
-TOP_ML_GOLDEN_VECTOR_UNIFIED_TOP     := tb_top_ml_golden_vector_unified
-TOP_ML_GOLDEN_VECTOR_UNIFIED_VVP     := $(BUILD_DIR)/$(TOP_ML_GOLDEN_VECTOR_UNIFIED_TOP).vvp
-TOP_ML_GOLDEN_VECTOR_UNIFIED_SOURCES := \
-	$(TB_DIR)/tb_top_ml_golden_vector_unified.sv \
-	$(TB_DIR)/spi_flash_model.v \
-	$(RTL_DIR)/top.sv \
-	$(RTL_DIR)/host_i2c_target.v \
-	$(RTL_DIR)/host_i2c_bridge_regs.v \
-	$(RTL_DIR)/i2c_master.sv \
-	$(RTL_DIR)/accel_reader.sv \
-	$(RTL_DIR)/motion_process.sv \
-	$(RTL_DIR)/ppg_fifo_reader.sv \
-	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/mssd_engine.sv \
-	$(RTL_DIR)/signal_quality.sv \
-	$(RTL_DIR)/feature_engine.sv \
-	$(RTL_DIR)/globaltimer.sv \
-	$(RTL_DIR)/simple_sram.v \
-	$(RTL_DIR)/spi_boot_ctrl.v \
-	$(RTL_DIR)/spi_master_mmio.v \
-	$(MAKEFILE_DIR)/../ip/picorv32.v \
-	$(RTL_DIR)/test_mmio.v \
-	$(RTL_DIR)/timer_mmio.v \
-	$(RTL_DIR)/ml_axil_bridge_mmio.v \
-	$(RTL_DIR)/weight_ram_axi.v \
-	$(RTL_DIR)/irq_ctrl_mmio.v \
-	$(RTL_DIR)/taketwo_wrap.v \
-	$(RTL_DIR)/taketwo.v \
-	$(RTL_DIR)/pwrctrl_mmio.v \
-	$(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v \
-	sensors/i2c_slave_lis2dw12.sv \
-	sensors/i2c_slave_adpd144ri.sv
-
-$(TOP_ML_GOLDEN_VECTOR_UNIFIED_VVP): $(TOP_ML_GOLDEN_VECTOR_UNIFIED_SOURCES)
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_ML_GOLDEN_VECTOR_UNIFIED_TOP) -o $@ \
-	  $(TOP_ML_GOLDEN_VECTOR_UNIFIED_SOURCES)
-
-.PHONY: sim-top-ml-golden-vector-unified
-sim-top-ml-golden-vector-unified: $(TOP_ML_GOLDEN_VECTOR_UNIFIED_VVP) | $(SIM_BUILD)
-	@$(SELF_MAKE) FW_VARIANT=test_top_ml_golden_vector_unified firmware
-	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
-	@echo "== Running $(TOP_ML_GOLDEN_VECTOR_UNIFIED_TOP) (FW=$(FW_DIR)/build/test_top_ml_golden_vector_unified/firmware.hex WEIGHTS=$(TAKETWO_PARAMS_HEX)) =="
-	$(VVP) $(TOP_ML_GOLDEN_VECTOR_UNIFIED_VVP)
-
 TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP     := tb_top_feature_ml_prod_main_host_i2c
 TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP     := $(BUILD_DIR)/$(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP).vvp
 TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES := \
@@ -837,6 +790,10 @@ test-soc-wake-e2e-p0:
 .PHONY: test-functional-matrix
 test-functional-matrix:
 	@bash tools/test_functionality_matrix.sh
+
+.PHONY: test-firmware-matrix
+test-firmware-matrix:
+	@bash $(TOOLS_DIR)/test_functionality_matrix.sh
 # ----------------------------
 # IRQ testbench (tb_irq)
 # ----------------------------
@@ -1282,6 +1239,43 @@ test-top-unified-runtime: test-top-unified-host-i2c test-top-unified-prod-loop t
 	@true
 
 # ============================================================
+# Bare taketwo_wrap: canonical_v1 isolated golden-vector check
+# ============================================================
+
+.PHONY: test-ml-canonical-v1
+test-ml-canonical-v1:
+	@echo "[COCOTB] Running isolated taketwo_wrap canonical_v1 check"
+	@$(MAKE) -C $(TB_DIR)/ml MODULE=ml_tb_canonical
+
+# ============================================================
+# Cocotb: unified-top golden-vector check via golden_vectors.py
+# ============================================================
+
+TOP_ML_GOLDEN_ENV_TOP    := sim_top_ml_golden_env
+TOP_ML_GOLDEN_ENV_TOP_V  := $(TB_DIR)/sim_top_ml_golden_env.sv
+TOP_ML_GOLDEN_ENV_VVP    := $(BUILD_DIR)/$(TOP_ML_GOLDEN_ENV_TOP).vvp
+TOP_ML_GOLDEN_ENV_PYMOD  := test_top_ml_golden_vector
+TOP_ML_GOLDEN_ENV_SRCS   := \
+  $(TOP_ML_GOLDEN_ENV_TOP_V) \
+  $(UNIFIED_TOP_RTL_SRCS) \
+  $(TB_DIR)/spi_flash_model.v \
+  sensors/i2c_slave_lis2dw12.sv \
+  sensors/i2c_slave_adpd144ri.sv
+
+$(TOP_ML_GOLDEN_ENV_VVP): $(TOP_ML_GOLDEN_ENV_SRCS)
+	@echo "[COCOTB] Building $@"
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_ML_GOLDEN_ENV_TOP) -o $@ $(TOP_ML_GOLDEN_ENV_SRCS)
+
+.PHONY: test-top-ml-golden-vector-unified
+test-top-ml-golden-vector-unified: $(TOP_ML_GOLDEN_ENV_VVP)
+	@$(SELF_MAKE) FW_VARIANT=test_top_ml_golden_vector_unified firmware
+	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
+	@echo "[COCOTB] Running $(TOP_ML_GOLDEN_ENV_PYMOD) on $(TOP_ML_GOLDEN_ENV_TOP)"
+	@export COCOTB_TOPLEVEL=$(TOP_ML_GOLDEN_ENV_TOP); \
+	export COCOTB_TEST_MODULES=$(TOP_ML_GOLDEN_ENV_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(TOP_ML_GOLDEN_ENV_VVP))
+
+# ============================================================
 # Cocotb: unified top feature latch/MMIO check
 # ============================================================
 
@@ -1307,7 +1301,33 @@ test-top-feature-mmio-unified: $(TOP_FEATURE_MMIO_VVP)
 	$(call RUN_COCOTB_ICARUS,$(TOP_FEATURE_MMIO_VVP))
 
 # ============================================================
-# Cocotb: top sensor pipeline stage-by-stage reference scoreboard
+# Cocotb: sensor pipeline debug mode test
+# ============================================================
+
+CHIP_CORE_DEBUG_TOP    := sim_chip_core_debug_modes
+CHIP_CORE_DEBUG_TOP_V  := $(TB_DIR)/sim_chip_core_debug_modes.sv
+CHIP_CORE_DEBUG_VVP    := $(BUILD_DIR)/$(CHIP_CORE_DEBUG_TOP).vvp
+CHIP_CORE_DEBUG_PYMOD  := test_chip_core_debug_modes
+CHIP_CORE_DEBUG_SRCS   := \
+  $(CHIP_CORE_DEBUG_TOP_V) \
+  $(RTL_DIR)/chip_core.sv \
+  $(UNIFIED_TOP_RTL_SRCS) \
+  sensors/i2c_slave_lis2dw12.sv \
+  sensors/i2c_slave_adpd144ri.sv
+
+$(CHIP_CORE_DEBUG_VVP): $(CHIP_CORE_DEBUG_SRCS)
+	@echo "[COCOTB] Building $@"
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(CHIP_CORE_DEBUG_TOP) -o $@ $(CHIP_CORE_DEBUG_SRCS)
+
+.PHONY: test-chip-core-debug-modes
+test-chip-core-debug-modes: $(CHIP_CORE_DEBUG_VVP)
+	@echo "[COCOTB] Running $(CHIP_CORE_DEBUG_PYMOD) on $(CHIP_CORE_DEBUG_TOP)"
+	@export COCOTB_TOPLEVEL=$(CHIP_CORE_DEBUG_TOP); \
+	export COCOTB_TEST_MODULES=$(CHIP_CORE_DEBUG_PYMOD); \
+	$(call RUN_COCOTB_ICARUS,$(CHIP_CORE_DEBUG_VVP))
+
+# ============================================================
+# Cocotb: top sensor pipeline stage-by-stage reference
 # ============================================================
 
 TOP_SENSOR_PIPELINE_TOP    := sim_top_sensor_pipeline
@@ -1331,8 +1351,12 @@ test-top-sensor-pipeline: $(TOP_SENSOR_PIPELINE_VVP)
 	export COCOTB_TEST_MODULES=$(TOP_SENSOR_PIPELINE_PYMOD); \
 	$(call RUN_COCOTB_ICARUS,$(TOP_SENSOR_PIPELINE_VVP))
 
-.PHONY: test-top-pipeline-scoreboard
-test-top-pipeline-scoreboard: test-top-sensor-pipeline
+.PHONY: test-top-pipeline
+test-top-pipeline: test-top-sensor-pipeline
+	@true
+
+.PHONY: test-chip-debug-feature-regression
+test-chip-debug-feature-regression: test-chip-core-debug-modes test-MSSD-engine-ref test-motion-process-ref test-ppg-process-ref test-top-sensor-pipeline
 	@true
 
 .PHONY: test-top-e2e-inference
@@ -1378,7 +1402,7 @@ test-ppg-process-ref: $(PPG_REF_VVP)
 MSSD_REF_TOP      := sim_mssd_engine_ref
 MSSD_REF_TOP_V    := $(TB_DIR)/sim_mssd_engine_ref.sv
 MSSD_REF_VVP      := $(BUILD_DIR)/$(MSSD_REF_TOP).vvp
-MSSD_REF_PYMOD    := test_MSSD_engine_ref
+MSSD_REF_PYMOD    := test_mssd_engine_ref
 MSSD_REF_SRCS     := $(MSSD_REF_TOP_V) $(RTL_DIR)/mssd_engine.sv
 
 $(MSSD_REF_VVP): $(MSSD_REF_SRCS)

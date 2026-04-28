@@ -115,7 +115,27 @@ module top #(
 
     output logic                      alarm_o,          // placeholder alarm output (unused in current RTL)
 
-    
+    output logic signed [15:0] logit0,
+    output logic signed [15:0] logit1,
+    // Signals used for test modes.
+    input  logic        test_force_irq_i,
+    input  logic        test_force_wake_i,
+    input  logic [2:0]  test_irq_src_i,
+    output logic [2:0]  irq_eoi_o,
+    output logic        boot_done_o,
+    output logic        pico_trap_o,
+    output logic        pico_cpu_clk_en_o,
+    output logic        pico_mem_valid_o,
+    output logic        pico_mem_instr_o,
+    output logic        pico_mem_ready_o,
+    output logic [3:0]  pico_mem_wstrb_o,
+    output logic [31:0] pico_mem_addr_o,
+    output logic [31:0] pico_mem_wdata_o,
+    output logic [31:0] pico_irq_o,
+    output logic        pico_sleeping_o,
+    output logic        host_i2c_irq_event_o,
+    output logic        ml_irq_o,
+    output logic        timer_event_o
 );
 
     localparam logic [11:0] CFG_LP_BETA_Q10      = 12'd128;
@@ -415,6 +435,8 @@ module top #(
 
     assign cpu_clk = clk_i & cpu_clk_en_lat;
 
+    wire [31:0] irq_eoi_o_wide;
+
     // PicoRV32 remains the owner of ML orchestration in the unified top.
     //JF: Wait on this for now, look more into pwrctrl_mmio
     picorv32 #(
@@ -444,7 +466,6 @@ module top #(
         .trap      (trap)
     );
 
-    wire [31:0] irq_eoi_o_wide;
     assign irq_eoi_o   = irq_eoi_o_wide[2:0];
     assign boot_done_o = boot_done;
 
@@ -888,7 +909,9 @@ module top #(
         .saxi_rdata  (ml_saxi_rdata),
         .saxi_rresp  (ml_saxi_rresp),
         .saxi_rvalid (ml_saxi_rvalid),
-        .saxi_rready (ml_saxi_rready)
+        .saxi_rready (ml_saxi_rready),
+        .dbg_logit0  (logit0),
+        .dbg_logit1  (logit1)
     );
 
     // Shared ML memory. Firmware writes inputs/weights through MMIO, while

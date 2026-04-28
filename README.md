@@ -8,12 +8,12 @@ Fabricated on the GF180MCU process via [wafer.space](https://wafer.space) MPW ru
 
 ## Directories
 
-* `src/` — All RTL sources (SystemVerilog/Verilog)
-* `cocotb/` — Simulation testbenches (cocotb + Icarus Verilog)
-* `scripts/` — Utility scripts (padring flow, GDS rendering)
-* `librelane/` — LibreLane PnR configuration and slot definitions
-* `ip/` — Custom IP blocks (chip ID, wafer.space logo)
-* `misc/` — ML model pipeline, sensor models, datasets
+* `src/` - All RTL sources (SystemVerilog/Verilog)
+* `cocotb/` - Simulation testbenches (cocotb + Icarus Verilog)
+* `scripts/` - Utility scripts (padring flow, GDS rendering)
+* `librelane/` - LibreLane PnR configuration and slot definitions
+* `ip/` - Custom IP blocks (chip ID, wafer.space logo)
+* `misc/` - ML model pipeline, sensor models, datasets
 
 ## Prerequisites
 
@@ -103,44 +103,49 @@ Walch, Olivia. "Motion and heart rate from a wrist-worn wearable and labeled sle
 ### Normal Mode
 Standard chip behavior when
 
-`input_in[3:0] = 4'b0000;`
+`input_in[4:0] = 5'b00000;`
 
 #### Input Pins (12)
 
-* `input_in[3:0]` — test mode selector
-* `input_in[11:4]` — unused
+* `input_in[4:0]` - test mode selector
+* `input_in[11:5]` - unused
 
 #### Bidirectional IO Pins (40)
 
-* `bidir[0]` — alarm output
-* `bidir[1]` — SPI flash clock output
-* `bidir[2]` — SPI flash MOSI output
-* `bidir[3]` — SPI flash CS_n output
-* `bidir[4]` — SPI flash MISO input
-* `bidir[5]` — I2C SCL input
-* `bidir[6]` — I2C SDA open drain in/out
-* `bidir[22:7]` — 16-bit debug bus outputs in test modes
-* `bidir[37]` — force Pico IRQ input used in test mode `4'b1010`
-* `bidir[38]` — force wake source input used in test mode `4'b1011`
-* `bidir[39]` — external test clock input used in test mode `4'b0101`
-* `bidir[36:23]` — unused
+* `bidir[0]` - alarm output
+* `bidir[1]` - SPI flash clock output
+* `bidir[2]` - SPI flash MOSI output
+* `bidir[3]` - SPI flash CS_n output
+* `bidir[4]` - SPI flash MISO input
+* `bidir[5]` - I2C SCL input
+* `bidir[6]` - I2C SDA open drain in/out
+* `bidir[22:7]` - 16-bit debug bus outputs in debug/test modes
+* `bidir[37]` - force Pico IRQ input used in test modes `5'b01010` and `5'b11010`
+* `bidir[38]` - force wake source input used in test modes `5'b01011` and `5'b11011`
+* `bidir[39]` - external test clock input used by the `1xxxx` test-mode bank
+* `bidir[36:23]` - unused
 
 #### Analog Pins (2)
 
-* `analog[1:0]` — unused
+* `analog[1:0]` - unused
 
 ### Test Modes
 
-* `4'b0000` — normal mode; debug bus is disabled.
-* `4'b0001` — drives `rmssd_feat[15:0]` onto `bidir[22:7]`.
-* `4'b0010` — drives `delta_hr_feat[15:0]` onto `bidir[22:7]`.
-* `4'b0011` — drives `time_feat[15:0]` onto `bidir[22:7]`.
-* `4'b0100` — drives `motion_feat[15:0]` onto `bidir[22:7]`.
-* `4'b0101` — uses `bidir[39]` as an external test clock.
-* `4'b0110` — drives `{ml_update_gate, epoch_end, invalid_reason[7:0], 6'b0}` onto `bidir[22:7]`.
-* `4'b0111` — drives `{pico_trap, pico_cpu_clk_en, pico_mem_valid, pico_mem_instr, pico_mem_ready, pico_mem_wstrb[3:0], pico_mem_addr[6:0]}` onto `bidir[22:7]`.
-* `4'b1000` — drives `{pico_mem_valid && (pico_mem_wstrb != 4'b0000), pico_trap, |pico_mem_wstrb, pico_mem_wstrb == 4'hF, pico_mem_addr[7:0], pico_mem_wdata[3:0]}` onto `bidir[22:7]`.
-* `4'b1001` — drives `{pico_trap, pico_sleeping, pico_cpu_clk_en, |pico_irq, 12'b0}` onto `bidir[22:7]`.
-* `4'b1010` — uses `bidir[37]` to force Pico IRQ and drives `{test_force_irq, pico_trap, pico_cpu_clk_en, pico_mem_instr, pico_mem_valid, pico_mem_ready, pico_mem_addr[9:0]}` onto `bidir[22:7]`.
-* `4'b1011` — uses `bidir[38]` to force wake and drives `{test_force_wake, host_i2c_irq_event, ml_irq, timer_event, 12'b0}` onto `bidir[22:7]`.
-
+* `5'b00000` - normal mode on the onboard PLL clock; debug bus is disabled.
+* `5'b00001` - drives `mssd_feat[15:0]` onto `bidir[22:7]`.
+* `5'b00010` - drives `delta_hr_feat[15:0]` onto `bidir[22:7]`.
+* `5'b00011` - drives `time_feat[15:0]` onto `bidir[22:7]`.
+* `5'b00100` - drives `motion_feat[15:0]` onto `bidir[22:7]`.
+* `5'b00101` - drives `{|mssd_feat, |delta_hr_feat, |time_feat, |motion_feat, feat_valid, |logit0, |logit1, ml_update_gate, epoch_end, alarm, 6'b0}` onto `bidir[22:7]`.
+* `5'b00110` - drives `{ml_update_gate, epoch_end, invalid_reason[7:0], 6'b0}` onto `bidir[22:7]`.
+* `5'b00111` - drives `{pico_trap, pico_cpu_clk_en, pico_mem_valid, pico_mem_instr, pico_mem_ready, pico_mem_wstrb[3:0], pico_mem_addr[6:0]}` onto `bidir[22:7]`.
+* `5'b01000` - drives `{pico_mem_valid && (pico_mem_wstrb != 4'b0000), pico_trap, |pico_mem_wstrb, pico_mem_wstrb == 4'hF, pico_mem_addr[7:0], pico_mem_wdata[3:0]}` onto `bidir[22:7]`.
+* `5'b01001` - drives `{pico_trap, pico_sleeping, pico_cpu_clk_en, |pico_irq, 12'b0}` onto `bidir[22:7]`.
+* `5'b01010` - uses `bidir[37]` to force Pico IRQ and drives `{test_force_irq, pico_trap, pico_cpu_clk_en, pico_mem_instr, pico_mem_valid, pico_mem_ready, pico_mem_addr[9:0]}` onto `bidir[22:7]`.
+* `5'b01011` - uses `bidir[38]` to force wake and drives `{test_force_wake, host_i2c_irq_event, ml_irq, timer_event, 12'b0}` onto `bidir[22:7]`.
+* `5'b01100` - drives `logit0[15:0]` onto `bidir[22:7]`.
+* `5'b01101` - drives `logit1[15:0]` onto `bidir[22:7]`.
+* `5'b01110` - currently unused
+* `5'b01111` - currently unused
+* `5'b10000` - normal mode on the external test clock from `bidir[39]`; debug bus is disabled.
+* `5'b1xxxx` - same debug-bus mapping as `0xxxx`, but clocked from `bidir[39]` instead of `clk`.

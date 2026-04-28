@@ -17,6 +17,10 @@ def u32(x: int) -> bytes: # convert an int to 4 bytes in little-endian order (un
 def u16_4(x: list[int]) -> bytes: # convert 4 int16s to byte struct (feature conversion)
     return struct.pack("<4h", *x) 
 
+def s16(x: int) -> int:
+    x &= 0xFFFF
+    return x - 0x10000 if x & 0x8000 else x
+
 
 async def reset_dut(dut, cycles=10):
     cocotb.start_soon(Clock(dut.CLK, 40, unit="ns").start())
@@ -120,7 +124,19 @@ async def load_weights_and_infer_once(dut):
         # read logits from output address
         out_bytes = axi_ram.read(out_addr, 4)
         log0, log1 = struct.unpack("<2h", out_bytes)
-        print(f"logits int16: [{log0}, {log1}] (raw bytes={out_bytes.hex()})")
+        dbg_log0 = s16(int(dut.dbg_logit0.value))
+        dbg_log1 = s16(int(dut.dbg_logit1.value))
+        assert (dbg_log0, dbg_log1) == (log0, log1), (
+            f"debug logit ports mismatch: ports=[{dbg_log0}, {dbg_log1}] "
+            f"mem=[{log0}, {log1}]"
+        )
+        # print(f"logits int16: [{log0}, {log1}] (raw bytes={out_bytes.hex()})")
+        print(
+    f"logits int16: mem=[{log0}, {log1}] "
+    f"dbg=[{dbg_log0}, {dbg_log1}] "
+    f"(raw bytes={out_bytes.hex()})"
+)
+
         pred = int(log1) > int(log0)
         if (pred == True and int(feats[4]) == 1):
             true_p += 1

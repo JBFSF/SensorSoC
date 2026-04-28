@@ -170,7 +170,8 @@ module chip_top #(
     chip_core #(
         .NUM_INPUT_PADS  (NUM_INPUT_PADS),
         .NUM_BIDIR_PADS  (NUM_BIDIR_PADS),
-        .NUM_ANALOG_PADS (NUM_ANALOG_PADS)
+        .NUM_ANALOG_PADS (NUM_ANALOG_PADS),
+        .DEBUG_STIM_EN   (0)
     ) i_chip_core (
         `ifdef USE_POWER_PINS
         .VDD        (VDD),
@@ -192,6 +193,24 @@ module chip_top #(
         .bidir_ie   (bidir_CORE2PAD_IE),
         .bidir_pu   (bidir_CORE2PAD_PU),
         .bidir_pd   (bidir_CORE2PAD_PD),
+
+        .sim_req_o    (),
+        .sim_addr_o   (),
+        .sim_reg_o    (),
+        .sim_len_o    (),
+        .sim_write_o  (),
+        .sim_wdata_o  (),
+        .sim_ack_i    (1'b0),
+        .sim_rdata_i  (8'h00),
+        .sim_rvalid_i (1'b0),
+        .sim_rlast_i  (1'b0),
+        .sim_err_i    (1'b0),
+
+        .debug_stim_override_en_i (1'b0),
+        .debug_stim_mssd_i        (16'h0000),
+        .debug_stim_delta_hr_i    (16'h0000),
+        .debug_stim_time_i        (16'h0000),
+        .debug_stim_motion_i      (16'h0000),
         
         .analog     (analog_PAD)
     );

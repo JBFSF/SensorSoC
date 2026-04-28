@@ -100,9 +100,12 @@ def chip_top_runner():
 
         defines = {"FUNCTIONAL": True, "USE_POWER_PINS": True}
     else:
-        sources.append(proj_path / "../src/chip_top.sv")
-        sources.append(proj_path / "../src/chip_core.sv")
-
+        # sources.append(proj_path / "../src/chip_top.sv")
+        # sources.append(proj_path / "../src/chip_core.sv")
+        src_dir = proj_path / "../src"
+        sources += sorted(src_dir.glob("*.sv"))
+        sources += sorted(src_dir.glob("*.v"))
+        
     sources += [
         # IO pad models
         Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_fd_io.v",

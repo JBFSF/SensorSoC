@@ -71,7 +71,10 @@ module taketwo_wrap (
   output wire [31:0]  saxi_rdata,
   output wire [1:0]   saxi_rresp,
   output wire         saxi_rvalid,
-  input  wire         saxi_rready
+  input  wire         saxi_rready,
+  
+  output wire signed [15:0] dbg_logit0,
+  output wire signed [15:0] dbg_logit1
 );
 
   // Tie master IDs to 0 (cocotbext needs them to exist)
@@ -157,7 +160,9 @@ module taketwo_wrap (
     .saxi_rdata  (saxi_rdata),
     .saxi_rresp  (saxi_rresp),
     .saxi_rvalid (saxi_rvalid),
-    .saxi_rready (saxi_rready)
+    .saxi_rready (saxi_rready),
+    .dbg_logit0  (dbg_logit0),
+    .dbg_logit1  (dbg_logit1)
   );
 
 endmodule
