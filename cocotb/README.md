@@ -27,6 +27,10 @@ RTL simulation environment using cocotb and Icarus Verilog. RTL sources live in 
 * IRQ Sleep/Wake test - command: `make firmware-main && make sim-irq`
   * Runs `sim/tb/tb_irq.sv`, validates wake behavior
   * Writes `sim/waves/irq.vcd`
+* Reproducible firmware flow - command from repo root: `make repro-firmware-flow`
+  * Initializes submodules, checks the selected RISC-V toolchain, rebuilds `irq_test` and `prod_main`
+  * Runs DFT smoke, IRQ-state firmware regression, and production firmware host-I2C/ML smoke regression
+  * Use `make repro-firmware-build` to rebuild only the two firmware images without running regressions
 * Host I2C target & bridge regs test - command: `make sim-host-i2c-target`
   * Runs `sim/tb/tb_host_i2c_target.sv` as a unit test for `host_i2c_target.v` and `host_i2c_bridge_regs.v` for I2C transactions/reads and an event pulse for the GPIO
   * Writes `/tmp/tb_host_i2c_target.vcd`

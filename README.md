@@ -61,6 +61,39 @@ To run the top-level chip RTL simulation:
 make sim
 ```
 
+To rerun the current reproducible firmware smoke flow:
+
+```
+make repro-firmware-flow
+```
+
+That script initializes submodules, checks the RISC-V toolchain, rebuilds both
+firmware integration images (`irq_test` and `prod_main`), then runs the DFT
+smoke test, IRQ-state regression, and production firmware host-I2C/ML smoke
+regression.
+
+The reproducible setup is split into smaller Make targets:
+
+```
+make init-submodules          # git submodule update --init --recursive
+make python-deps              # install requirements.txt into .venv
+make check-riscv-toolchain    # verify riscv-none-elf/riscv64-unknown-elf tools
+make repro-firmware-build     # rebuild irq_test and prod_main only
+make repro-firmware-flow      # rebuild firmware and run smoke regressions
+```
+
+If the RISC-V GCC toolchain is vendored as a submodule, put the source at
+`third_party/riscv-gnu-toolchain` and build it with:
+
+```
+git submodule update --init --recursive
+make build-riscv-toolchain
+```
+
+The build installs into `third_party/riscv-toolchain`, which the firmware
+scripts automatically detect. Skip `make build-riscv-toolchain` when
+`make check-riscv-toolchain` already finds an external toolchain.
+
 To run the gate-level simulation (requires a completed LibreLane run in `final/`):
 
 ```

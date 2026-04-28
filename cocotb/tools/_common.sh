@@ -6,10 +6,14 @@ TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${TOOLS_DIR}/../.." && pwd)"
 COCOTB_DIR="${REPO_ROOT}/cocotb"
 LOCAL_RISCV_BIN="${REPO_ROOT}/../riscv-toolchain/bin"
+SUBMODULE_RISCV_BIN="${REPO_ROOT}/third_party/riscv-toolchain/bin"
+VENV_BIN="${REPO_ROOT}/.venv/bin"
 
 detect_riscv_prefix() {
     local candidate
     for candidate in \
+        "${SUBMODULE_RISCV_BIN}/riscv-none-elf-" \
+        "${SUBMODULE_RISCV_BIN}/riscv64-unknown-elf-" \
         "${LOCAL_RISCV_BIN}/riscv-none-elf-" \
         "${LOCAL_RISCV_BIN}/riscv64-unknown-elf-" \
         "riscv-none-elf-" \
@@ -51,5 +55,13 @@ resolve_riscv_prefix() {
 run_make() {
     local prefix
     prefix="$(resolve_riscv_prefix)"
-    make -C "${COCOTB_DIR}" RISCV_PREFIX="${prefix}" "$@"
+    if [[ -x "${VENV_BIN}/python" && -x "${VENV_BIN}/cocotb-config" ]]; then
+        make -C "${COCOTB_DIR}" \
+            RISCV_PREFIX="${prefix}" \
+            PYTHON="${VENV_BIN}/python" \
+            COCOTB_CONFIG="${VENV_BIN}/cocotb-config" \
+            "$@"
+    else
+        make -C "${COCOTB_DIR}" RISCV_PREFIX="${prefix}" "$@"
+    fi
 }

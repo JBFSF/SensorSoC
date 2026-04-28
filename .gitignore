@@ -1,5 +1,6 @@
 runs/
 __pycache__/
+.venv/
 gf180mcu/
 gf180_drc.lyrdb
 sim/build/
@@ -9,5 +10,9 @@ img/
 sim/data/
 sensor_output/
 sim/waves/
+cocotb/sim_build/
+cocotb/results.xml
 *.vcd
 *.vvp
+cocotb/firmware/build/
+third_party/riscv-toolchain/
