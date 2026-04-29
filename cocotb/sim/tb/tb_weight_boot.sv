@@ -2,41 +2,31 @@
 //
 // tb_weight_boot.sv
 //
-// Verifies the two-stage hardware weight-boot path:
+// Verifies the weight_flash_axi path: taketwo reads ML weights directly
+// from the dedicated SPI flash at inference time (no boot-time SRAM load).
 //
-//   Stage 1 — SPI flash -> weight_ram_axi
-//     u_weight_boot_ctrl (spi_boot_ctrl) reads WEIGHT_WORDS 32-bit words
-//     from SPI flash and writes them into weight_ram_axi via the CPU MMIO
-//     port.  weight_boot_done_o asserts when all words are loaded.
+// weight_boot_done_o is permanently 1'b1 — no boot stage needed.
 //
-//   Stage 2 — weight_ram_axi -> taketwo internal SRAMs
-//     Once weight_boot_done, we drive taketwo's AXI-Lite slave directly
-//     from the testbench (bypassing the CPU/bridge) to:
-//       a. Set _maxi_global_base_addr = WEIGHT_BASE (0x0300_6000).
-//       b. Assert the start trigger (_saxi_register_4 = 1).
-//     taketwo's AXI4 master then reads from weight_ram_axi and loads
-//     the data into the internal gf180mcu_fd_ip_sram__sram512x8m8wm1
-//     arrays.
-//
-// Stage 1 checks:
-//   1. weight SPI CS was asserted at least once.
-//   2. Enough SPI bits were clocked (8 cmd + 24 addr + WEIGHT_WORDS*32 data).
-//   3. weight_ram_axi.mem[0..3] match weight_flash.mem[0..3].
-//
-// Stage 2 checks:
-//   4. taketwo issued at least one AXI read within the WEIGHT_BASE range.
-//   5. taketwo issued >= WEIGHT_WORDS AXI read beats (full load attempted).
+// Checks:
+//   1. taketwo issued at least one AXI read within the WEIGHT_BASE range.
+//   2. taketwo issued >= MIN_AXI_BEATS AXI read beats (one full inference pass).
+//   3. weight SPI CS was asserted (flash was accessed during inference).
+//   4. >= MIN_SPI_BITS SPI clock edges seen (at least all weight data bits).
 //
 // Run via: make sim-weight-boot
 //
 
 module tb_weight_boot;
 
-localparam int unsigned WEIGHT_WORDS = 16;
-localparam int unsigned TB_TIMEOUT   = 20_000;
-localparam int unsigned S2_TIMEOUT   = 200_000; // beat-wait limit
-// Minimum SPI bits: 8 (cmd) + 24 (addr) + WEIGHT_WORDS*32 (data)
-localparam int unsigned MIN_SPI_BITS = 8 + 24 + WEIGHT_WORDS * 32;
+// Actual AXI read beats for one complete inference pass:
+//   layer0: 32 filter + 8 bias + 1 scale + 2 input_act = 43
+//   layer1: 64 filter + 4 bias + 1 scale + 8 input_act = 77
+//   layer2:  8 filter + 1 bias + 1 scale + 4 input_act = 14  => total 134
+localparam int unsigned MIN_AXI_BEATS = 134;
+// Minimum SPI data bits = 134 words × 32 bits (command/addr overhead per burst on top)
+localparam int unsigned MIN_SPI_BITS  = 134 * 32;
+localparam int unsigned S2_TIMEOUT    = 200_000;
+localparam int unsigned WEIGHT_WORDS  = 208;
 // AXI base addresses (MUST match top.sv parameters)
 localparam logic [31:0] WEIGHT_BASE = 32'h0300_6000;
 
@@ -141,7 +131,7 @@ top #(
 );
 
 
-// Weight flash model — first 16 words of taketwo_params.hex
+// Weight flash model
 
 spi_flash_model #(
     .FLASH_WORDS    (WEIGHT_WORDS),
@@ -154,7 +144,7 @@ spi_flash_model #(
 );
 
 
-// Stage 1
+// SPI activity monitor (inference-time flash reads)
 
 integer spi_cs_asserts;
 integer spi_bit_count;
@@ -178,11 +168,10 @@ always @(posedge clk) begin
     end
 end
 
-// Stage 2
-// wram_* wires in dut connect taketwo_wrap.maxi_* to weight_ram_axi.saxi_*
+// AXI read beat monitor (wram_* wires connect taketwo maxi → weight_flash_axi saxi)
 
-integer wram_read_beats;   // count of rvalid && rready beats
-reg     wram_araddr_ok;    // went high when araddr was in WEIGHT_BASE range
+integer wram_read_beats;
+reg     wram_araddr_ok;
 
 always @(posedge clk) begin
     if (reset) begin
@@ -193,21 +182,16 @@ always @(posedge clk) begin
             wram_read_beats <= wram_read_beats + 1;
         if (dut.wram_arvalid && dut.wram_arready)
             if (dut.wram_araddr >= WEIGHT_BASE &&
-                dut.wram_araddr <  WEIGHT_BASE + 32'h4000)  // 16KB weight_ram_axi window
+                dut.wram_araddr <  WEIGHT_BASE + 32'h4000)
                 wram_araddr_ok <= 1'b1;
     end
 end
 
 
 // AXI-Lite write task — drives taketwo's saxi_* via dut.ml_saxi_* wires.
-// Uses force/release to bypass the ml_axil_bridge_mmio (which is idle
-// when the CPU has no firmware).  taketwo's saxi slave is registered:
-//   AW handshake fires 1 clock after awvalid (registered prev_awvalid).
-//   W  handshake fires when FSM reaches state 3 (~2 clocks after AW).
-//   B  handshake fires 1 clock after W completes.
 
 task axil_write_taketwo;
-    input [31:0] offset;   // byte offset within taketwo's register space
+    input [31:0] offset;
     input [31:0] data;
     integer t;
     begin
@@ -219,22 +203,19 @@ task axil_write_taketwo;
         force dut.ml_saxi_wvalid  = 1'b1;
         force dut.ml_saxi_bready  = 1'b1;
 
-        // Wait for AW handshake (awready fires 1 clock after awvalid is seen)
         @(posedge clk);
         t = 0;
         while (!dut.ml_saxi_awready && t < 20) begin
             @(posedge clk); t = t + 1;
         end
-        @(posedge clk);   // let writevalid propagate through NBA
+        @(posedge clk);
 
-        // Wait for W handshake (wready is combinatorial from FSM==3)
         t = 0;
         while (!dut.ml_saxi_wready && t < 20) begin
             @(posedge clk); t = t + 1;
         end
-        @(posedge clk);   // W data written to register; bvalid scheduled
+        @(posedge clk);
 
-        // Wait for B channel (write response)
         t = 0;
         while (!dut.ml_saxi_bvalid && t < 20) begin
             @(posedge clk); t = t + 1;
@@ -262,135 +243,86 @@ initial begin
     failures = 0;
 
     $display("[TB] tb_weight_boot start");
-    $display("     WEIGHT_WORDS=%0d  flash=firmware/build/generated/taketwo_params.hex",
-             WEIGHT_WORDS);
+    $display("     weight_boot_done_o is tied 1 — flash bridge active at inference time");
 
     repeat (10) @(posedge clk);
     reset = 1'b0;
-    $display("[%0t] Reset released — weight boot controller running", $time);
+    $display("[%0t] Reset released", $time);
 
-    // stage 1 (waiting for weight_boot_done)
+    // weight_boot_done is permanently 1'b1 — skip straight to Stage 2.
+    repeat (20) @(posedge clk);
+    cycles = 20;
 
-    while (cycles < TB_TIMEOUT) begin
-        @(posedge clk);
-        cycles = cycles + 1;
-
-        if (weight_boot_done) begin
-            $display("[cyc %0d] weight_boot_done asserted — verifying weight_ram contents",
-                     cycles);
-
-            // Extra cycle for final write to commit.
-            @(posedge clk);
-
-            // --- Check 1: SPI CS asserted ---
-            if (spi_cs_asserts == 0) begin
-                $display("FAIL: weight SPI CS never asserted");
-                failures = failures + 1;
-            end
-
-            // --- Check 2: Enough SPI bits clocked ---
-            if (spi_bit_count < MIN_SPI_BITS) begin
-                $display("FAIL: too few weight SPI bits: %0d (expected >= %0d)",
-                         spi_bit_count, MIN_SPI_BITS);
-                failures = failures + 1;
-            end
-
-            // --- Check 3: weight_ram_axi contents match flash ---
-            if (dut.u_weight_ram.mem[0] !== u_weight_flash.mem[0]) begin
-                $display("FAIL: wram[0]=0x%08x != flash[0]=0x%08x",
-                         dut.u_weight_ram.mem[0], u_weight_flash.mem[0]);
-                failures = failures + 1;
-            end
-            if (dut.u_weight_ram.mem[1] !== u_weight_flash.mem[1]) begin
-                $display("FAIL: wram[1]=0x%08x != flash[1]=0x%08x",
-                         dut.u_weight_ram.mem[1], u_weight_flash.mem[1]);
-                failures = failures + 1;
-            end
-            if (dut.u_weight_ram.mem[2] !== u_weight_flash.mem[2]) begin
-                $display("FAIL: wram[2]=0x%08x != flash[2]=0x%08x",
-                         dut.u_weight_ram.mem[2], u_weight_flash.mem[2]);
-                failures = failures + 1;
-            end
-            if (dut.u_weight_ram.mem[3] !== u_weight_flash.mem[3]) begin
-                $display("FAIL: wram[3]=0x%08x != flash[3]=0x%08x",
-                         dut.u_weight_ram.mem[3], u_weight_flash.mem[3]);
-                failures = failures + 1;
-            end
-
-            if (failures > 0) begin
-                $display("FAIL: Stage 1 — %0d check(s) failed, aborting", failures);
-                $fatal(1);
-            end
-
-            $display("PASS: Stage 1 (SPI→weight_ram_axi)");
-            $display("  spi_cs=%0d  spi_bits=%0d", spi_cs_asserts, spi_bit_count);
-            $display("  wram[0..3] = %08x %08x %08x %08x",
-                         dut.u_weight_ram.mem[0], dut.u_weight_ram.mem[1],
-                         dut.u_weight_ram.mem[2], dut.u_weight_ram.mem[3]);
-            $display("  flash[0..3]= %08x %08x %08x %08x",
-                         u_weight_flash.mem[0], u_weight_flash.mem[1],
-                         u_weight_flash.mem[2], u_weight_flash.mem[3]);
-            // stage 2 (trigger taketwo to read from weight_ram_axi)
-            // top_fsm starts in SLEEP (ml_en=0).  Force ml_en=1 so taketwo's
-            // AXI master signals are not gated.  Then drive taketwo's saxi
-            // slave directly to set the base address and fire the start trigger.
-            $display("[cyc %0d] Stage 2 start — enabling ML domain", cycles);
-            force dut.ml_en = 1'b1;
-            repeat (2) @(posedge clk);
-
-            // 2a. Set _maxi_global_base_addr = WEIGHT_BASE (reg 32, offset 0x80)
-            $display("[cyc %0d] Stage 2: writing maxi_global_base_addr = 0x%08x",
-                     cycles, WEIGHT_BASE);
-            axil_write_taketwo(32'h80, WEIGHT_BASE);
-
-            // 2b. Assert start trigger (reg 4, offset 0x10) to launch inference
-            $display("[cyc %0d] Stage 2: writing start trigger (reg4 = 1)", cycles);
-            axil_write_taketwo(32'h10, 32'h1);
-            $display("[cyc %0d] Stage 2: taketwo triggered — watching AXI master",
-                     cycles);
-
-            // Wait for taketwo to issue >= WEIGHT_WORDS read beats from weight_ram_axi
-            tw = 0;
-            while (wram_read_beats < WEIGHT_WORDS && tw < S2_TIMEOUT) begin
-                @(posedge clk);
-                cycles = cycles + 1;
-                tw     = tw + 1;
-            end
-            @(posedge clk);   // let last beat settle
-
-            release dut.ml_en;
-
-            // --- Check 4: AXI read address was within WEIGHT_BASE range ---
-            if (!wram_araddr_ok) begin
-                $display("FAIL: taketwo never issued AXI read at WEIGHT_BASE range [0x%08x..0x%08x)",
-                         WEIGHT_BASE, WEIGHT_BASE + 32'h4000);
-                failures = failures + 1;
-            end
-
-            // --- Check 5: enough AXI read beats ---
-            if (wram_read_beats < WEIGHT_WORDS) begin
-                $display("FAIL: taketwo only issued %0d AXI read beats (expected >= %0d)",
-                         wram_read_beats, WEIGHT_WORDS);
-                failures = failures + 1;
-            end
-
-            if (failures == 0) begin
-                $display("PASS: tb_weight_boot — all %0d checks passed", 5);
-                $display("  Stage 1: spi_cs=%0d  spi_bits=%0d", spi_cs_asserts, spi_bit_count);
-                $display("  Stage 2: wram_araddr_ok=%0d  wram_read_beats=%0d",
-                         wram_araddr_ok, wram_read_beats);
-
-                $finish;
-            end else begin
-                $display("FAIL: tb_weight_boot — %0d check(s) failed", failures);
-                $fatal(1);
-            end
-        end
+    if (!weight_boot_done) begin
+        $display("FAIL: weight_boot_done not asserted after reset (should be tied 1)");
+        $fatal(1);
     end
 
-    $display("FAIL: timeout — weight_boot_done never asserted after %0d cycles", TB_TIMEOUT);
-    $display("  spi_cs=%0d  spi_bits=%0d", spi_cs_asserts, spi_bit_count);
-    $fatal(1);
+    // Stage 2: trigger taketwo to run one inference pass via weight_flash_axi.
+    $display("[cyc %0d] Stage 2 start — enabling ML domain", cycles);
+    force dut.ml_en = 1'b1;
+    repeat (2) @(posedge clk);
+
+    // Set _maxi_global_base_addr = WEIGHT_BASE (reg 32, offset 0x80)
+    $display("[cyc %0d] Stage 2: writing maxi_global_base_addr = 0x%08x",
+             cycles, WEIGHT_BASE);
+    axil_write_taketwo(32'h80, WEIGHT_BASE);
+
+    // Assert start trigger (reg 4, offset 0x10) to launch inference
+    $display("[cyc %0d] Stage 2: writing start trigger (reg4 = 1)", cycles);
+    axil_write_taketwo(32'h10, 32'h1);
+    $display("[cyc %0d] Stage 2: taketwo triggered — watching AXI master + SPI",
+             cycles);
+
+    // Wait for taketwo to issue >= MIN_AXI_BEATS read beats
+    tw = 0;
+    while (wram_read_beats < MIN_AXI_BEATS && tw < S2_TIMEOUT) begin
+        @(posedge clk);
+        cycles = cycles + 1;
+        tw     = tw + 1;
+    end
+    @(posedge clk);
+
+    release dut.ml_en;
+
+    // --- Check 1: AXI read address was within WEIGHT_BASE range ---
+    if (!wram_araddr_ok) begin
+        $display("FAIL: taketwo never issued AXI read at WEIGHT_BASE range [0x%08x..0x%08x)",
+                 WEIGHT_BASE, WEIGHT_BASE + 32'h4000);
+        failures = failures + 1;
+    end
+
+    // --- Check 2: enough AXI read beats (one complete inference pass) ---
+    if (wram_read_beats < MIN_AXI_BEATS) begin
+        $display("FAIL: taketwo only issued %0d AXI read beats (expected >= %0d)",
+                 wram_read_beats, MIN_AXI_BEATS);
+        failures = failures + 1;
+    end
+
+    // --- Check 3: SPI CS was asserted (flash was accessed during inference) ---
+    if (spi_cs_asserts == 0) begin
+        $display("FAIL: weight SPI CS never asserted during inference");
+        failures = failures + 1;
+    end
+
+    // --- Check 4: enough SPI bits clocked (at least 134 words × 32 bits) ---
+    if (spi_bit_count < MIN_SPI_BITS) begin
+        $display("FAIL: too few SPI clock edges: %0d (expected >= %0d)",
+                 spi_bit_count, MIN_SPI_BITS);
+        failures = failures + 1;
+    end
+
+    if (failures == 0) begin
+        $display("PASS: tb_weight_boot — all 4 checks passed");
+        $display("  Stage 2: wram_araddr_ok=%0d  wram_read_beats=%0d",
+                 wram_araddr_ok, wram_read_beats);
+        $display("  SPI:     cs_asserts=%0d  spi_bits=%0d",
+                 spi_cs_asserts, spi_bit_count);
+        $finish;
+    end else begin
+        $display("FAIL: tb_weight_boot — %0d check(s) failed", failures);
+        $fatal(1);
+    end
 end
 
 

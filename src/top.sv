@@ -281,11 +281,6 @@ module top #(
     wire [31:0] boot_sram_addr_w;
     wire [31:0] boot_sram_wdata_w;
 
-    wire        weight_boot_done;
-    wire        weight_boot_sram_valid_w;
-    wire [3:0]  weight_boot_sram_wstrb_w;
-    wire [31:0] weight_boot_sram_addr_w;
-    wire [31:0] weight_boot_sram_wdata_w;
 
     wire        timer_ready;
     wire [31:0] timer_rdata;
@@ -302,8 +297,10 @@ module top #(
     wire [31:0] ml_rdata;
     wire        ml_irq;
 
-    wire        weight_ready;
-    wire [31:0] weight_rdata;
+    // Weight SRAM is write-only from CPU perspective (static after boot).
+    // Return immediate ACK with zero data to prevent stall on accidental access.
+    wire        weight_ready = weight_sel;
+    wire [31:0] weight_rdata = 32'h0;
 
     wire        irqc_ready;
     wire [31:0] irqc_rdata;
@@ -859,7 +856,7 @@ module top #(
     );
 
     // ML accelerator instance. Firmware talks to it through u_ml above,
-    // and the core reads/writes its working set through weight_ram_axi below.
+    // and the core reads/writes its working set through weight_flash_axi below.
     //JF: ML, Sleep until features are ready
     //      figure out how to sleep rest of chip BESIDES ram within, also expose interfaces
     taketwo_wrap u_taketwo_wrap (
@@ -929,63 +926,60 @@ module top #(
         .dbg_logit1  (logit1)
     );
 
-    // Shared ML memory. Firmware writes inputs/weights through MMIO, while
-    // taketwo accesses the same storage through its AXI master interface.
-    weight_ram_axi #(
-        .WORDS          (16),
-        .BASE_ADDR      (WEIGHT_BASE),
-        .WEIGHT_INIT_HEX(WEIGHT_INIT_HEX)
+    // AXI-to-SPI bridge: taketwo reads ML weights directly from dedicated SPI
+    // flash at inference time.  No intermediate SRAM needed.
+    weight_flash_axi #(
+        .BASE_ADDR (WEIGHT_BASE),
+        .CLK_DIV   (8'd2),
+        .FLASH_BASE(24'h00_0000)
     ) u_weight_ram (
-        .clk         (clk_i),
-        .resetn      (~reset_i),
-
-        // During weight boot, hardware controller owns this port; CPU takes
-        // over after weight_boot_done (mirrors the firmware SRAM mux pattern).
-        .mem_valid   (weight_boot_done ? mmio_sel : weight_boot_sram_valid_w),
-        .mem_addr    (weight_boot_done ? mem_addr : weight_boot_sram_addr_w + WEIGHT_BASE),
-        .mem_wdata   (weight_boot_done ? mem_wdata : weight_boot_sram_wdata_w),
-        .mem_wstrb   (weight_boot_done ? mem_wstrb : weight_boot_sram_wstrb_w),
-        .mem_ready   (weight_ready),
-        .mem_rdata   (weight_rdata),
-        .saxi_awid   (wram_awid),
-        .saxi_awaddr (wram_awaddr),
-        .saxi_awlen  (wram_awlen),
-        .saxi_awsize (wram_awsize),
-        .saxi_awburst(wram_awburst),
-        .saxi_awlock (wram_awlock),
-        .saxi_awcache(wram_awcache),
-        .saxi_awprot (wram_awprot),
-        .saxi_awqos  (wram_awqos),
-        .saxi_awuser (wram_awuser),
-        .saxi_awvalid(wram_awvalid),
-        .saxi_awready(wram_awready),
-        .saxi_wdata  (wram_wdata),
-        .saxi_wstrb  (wram_wstrb),
-        .saxi_wlast  (wram_wlast),
-        .saxi_wvalid (wram_wvalid),
-        .saxi_wready (wram_wready),
-        .saxi_bid    (wram_bid),
-        .saxi_bresp  (wram_bresp),
-        .saxi_bvalid (wram_bvalid),
-        .saxi_bready (wram_bready),
-        .saxi_arid   (wram_arid),
-        .saxi_araddr (wram_araddr),
-        .saxi_arlen  (wram_arlen),
-        .saxi_arsize (wram_arsize),
-        .saxi_arburst(wram_arburst),
-        .saxi_arlock (wram_arlock),
-        .saxi_arcache(wram_arcache),
-        .saxi_arprot (wram_arprot),
-        .saxi_arqos  (wram_arqos),
-        .saxi_aruser (wram_aruser),
-        .saxi_arvalid(wram_arvalid),
-        .saxi_arready(wram_arready),
-        .saxi_rid    (wram_rid),
-        .saxi_rdata  (wram_rdata),
-        .saxi_rresp  (wram_rresp),
-        .saxi_rlast  (wram_rlast),
-        .saxi_rvalid (wram_rvalid),
-        .saxi_rready (wram_rready)
+        .clk      (clk_i),
+        .resetn   (~reset_i),
+        .spi_cs_n (weight_spi_cs_n_o),
+        .spi_clk  (weight_spi_clk_o),
+        .spi_mosi (weight_spi_mosi_o),
+        .spi_miso (weight_spi_miso_i),
+        // AXI slave — write channel (accept-and-discard)
+        .saxi_awid    (wram_awid),
+        .saxi_awaddr  (wram_awaddr),
+        .saxi_awlen   (wram_awlen),
+        .saxi_awsize  (wram_awsize),
+        .saxi_awburst (wram_awburst),
+        .saxi_awlock  (wram_awlock),
+        .saxi_awcache (wram_awcache),
+        .saxi_awprot  (wram_awprot),
+        .saxi_awqos   (wram_awqos),
+        .saxi_awuser  (wram_awuser),
+        .saxi_awvalid (wram_awvalid),
+        .saxi_awready (wram_awready),
+        .saxi_wdata   (wram_wdata),
+        .saxi_wstrb   (wram_wstrb),
+        .saxi_wlast   (wram_wlast),
+        .saxi_wvalid  (wram_wvalid),
+        .saxi_wready  (wram_wready),
+        .saxi_bid     (wram_bid),
+        .saxi_bresp   (wram_bresp),
+        .saxi_bvalid  (wram_bvalid),
+        .saxi_bready  (wram_bready),
+        // AXI slave — read channel (taketwo maxi reads weights here)
+        .saxi_arid    (wram_arid),
+        .saxi_araddr  (wram_araddr),
+        .saxi_arlen   (wram_arlen),
+        .saxi_arsize  (wram_arsize),
+        .saxi_arburst (wram_arburst),
+        .saxi_arlock  (wram_arlock),
+        .saxi_arcache (wram_arcache),
+        .saxi_arprot  (wram_arprot),
+        .saxi_arqos   (wram_arqos),
+        .saxi_aruser  (wram_aruser),
+        .saxi_arvalid (wram_arvalid),
+        .saxi_arready (wram_arready),
+        .saxi_rid     (wram_rid),
+        .saxi_rdata   (wram_rdata),
+        .saxi_rresp   (wram_rresp),
+        .saxi_rlast   (wram_rlast),
+        .saxi_rvalid  (wram_rvalid),
+        .saxi_rready  (wram_rready)
     );
 
     // CPU-driven SPI master used by the simulation boot stub to stream
@@ -1027,25 +1021,6 @@ module top #(
         .boot_done   (boot_done)
     );
 
-    // Hardware weight boot controller: loads 16 weight words from external SPI
-    // flash into weight_ram_axi before handing the port back to the CPU.
-    spi_boot_ctrl #(
-        .WORDS     (16),
-        .CLK_DIV   (2),
-        .FLASH_ADDR(24'h000000)
-    ) u_weight_boot_ctrl (
-        .clk         (clk_i),
-        .resetn      (~reset_i),
-        .spi_clk_o   (weight_spi_clk_o),
-        .spi_mosi_o  (weight_spi_mosi_o),
-        .spi_miso_i  (weight_spi_miso_i),
-        .spi_cs_n_o  (weight_spi_cs_n_o),
-        .sram_valid_o(weight_boot_sram_valid_w),
-        .sram_wstrb_o(weight_boot_sram_wstrb_w),
-        .sram_addr_o (weight_boot_sram_addr_w),
-        .sram_wdata_o(weight_boot_sram_wdata_w),
-        .boot_done   (weight_boot_done)
-    );
 
     // Off-chip host I2C target bridge in the always-on domain. This mirrors
     // soc_top so the unified top can participate in end-to-end host config and
@@ -1228,6 +1203,6 @@ module top #(
 
     assign epoch_end_o = epoch_end_w;
     assign alarm_o = 1'b0;
-    assign weight_boot_done_o = weight_boot_done;
+    assign weight_boot_done_o = 1'b1;
 
 endmodule
