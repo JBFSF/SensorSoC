@@ -20,7 +20,7 @@ localparam [31:0] FEAT_MSSD   = FEATURE_BASE + 32'h10;
 
 localparam int unsigned FLASH_WORDS = 208;
 localparam int unsigned TB_TIMEOUT_CYCLES = 10_000_000;
-localparam int unsigned TB_PROGRESS_EVERY = 1_000_000;
+localparam int unsigned TB_PROGRESS_EVERY = 10_000;
 localparam int unsigned MIN_SPI_BITS = 8 * (4 + FLASH_WORDS * 4);
 
 reg clk;
@@ -52,8 +52,15 @@ wire        ppg_sim_err;
 
 wire        spi_clk;
 wire        spi_mosi;
-wire        spi_miso;
 wire        spi_cs_n;
+wire        weight_spi_clk;
+wire        weight_spi_mosi;
+wire        weight_spi_miso;
+wire        weight_spi_cs_n;
+wire        boot_spi_clk;
+wire        boot_spi_mosi;
+wire        boot_spi_miso;
+wire        boot_spi_cs_n;
 wire signed [15:0] logit0;
 wire signed [15:0] logit1;
 wire        host_i2c_scl;
@@ -79,6 +86,9 @@ integer axi_w_hs;
 integer axi_b_hs;
 integer spi_cs_asserts;
 integer spi_bit_count;
+// main SPI (spi_master_mmio) counters — used by firmware's spi_boot_load(), separate from weight SPI
+integer main_spi_cs_asserts;
+integer main_spi_bit_count;
 integer boot_writes_seen;
 reg saw_feature_latch;
 reg signed [15:0] first_time_feat;
@@ -90,6 +100,8 @@ reg saw_start_write;
 reg saw_busy_read;
 reg prev_spi_cs_n;
 reg prev_spi_clk;
+reg prev_main_spi_cs_n;
+reg prev_main_spi_clk;
 reg [31:0] boot_word0;
 reg [31:0] boot_word1;
 reg [31:0] boot_word2;
@@ -140,9 +152,6 @@ top #(
     .CFG_MAX_MISSED(8'd3),
     .CFG_MOTION_HI_TH(16'hFFFF),
     .CFG_MAX_MOTION_HI(16'hFFFF),
-    
-    
-    
     .MSSD_MIN_RR_COUNT(1)
 ) dut (
     .clk_i(clk),
@@ -171,16 +180,22 @@ top #(
     .invalid_reason_o(),
     .spi_clk_o(spi_clk),
     .spi_mosi_o(spi_mosi),
-    .spi_miso_i(spi_miso),
+    .spi_miso_i(1'b1),     // CPU-driven spi_master_mmio; firmware spi_boot_load() reads are discarded, tie high
     .spi_cs_n_o(spi_cs_n),
-    .boot_spi_clk_o(),
-    .boot_spi_mosi_o(),
-    .boot_spi_miso_i(1'b1),
-    .boot_spi_cs_n_o(),
+    .weight_spi_clk_o(weight_spi_clk),
+    .weight_spi_mosi_o(weight_spi_mosi),
+    .weight_spi_miso_i(weight_spi_miso),
+    .weight_spi_cs_n_o(weight_spi_cs_n),
+    // boot SPI flash: spi_boot_ctrl copies firmware into SRAM before releasing CPU from reset
+    .boot_spi_clk_o(boot_spi_clk),
+    .boot_spi_mosi_o(boot_spi_mosi),
+    .boot_spi_miso_i(boot_spi_miso),
+    .boot_spi_cs_n_o(boot_spi_cs_n),
     .epoch_end_o(),
     .alarm_o(),
     .logit0(logit0),
     .logit1(logit1),
+    .test_mode_i(4'b0101),    // force FSM to ALL: feat+ML+CPU all active; bypasses SLEEP deadlock in sim
     .test_force_irq_i(1'b0),
     .test_force_wake_i(1'b0),
     .test_irq_src_i(3'b000),
@@ -225,15 +240,60 @@ i2c_slave_adpd144ri #(
     .sim_err(ppg_sim_err)
 );
 
+// Weight SPI flash: taketwo reads ML parameters from here during inference
 spi_flash_model #(
     .FLASH_WORDS(FLASH_WORDS),
     .FLASH_INIT_HEX("firmware/build/generated/taketwo_params.hex")
 ) u_flash (
-    .spi_clk(spi_clk),
-    .spi_cs_n(spi_cs_n),
-    .spi_mosi(spi_mosi),
-    .spi_miso(spi_miso)
+    .spi_clk(weight_spi_clk),
+    .spi_cs_n(weight_spi_cs_n),
+    .spi_mosi(weight_spi_mosi),
+    .spi_miso(weight_spi_miso)
 );
+
+// Boot SPI flash: spi_boot_ctrl copies firmware into SRAM before boot_done, releasing CPU from reset.
+// Without this, the boot controller fills SRAM with 0xFF (illegal instructions).
+spi_flash_model #(
+    .FLASH_WORDS(1024),   // must match top.sv BOOT_WORDS
+    .FLASH_INIT_HEX("firmware/build/test_top_feature_ml_cpu_spi_flash/firmware.hex")
+) u_boot_flash (
+    .spi_clk(boot_spi_clk),
+    .spi_cs_n(boot_spi_cs_n),
+    .spi_mosi(boot_spi_mosi),
+    .spi_miso(boot_spi_miso)
+);
+
+// The gf180mcu_fd_ip_sram behavioral model defaults all memory cells to X (uninitialized).
+// taketwo's accumulator SRAMs are read-before-written on each inference, so X propagates
+// through the entire computation and makes ML output checks pass vacuously (X !== X = false).
+// We cannot modify the vendor SRAM model, so we zero-initialize all 10 taketwo SRAM
+// instances here from the testbench via hierarchical assignment, which is the simulation
+// equivalent of the RTL clearing those buffers before inference begins.
+integer sram_k;
+initial begin
+    for (sram_k = 0; sram_k < 512; sram_k = sram_k + 1) begin
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id0_0.mem_top.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id0_0.mem_bot.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id0_1.mem_top.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id0_1.mem_bot.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id1_0.mem_top.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id1_0.mem_bot.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id1_1.mem_top.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id1_1.mem_bot.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id2_0.mem_top.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id2_0.mem_bot.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id2_1.mem_top.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id2_1.mem_bot.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id3_0.mem_top.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id3_0.mem_bot.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id3_1.mem_top.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id3_1.mem_bot.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_0.mem_top.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_0.mem_bot.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_1.mem_top.mem[sram_k] = 8'h00;
+        dut.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_1.mem_bot.mem[sram_k] = 8'h00;
+    end
+end
 
 always #10 clk = ~clk;
 
@@ -254,6 +314,12 @@ always @(posedge clk) begin
         axi_b_hs <= 0;
         spi_cs_asserts <= 0;
         spi_bit_count <= 0;
+        // main SPI tracks spi_master_mmio (spi_clk_o/spi_cs_n_o), used by spi_boot_load()
+        // separate from weight_spi_* which taketwo drives via AXI
+        main_spi_cs_asserts <= 0;
+        main_spi_bit_count <= 0;
+        prev_main_spi_cs_n <= 1'b1;
+        prev_main_spi_clk <= 1'b0;
         boot_writes_seen <= 0;
         saw_feature_latch <= 1'b0;
         first_time_feat <= '0;
@@ -275,12 +341,20 @@ always @(posedge clk) begin
         saw_feature_word0_snap <= 1'b0;
         saw_feature_word1_snap <= 1'b0;
     end else begin
-        if (prev_spi_cs_n && !spi_cs_n)
+        // weight SPI (weight_flash_axi): driven by taketwo AXI reads during inference
+        if (prev_spi_cs_n && !weight_spi_cs_n)
             spi_cs_asserts <= spi_cs_asserts + 1;
-        prev_spi_cs_n <= spi_cs_n;
-        if (!prev_spi_clk && spi_clk && !spi_cs_n)
+        prev_spi_cs_n <= weight_spi_cs_n;
+        if (!prev_spi_clk && weight_spi_clk && !weight_spi_cs_n)
             spi_bit_count <= spi_bit_count + 1;
-        prev_spi_clk <= spi_clk;
+        prev_spi_clk <= weight_spi_clk;
+        // main SPI (spi_master_mmio): driven by CPU firmware's spi_boot_load() call
+        if (prev_main_spi_cs_n && !spi_cs_n)
+            main_spi_cs_asserts <= main_spi_cs_asserts + 1;
+        prev_main_spi_cs_n <= spi_cs_n;
+        if (!prev_main_spi_clk && spi_clk && !spi_cs_n)
+            main_spi_bit_count <= main_spi_bit_count + 1;
+        prev_main_spi_clk <= spi_clk;
 
         if (!saw_feature_latch && dut.feat_latched_valid_r)
             saw_feature_latch <= 1'b1;
@@ -431,12 +505,15 @@ initial begin
                          first_mssd_feat[15:0], first_delta_hr_feat[15:0], feature_word1_snap);
                 failures = failures + 1;
             end
+            // weight SPI CS check: taketwo must have driven at least one AXI read burst to weight flash
             if (spi_cs_asserts == 0) begin
-                $display("FAIL: firmware never asserted SPI CS");
+                $display("FAIL: taketwo never asserted weight SPI CS");
                 failures = failures + 1;
             end
-            if (spi_bit_count < MIN_SPI_BITS) begin
-                $display("FAIL: too few SPI bit clocks observed: %0d", spi_bit_count);
+            // main SPI bit check: spi_boot_load() reads 208 words (header+data = MIN_SPI_BITS)
+            // via spi_master_mmio (spi_clk/spi_cs_n), NOT weight_spi — tracked separately
+            if (main_spi_bit_count < MIN_SPI_BITS) begin
+                $display("FAIL: too few main SPI bit clocks from spi_boot_load: %0d", main_spi_bit_count);
                 failures = failures + 1;
             end
             if (!saw_global_base_write) begin
