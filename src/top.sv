@@ -332,10 +332,8 @@ module top #(
     wire [31:0] ml_rdata;
     wire        ml_irq;
 
-    // Weight SRAM is write-only from CPU perspective (static after boot).
-    // Return immediate ACK with zero data to prevent stall on accidental access.
-    wire        weight_ready = weight_sel;
-    wire [31:0] weight_rdata = 32'h0;
+    wire        weight_ready;
+    wire [31:0] weight_rdata;
 
     wire        irqc_ready;
     wire [31:0] irqc_rdata;
@@ -978,6 +976,13 @@ module top #(
     ) u_weight_ram (
         .clk      (clk_i),
         .resetn   (~reset_i),
+        // CPU MMIO port — write live sensor features before inference
+        .mem_valid(weight_sel),
+        .mem_addr (mem_addr),
+        .mem_wdata(mem_wdata),
+        .mem_wstrb(mem_wstrb),
+        .mem_ready(weight_ready),
+        .mem_rdata(weight_rdata),
         .spi_cs_n (weight_spi_cs_n_o),
         .spi_clk  (weight_spi_clk_o),
         .spi_mosi (weight_spi_mosi_o),
