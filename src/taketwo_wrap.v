@@ -1,5 +1,9 @@
 
 module taketwo_wrap (
+  `ifdef USE_POWER_PINS
+  inout  wire         VDD,
+  inout  wire         VSS,
+  `endif
   input  wire         CLK,
   input  wire         RESETN,
   input  wire         en_i,
@@ -93,6 +97,10 @@ module taketwo_wrap (
   assign maxi_rready  = core_maxi_rready  & en_i;
 
   taketwo u_core (
+    `ifdef USE_POWER_PINS
+    .VDD(VDD),
+    .VSS(VSS),
+    `endif
     .CLK(CLK),
     .RESETN(RESETN),
     .irq(irq),
