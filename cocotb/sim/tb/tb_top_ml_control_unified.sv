@@ -262,7 +262,17 @@ always @(posedge clk) begin
         if (dut.wram_arvalid && dut.wram_arready) axi_ar_hs <= axi_ar_hs + 1;
         if (dut.wram_rvalid  && dut.wram_rready)  axi_r_hs  <= axi_r_hs + 1;
         if (dut.wram_awvalid && dut.wram_awready) axi_aw_hs <= axi_aw_hs + 1;
-        if (dut.wram_wvalid  && dut.wram_wready)  axi_w_hs  <= axi_w_hs + 1;
+        if (dut.wram_wvalid  && dut.wram_wready) begin
+            axi_w_hs  <= axi_w_hs + 1;
+            $display("[%0t] TB: AXI W beat awvalid=%0b awaddr=0x%08x eff_waddr=0x%08x eff_woff=%0d wdata=0x%08x wlast=%0b",
+                     $time,
+                     dut.wram_awvalid,
+                     dut.wram_awaddr,
+                     dut.u_weight_ram.eff_waddr,
+                     dut.u_weight_ram.eff_woff,
+                     dut.wram_wdata,
+                     dut.wram_wlast);
+        end
         if (dut.wram_bvalid  && dut.wram_bready)  axi_b_hs  <= axi_b_hs + 1;
 
         // The short regression expects completion IRQ activity as part of the
