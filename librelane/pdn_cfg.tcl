@@ -195,9 +195,40 @@ add_pdn_connect \
 
 # SRAM macros
 
+set sram_instances [list \
+    i_chip_core.u_top.sram.mem_A_1 \
+    i_chip_core.u_top.sram.mem_A_2 \
+    i_chip_core.u_top.sram.mem_A_3 \
+    i_chip_core.u_top.sram.mem_A_4 \
+    i_chip_core.u_top.sram.mem_B_1 \
+    i_chip_core.u_top.sram.mem_B_2 \
+    i_chip_core.u_top.sram.mem_B_3 \
+    i_chip_core.u_top.sram.mem_B_4 \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id0_0.mem_bot \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id0_0.mem_top \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id0_1.mem_bot \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id0_1.mem_top \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id1_0.mem_bot \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id1_0.mem_top \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id1_1.mem_bot \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id1_1.mem_top \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id2_0.mem_bot \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id2_0.mem_top \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id2_1.mem_bot \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id2_1.mem_top \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id3_0.mem_bot \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id3_0.mem_top \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id3_1.mem_bot \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id3_1.mem_top \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_0.mem_bot \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_0.mem_top \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_1.mem_bot \
+    i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_1.mem_top \
+]
+
 define_pdn_grid \
     -macro \
-    -instances "i_chip_core.u_top.sram.mem_A_1 i_chip_core.u_top.sram.mem_A_2 i_chip_core.u_top.sram.mem_A_3 i_chip_core.u_top.sram.mem_A_4 i_chip_core.u_top.sram.mem_B_1 i_chip_core.u_top.sram.mem_B_2 i_chip_core.u_top.sram.mem_B_3 i_chip_core.u_top.sram.mem_B_4" \
+    -instances [join $sram_instances " "] \
     -name sram_macros_NS \
     -starts_with POWER \
     -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
