@@ -9,6 +9,8 @@ module tb_top_fsm;
     reg        resetn_i        = 1'b0;
     reg  [3:0] test_mode_i     = 4'b0000;
 
+    reg        start_i         = 1'b0;
+    reg        boot_done_i     = 1'b0;
     reg        feat_valid_i    = 1'b0;
     reg        ml_irq_i        = 1'b0;
 
@@ -17,6 +19,7 @@ module tb_top_fsm;
     reg        mem_valid_i     = 1'b0;
     reg        irqc_wake_req_i = 1'b0;
 
+    wire       watchdog_o;
     wire       feat_en_o;
     wire       ml_en_o;
     wire       cpu_en_o;
@@ -26,12 +29,15 @@ module tb_top_fsm;
         .clk_i           (clk_i),
         .resetn_i        (resetn_i),
         .test_mode_i     (test_mode_i),
+        .start_i         (start_i),
+        .boot_done_i     (boot_done_i),
         .feat_valid_i    (feat_valid_i),
         .ml_irq_i        (ml_irq_i),
         .wake_sources_i  (wake_sources_i),
         .sleep_req_i     (sleep_req_i),
         .mem_valid_i     (mem_valid_i),
         .irqc_wake_req_i (irqc_wake_req_i),
+        .watchdog_o      (watchdog_o),
         .feat_en_o       (feat_en_o),
         .ml_en_o         (ml_en_o),
         .cpu_en_o        (cpu_en_o),

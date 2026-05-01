@@ -124,7 +124,7 @@ module top #(
     output logic                      weight_boot_done_o,
 
     // Epoch pulse for TB orchestration
-
+    input  logic                      start_i,          // Start button to start watchdog timer
     output logic                      alarm_o,          // placeholder alarm output (unused in current RTL)
 
     output logic signed [15:0] logit0,
@@ -278,6 +278,7 @@ module top #(
     //reg cpu_clk_en;
     reg cpu_clk_en_lat;
     wire cpu_clk;
+    wire watchdog_w
 
     wire        mem_valid;
     wire        mem_instr;
@@ -847,6 +848,7 @@ module top #(
     timer_mmio #(.BASE_ADDR(TIMER_BASE)) u_timer (
         .clk      (clk_i),
         .resetn   (~reset_i),
+        .watchdog_en_i(watchdog_w),
         .mem_valid(mmio_sel),
         .mem_addr (mem_addr),
         .mem_wdata(mem_wdata),
@@ -1216,6 +1218,8 @@ module top #(
     top_fsm fsm (
         .resetn_i(~reset_i),
         .clk_i(clk_i),
+
+        .start_i(start_i),                 //start signal for timer to go
         .test_mode_i(test_mode_i[3:0]),
         
         // .watchdog_i(timer_event),       // when the watchdog timer goes off
@@ -1229,6 +1233,7 @@ module top #(
         .mem_valid_i(mem_valid),     // CPU memory-access valid (for idle detection)
         .irqc_wake_req_i(irqc_wake_req), // interrupt controller forces wake
 
+        .watchdog_o(watchdog_w)
         .feat_en_o(feat_en),
         .ml_en_o(ml_en),
         .cpu_en_o(cpu_clk_en),

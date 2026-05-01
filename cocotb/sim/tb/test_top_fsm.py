@@ -4,20 +4,23 @@ from cocotb.triggers import FallingEdge, ClockCycles
 
 CLK_PERIOD_NS = 10
 
-# States (for readability in failure messages)
-IDLE      = 0
-SLEEP     = 1
-FEAT_ONLY = 2
-ALL       = 3
-CPU_FEAT  = 4
-ML_ONLY   = 5
-CPU_ONLY  = 6
+# States (must match localparams in top_fsm.v)
+BOOT      = 0
+IDLE      = 1
+SLEEP     = 2
+FEAT_ONLY = 3
+ALL       = 4
+CPU_FEAT  = 5
+FEAT_ML   = 6
+CPU_ONLY  = 7
 
 
 async def reset_dut(dut, cycles=5):
-    """Start clock, hold reset for `cycles` cycles, release, settle."""
+    """Start clock, hold reset, release, drive BOOT->IDLE->SLEEP."""
     cocotb.start_soon(Clock(dut.clk_i, CLK_PERIOD_NS, unit="ns").start())
     dut.resetn_i.value        = 0
+    dut.start_i.value         = 0
+    dut.boot_done_i.value     = 0
     dut.feat_valid_i.value    = 0
     dut.ml_irq_i.value        = 0
     dut.wake_sources_i.value  = 0
@@ -27,8 +30,16 @@ async def reset_dut(dut, cycles=5):
     dut.test_mode_i.value     = 0
     await ClockCycles(dut.clk_i, cycles)
     await FallingEdge(dut.clk_i)
-    dut.resetn_i.value = 1
-    await ClockCycles(dut.clk_i, 2)   # settle: IDLE->SLEEP takes 1 posedge
+    dut.resetn_i.value    = 1
+    await ClockCycles(dut.clk_i, 1)   # settle in BOOT
+    dut.boot_done_i.value = 1
+    await ClockCycles(dut.clk_i, 1)   # BOOT -> IDLE on this posedge
+    dut.boot_done_i.value = 0
+    await ClockCycles(dut.clk_i, 1)   # settle in IDLE
+    dut.start_i.value = 1
+    await ClockCycles(dut.clk_i, 1)   # IDLE -> SLEEP on this posedge
+    dut.start_i.value = 0
+    await ClockCycles(dut.clk_i, 1)   # settle in SLEEP
 
 
 async def wake_to_feat_only(dut):
@@ -90,6 +101,8 @@ async def test_irqc_wake(dut): #See if we go into FEAT_ONLY after watchdog goes 
 async def test_random_reset(dut): #Test for weird behavior on resets
     cocotb.start_soon(Clock(dut.clk_i, CLK_PERIOD_NS, unit="ns").start())
     dut.resetn_i.value        = 0
+    dut.start_i.value         = 1  # asserted during reset, must not affect FSM
+    dut.boot_done_i.value     = 1  # asserted during reset, must not affect FSM
     dut.feat_valid_i.value    = 1
     dut.ml_irq_i.value        = 1
     dut.wake_sources_i.value  = 0xF0EF_9FDF # arbitrary garbage input to wake sources
@@ -100,13 +113,23 @@ async def test_random_reset(dut): #Test for weird behavior on resets
     await ClockCycles(dut.clk_i, 5)
     await FallingEdge(dut.clk_i)
     dut.resetn_i.value        = 1
+    dut.start_i.value         = 0
+    dut.boot_done_i.value     = 0
     dut.feat_valid_i.value    = 0
     dut.ml_irq_i.value        = 0
-    #dut.wake_sources_i.value  = 0x0000_0000  
+    #dut.wake_sources_i.value  = 0x0000_0000
     dut.sleep_req_i.value     = 0
     dut.mem_valid_i.value     = 0
     dut.irqc_wake_req_i.value = 0
-    await ClockCycles(dut.clk_i, 5)   # extra margin
+    await ClockCycles(dut.clk_i, 2)   # settle in BOOT (wake_sources_d_r catches up)
+    dut.boot_done_i.value     = 1
+    await ClockCycles(dut.clk_i, 1)   # BOOT -> IDLE
+    dut.boot_done_i.value     = 0
+    await ClockCycles(dut.clk_i, 1)   # settle in IDLE
+    dut.start_i.value         = 1
+    await ClockCycles(dut.clk_i, 1)   # IDLE -> SLEEP
+    dut.start_i.value         = 0
+    await ClockCycles(dut.clk_i, 3)   # extra margin
 
     assert dut.sleeping_o.value == 1, "Static-high wake_sources must not wake FSM"
 
