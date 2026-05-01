@@ -12,6 +12,7 @@ module top_fsm
     input         clk_i,
 
     input   [3:0] test_mode_i,
+    input         boot_done_i,
     //add input start? 
 
     // Pipeline done signals
@@ -67,7 +68,7 @@ module top_fsm
         state_d = state_q;
 
         case (state_q)
-            IDLE:     state_d = SLEEP;
+            IDLE:     if (boot_done_i) state_d = SLEEP;
             SLEEP:    if (irqc_wake_req_i || wake_event_w) state_d = FEAT_ONLY;
             FEAT_ONLY:if (feat_valid_i)                    state_d = ALL;
             ALL:      if (ml_irq_i)                        state_d = CPU_FEAT;
@@ -85,7 +86,7 @@ module top_fsm
 
     // Output enables (combinational from state)
     assign feat_en_o  = (state_q == FEAT_ONLY) || (state_q == ALL) || (state_q == CPU_FEAT) || (state_q == FEAT_ML);
-    assign ml_en_o    = (state_q == ALL) || (state_q == FEAT_ML);
+    assign ml_en_o    = (state_q == ALL) || (state_q == FEAT_ML) || (state_q == IDLE);
     assign cpu_en_o   = cpu_clk_en_r;
     assign sleeping_o = (state_q == SLEEP);
 

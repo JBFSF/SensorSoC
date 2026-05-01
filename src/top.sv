@@ -1050,7 +1050,6 @@ module top #(
 
     // Hardware SPI boot controller: loads BOOT_WORDS words from external flash
     // into SRAM before releasing the CPU from reset.
-    //JF: probably not needed, SIKE
     spi_boot_ctrl #(
         .WORDS    (BOOT_WORDS),
         .CLK_DIV  (2),
@@ -1222,6 +1221,7 @@ module top #(
         // .watchdog_i(timer_event),       // when the watchdog timer goes off
         .feat_valid_i(feat_valid_o),    // one-cycle strobe: feature vector ready (FEAT_ONLY -> ALL)
         .ml_irq_i(ml_irq),        // ML inference complete (ALL -> CPU_FEAT)
+        .boot_done_i(boot_done),
 
         // CPU sleep/wake inputs
         .wake_sources_i(wake_sources),
