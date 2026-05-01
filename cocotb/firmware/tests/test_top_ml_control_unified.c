@@ -26,6 +26,8 @@
 #define TEST_FAIL 0xDEADBEEFu
 
 #define X_BASE        64u
+#define VAR_BASE      128u
+#define LOGIT_BASE    5504u
 #define OUT0_SENTINEL 0xA5A55A5Au
 #define OUT1_SENTINEL 0x5A5AA5A5u
 
@@ -58,6 +60,12 @@ int main(void) {
     // current unified-top regressions.
     ML_REG(0x80u) = WEIGHT_BASE;
     if (ML_REG(0x80u) != WEIGHT_BASE) fail(0xEC00u);
+    ML_REG(0x88u) = LOGIT_BASE;
+    if (ML_REG(0x88u) != LOGIT_BASE) fail(0xEC01u);
+    ML_REG(0x8Cu) = X_BASE;
+    if (ML_REG(0x8Cu) != X_BASE) fail(0xEC02u);
+    ML_REG(0x90u) = VAR_BASE;
+    if (ML_REG(0x90u) != VAR_BASE) fail(0xEC03u);
 
     // Direct test vector: x0=motion, x1=time, x2=delta_hr, x3=rmssd.
     WRAM_I16(X_BASE + 0u) = (int16_t)0x0100;
