@@ -258,11 +258,47 @@ always @(posedge clk) begin
             saw_busy_read <= 1'b1;
         end
 
+        if (dut.u_taketwo_wrap.u_core._stream_matmul_11_stream_oready &&
+            dut.u_taketwo_wrap.u_core._stream_matmul_11_sink_26_sink_wenable &&
+            (dut.u_taketwo_wrap.u_core._stream_matmul_11_sink_26_sink_sel == 5)) begin
+            $display("[%0t] TB: SINK write waddr=%0d wdata=0x%04x count=%0d dbg0=%0d dbg1=%0d",
+                     $time,
+                     dut.u_taketwo_wrap.u_core._stream_matmul_11_sink_26_sink_waddr,
+                     dut.u_taketwo_wrap.u_core._stream_matmul_11_sink_26_sink_wdata,
+                     dut.u_taketwo_wrap.u_core._stream_matmul_11_sink_26_sink_count,
+                     $signed(dut.logit0),
+                     $signed(dut.logit1));
+        end
+
         // AXI traffic is the main datapath-side proof that taketwo actually ran.
         if (dut.wram_arvalid && dut.wram_arready) axi_ar_hs <= axi_ar_hs + 1;
         if (dut.wram_rvalid  && dut.wram_rready)  axi_r_hs  <= axi_r_hs + 1;
         if (dut.wram_awvalid && dut.wram_awready) axi_aw_hs <= axi_aw_hs + 1;
-        if (dut.wram_wvalid  && dut.wram_wready)  axi_w_hs  <= axi_w_hs + 1;
+        if (dut.wram_wvalid  && dut.wram_wready) begin
+            axi_w_hs  <= axi_w_hs + 1;
+            $display("[%0t] TB: AXI W beat awvalid=%0b awaddr=0x%08x eff_waddr=0x%08x eff_woff=%0d wdata=0x%08x wlast=%0b",
+                     $time,
+                     dut.wram_awvalid,
+                     dut.wram_awaddr,
+                     dut.u_weight_ram.eff_waddr,
+                     dut.u_weight_ram.eff_woff,
+                     dut.wram_wdata,
+                     dut.wram_wlast);
+            if ((dut.u_weight_ram.eff_woff == 32'd5504) ||
+                (dut.u_weight_ram.eff_woff == 32'd5508)) begin
+                $display("[%0t] TB: FINAL OUT detail maxi_wdata=0x%08x sb=0x%08x packed=0x%08x ram_lo=0x%04x ram_hi=0x%04x sink_waddr=%0d sink_wdata=0x%04x read_fsm=%0d write_size_buf=%0d",
+                         $time,
+                         dut.wram_wdata,
+                         dut.u_taketwo_wrap.u_core._maxi_wdata_sb_0,
+                         dut.u_taketwo_wrap.u_core.read_burst_packed_rdata_543,
+                         dut.u_taketwo_wrap.u_core.read_burst_packed_ram_rdata_538,
+                         dut.u_taketwo_wrap.u_core.read_burst_packed_ram_rdata_542,
+                         dut.u_taketwo_wrap.u_core._stream_matmul_11_sink_26_sink_waddr,
+                         dut.u_taketwo_wrap.u_core._stream_matmul_11_sink_26_sink_wdata,
+                         dut.u_taketwo_wrap.u_core.read_burst_packed_fsm_4,
+                         dut.u_taketwo_wrap.u_core._maxi_write_size_buf);
+            end
+        end
         if (dut.wram_bvalid  && dut.wram_bready)  axi_b_hs  <= axi_b_hs + 1;
 
         // The short regression expects completion IRQ activity as part of the

@@ -12,8 +12,8 @@ module top_fsm
     input         clk_i,
 
     input   [3:0] test_mode_i,
-    //add input start? 
-
+    input         start_i,
+    input         boot_done_i,
     // Pipeline done signals
     input         feat_valid_i,    // one-cycle strobe: feature vector ready (FEAT_ONLY -> ALL)
     input         ml_irq_i,        // ML inference complete (ALL -> CPU_FEAT)
@@ -24,19 +24,21 @@ module top_fsm
     input         mem_valid_i,     // CPU memory-access valid (for idle detection)
     input         irqc_wake_req_i, // interrupt controller forces wake
 
+    output        watchdog_o,      // enable the watchdog after we've started
     output        feat_en_o,
     output        ml_en_o,
     output        cpu_en_o,
     output        sleeping_o
 );
 
-    localparam IDLE      = 3'd0;
-    localparam SLEEP     = 3'd1;
-    localparam FEAT_ONLY = 3'd2;
-    localparam ALL       = 3'd3;
-    localparam CPU_FEAT  = 3'd4;
-    localparam FEAT_ML   = 3'd5;
-    localparam CPU_ONLY  = 3'd6;
+    localparam BOOT      = 3'd0;
+    localparam IDLE      = 3'd1;
+    localparam SLEEP     = 3'd2;
+    localparam FEAT_ONLY = 3'd3;
+    localparam ALL       = 3'd4;
+    localparam CPU_FEAT  = 3'd5;
+    localparam FEAT_ML   = 3'd6;
+    localparam CPU_ONLY  = 3'd7;
 
     reg [2:0] state_d, state_q, state_debug_q;
 
@@ -58,7 +60,7 @@ module top_fsm
 
     always @(posedge clk_i) begin
         if (!resetn_i)
-            state_q <= IDLE;
+            state_q <= BOOT;
         else
             state_q <= state_d;
     end
@@ -67,7 +69,8 @@ module top_fsm
         state_d = state_q;
 
         case (state_q)
-            IDLE:     state_d = SLEEP;
+            BOOT:     if (boot_done_i) state_d = IDLE;
+            IDLE:     if (start_i) state_d = SLEEP;
             SLEEP:    if (irqc_wake_req_i || wake_event_w) state_d = FEAT_ONLY;
             FEAT_ONLY:if (feat_valid_i)                    state_d = ALL;
             ALL:      if (ml_irq_i)                        state_d = CPU_FEAT;
@@ -85,9 +88,10 @@ module top_fsm
 
     // Output enables (combinational from state)
     assign feat_en_o  = (state_q == FEAT_ONLY) || (state_q == ALL) || (state_q == CPU_FEAT) || (state_q == FEAT_ML);
-    assign ml_en_o    = (state_q == ALL) || (state_q == FEAT_ML);
+    assign ml_en_o    = (state_q == ALL) || (state_q == FEAT_ML) || (state_q == BOOT);
     assign cpu_en_o   = cpu_clk_en_r;
     assign sleeping_o = (state_q == SLEEP);
+    assign watchdog_o = (state_q == FEAT_ONLY) || (state_q == ALL) || (state_q == CPU_FEAT) || (state_q == FEAT_ML) || (state_q == SLEEP); 
 
     always @(posedge clk_i) begin
         if (!resetn_i) begin

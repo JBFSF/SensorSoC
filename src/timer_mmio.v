@@ -18,7 +18,7 @@
 //                      Write-1-to-clear: writing bit0=1 clears event_latched.
 //
 // Event behavior
-// - While enable=1:
+// - While enable=1 AND watchdog_en_i=1:
 //     count decrements every cycle until it reaches 0.
 // - When count hits 0:
 //     event_latched is set to 1 (sticky)
@@ -49,6 +49,8 @@ module timer_mmio #(
 )(
     input  wire        clk,
     input  wire        resetn,
+
+    input  wire        watchdog_en_i,
 
     input  wire        mem_valid,
     input  wire [31:0] mem_addr,
@@ -104,7 +106,7 @@ module timer_mmio #(
             // -------------------------
             // Timer countdown (always-on)
             // -------------------------
-            if (enable) begin
+            if (enable && watchdog_en_i) begin
                 if (count != 32'd0) begin
                     count <= count - 32'd1;
                 end else begin

@@ -12,7 +12,8 @@ What it checks
 3. The golden firmware writes the expected quantized feature vector through the
    CPU MMIO path into the visible feature/logit register window.
 4. Firmware reaches PASS without trapping.
-5. The final WRAM logit word matches the packed logits for ``canonical_v1``.
+5. The final CPU-visible logit register word matches the packed logits for
+   ``canonical_v1``.
 """
 
 import cocotb
@@ -91,7 +92,8 @@ async def test_unified_top_canonical_v1(dut):
     assert observed_x_word0 is not None, "never observed CPU write of canonical input word0"
     assert observed_x_word1 is not None, "never observed CPU write of canonical input word1"
 
-    observed_logit_word = pack_int16_pair(_u(dut.logit0), _u(dut.logit1))
+    observed_logit_word = _u(dut.u_dut.u_weight_ram.logit_reg_0)
+    observed_logit_word_1 = _u(dut.u_dut.u_weight_ram.logit_reg_1)
     observed_logits = unpack_int16_pair(observed_logit_word)
 
     assert observed_x_word0 == expected_x_word0, (
@@ -104,7 +106,8 @@ async def test_unified_top_canonical_v1(dut):
     )
     assert observed_logit_word == expected_word, (
         f"golden logits mismatch: got word 0x{observed_logit_word:08x} "
-        f"({observed_logits}), expected 0x{expected_word:08x} ({y_int})"
+        f"(aux word1 0x{observed_logit_word_1:08x}, {observed_logits}), "
+        f"expected 0x{expected_word:08x} ({y_int})"
     )
     assert predicted_class_from_logits(*observed_logits) == vector["predicted_class"]
     assert absdiff_confidence(*observed_logits) == vector["confidence_absdiff"]
