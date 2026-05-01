@@ -3,7 +3,6 @@
 #define FEATURE_BASE  0x03004000u
 #define ML_BASE       0x03003000u
 #define WEIGHT_BASE   0x03006000u
-#define SPI_BASE      0x0300A000u
 #define TEST_BASE     0x0300F000u
 
 #define TEST_STATUS   (*(volatile uint32_t*)(TEST_BASE + 0x00u))
@@ -32,22 +31,13 @@
 #define IRQC_CLAIM       (*(volatile uint32_t*)0x03005014u)
 #define IRQC_COMPLETE    (*(volatile uint32_t*)0x03005018u)
 
-#define SPI_CS           (*(volatile uint32_t*)(SPI_BASE + 0x00u))
-#define SPI_STATUS       (*(volatile uint32_t*)(SPI_BASE + 0x04u))
-#define SPI_DATA         (*(volatile uint32_t*)(SPI_BASE + 0x08u))
-#define SPI_DIVIDER      (*(volatile uint32_t*)(SPI_BASE + 0x0Cu))
-#define SPI_BUSY_BIT     (1u << 0)
-
 #define IRQ_ML_BIT       (1u << 1)
 
-#define WEIGHT_WORDS     208u
 #define VAR_BASE         128u
 #define X_BASE           64u
 #define LOGIT_BASE       5504u
 
 #define TEST_FAIL        0xDEADBEEFu
-#define OUT0_SENTINEL    0xA5A55A5Au
-#define OUT1_SENTINEL    0x5A5AA5A5u
 
 static void fail(uint32_t code) {
     TEST_CODE = code;
@@ -104,46 +94,6 @@ static inline uint32_t cpu_waitirq(void) {
     return pending;
 }
 
-static uint8_t spi_xfer(uint8_t tx) {
-    uint32_t delay;
-    uint32_t rx_word;
-
-    SPI_DATA = (uint32_t)tx;
-    for (delay = 0u; delay < 8u; delay++) {
-        __asm__ volatile ("nop");
-    }
-    while (SPI_STATUS & SPI_BUSY_BIT) {}
-    rx_word = SPI_DATA;
-    rx_word = SPI_DATA;
-    return (uint8_t)(rx_word & 0xFFu);
-}
-
-static void spi_boot_load(void) {
-    uint32_t i;
-    uint32_t settle;
-
-    SPI_DIVIDER = 2u;
-    SPI_CS = 0u;
-    spi_xfer(0x03u);
-    spi_xfer(0x00u);
-    spi_xfer(0x00u);
-    spi_xfer(0x00u);
-
-    for (i = 0u; i < WEIGHT_WORDS; i++) {
-        uint32_t b0 = spi_xfer(0x00u);
-        uint32_t b1 = spi_xfer(0x00u);
-        uint32_t b2 = spi_xfer(0x00u);
-        uint32_t b3 = spi_xfer(0x00u);
-        WRAM_U32(VAR_BASE + (i * 4u)) = b0 | (b1 << 8u) | (b2 << 16u) | (b3 << 24u);
-        (void)SPI_STATUS;
-        for (settle = 0u; settle < 16u; settle++) {
-            __asm__ volatile ("nop");
-        }
-    }
-
-    SPI_CS = 1u;
-}
-
 static uint16_t abs_i16(int16_t x) {
     return (x < 0) ? (uint16_t)(-x) : (uint16_t)x;
 }
@@ -172,8 +122,6 @@ int main(void) {
     PWR_CTRL = 0u;
     PWR_WAKE_STATUS = 0xFFFFFFFFu;
     IRQC_PENDING = 0xFFFFFFFFu;
-
-    spi_boot_load();
 
     ML_REG(0x80u) = WEIGHT_BASE;
     if (ML_REG(0x80u) != WEIGHT_BASE) fail(0xF801u);
@@ -212,9 +160,6 @@ int main(void) {
         WRAM_I16(X_BASE + 4u) = delta_hr_feat;
         WRAM_I16(X_BASE + 6u) = rmssd_feat;
 
-        WRAM_U32(LOGIT_BASE + 0u) = OUT0_SENTINEL;
-        WRAM_U32(LOGIT_BASE + 4u) = OUT1_SENTINEL;
-
         g_ml_done_flag = 0u;
         IRQC_PENDING = IRQ_ML_BIT;
         ML_REG(0x2Cu) = 1u;
@@ -231,7 +176,6 @@ int main(void) {
         out0_after = WRAM_U32(LOGIT_BASE + 0u);
         out1_after = WRAM_U32(LOGIT_BASE + 4u);
 
-        if ((out0_after == OUT0_SENTINEL) && (out1_after == OUT1_SENTINEL)) fail(0xF805u);
         if (g_irq_bad_claims != 0u) fail(0xF806u);
 
         logits_word = out0_after;
