@@ -180,7 +180,7 @@ top #(
     .invalid_reason_o(),
     .spi_clk_o(spi_clk),
     .spi_mosi_o(spi_mosi),
-    .spi_miso_i(1'b1),     // CPU-driven spi_master_mmio; firmware spi_boot_load() reads are discarded, tie high
+    .spi_miso_i(1'b1),     // CPU SPI unused; weight_flash_axi boots from weight_spi_*
     .spi_cs_n_o(spi_cs_n),
     .weight_spi_clk_o(weight_spi_clk),
     .weight_spi_mosi_o(weight_spi_mosi),
@@ -200,6 +200,7 @@ top #(
     .test_force_wake_i(1'b0),
     .test_irq_src_i(3'b000),
     .irq_eoi_o(),
+    .start_i(1'b1),
     .boot_done_o(),
     .weight_boot_done_o()
 );
@@ -240,11 +241,12 @@ i2c_slave_adpd144ri #(
     .sim_err(ppg_sim_err)
 );
 
-// Weight SPI flash: taketwo reads ML parameters from here during inference
+// Weight flash: weight_flash_axi reads 208 weight words at reset via weight_spi_*
+// and caches them on-chip before the CPU triggers inference.
 spi_flash_model #(
     .FLASH_WORDS(FLASH_WORDS),
     .FLASH_INIT_HEX("firmware/build/generated/taketwo_params.hex")
-) u_flash (
+) u_weight_flash (
     .spi_clk(weight_spi_clk),
     .spi_cs_n(weight_spi_cs_n),
     .spi_mosi(weight_spi_mosi),
@@ -341,14 +343,14 @@ always @(posedge clk) begin
         saw_feature_word0_snap <= 1'b0;
         saw_feature_word1_snap <= 1'b0;
     end else begin
-        // weight SPI (weight_flash_axi): driven by taketwo AXI reads during inference
+        // weight SPI (weight_flash_axi): driven at reset to boot-load cache from flash
         if (prev_spi_cs_n && !weight_spi_cs_n)
             spi_cs_asserts <= spi_cs_asserts + 1;
         prev_spi_cs_n <= weight_spi_cs_n;
         if (!prev_spi_clk && weight_spi_clk && !weight_spi_cs_n)
             spi_bit_count <= spi_bit_count + 1;
         prev_spi_clk <= weight_spi_clk;
-        // main SPI (spi_master_mmio): driven by CPU firmware's spi_boot_load() call
+        // main SPI (spi_master_mmio): CPU SPI — unused in this test (no spi_boot_load)
         if (prev_main_spi_cs_n && !spi_cs_n)
             main_spi_cs_asserts <= main_spi_cs_asserts + 1;
         prev_main_spi_cs_n <= spi_cs_n;
@@ -464,7 +466,7 @@ initial begin
             $display("  spi_cs=%0d spi_bits=%0d boot_writes=%0d captured=%08x %08x %08x %08x wram[0..3]=%08x %08x %08x %08x flash[0..3]=%08x %08x %08x %08x out=%08x %08x",
                      spi_cs_asserts, spi_bit_count, boot_writes_seen,
                      boot_word0, boot_word1, boot_word2, boot_word3,
-                     u_flash.mem[0], u_flash.mem[1], u_flash.mem[2], u_flash.mem[3],
+                     u_weight_flash.mem[0], u_weight_flash.mem[1], u_weight_flash.mem[2], u_weight_flash.mem[3],
                      {logit1[15:0], logit0[15:0]}, 32'h0000_0000);
             $fatal(1);
         end
@@ -505,15 +507,15 @@ initial begin
                          first_mssd_feat[15:0], first_delta_hr_feat[15:0], feature_word1_snap);
                 failures = failures + 1;
             end
-            // weight SPI CS check: taketwo must have driven at least one AXI read burst to weight flash
+            // Weight SPI boot check: weight_flash_axi must have read weights from flash at
+            // reset (one CS assert for the bulk READ, MIN_SPI_BITS bits total).
             if (spi_cs_asserts == 0) begin
-                $display("FAIL: taketwo never asserted weight SPI CS");
+                $display("FAIL: weight_flash_axi never asserted weight SPI CS during boot");
                 failures = failures + 1;
             end
-            // main SPI bit check: spi_boot_load() reads 208 words (header+data = MIN_SPI_BITS)
-            // via spi_master_mmio (spi_clk/spi_cs_n), NOT weight_spi — tracked separately
-            if (main_spi_bit_count < MIN_SPI_BITS) begin
-                $display("FAIL: too few main SPI bit clocks from spi_boot_load: %0d", main_spi_bit_count);
+            if (spi_bit_count < MIN_SPI_BITS) begin
+                $display("FAIL: too few weight SPI bit clocks during boot: %0d (expected >= %0d)",
+                         spi_bit_count, MIN_SPI_BITS);
                 failures = failures + 1;
             end
             if (!saw_global_base_write) begin

@@ -278,7 +278,7 @@ module top #(
     //reg cpu_clk_en;
     reg cpu_clk_en_lat;
     wire cpu_clk;
-    wire watchdog_w
+    wire watchdog_w;
 
     wire        mem_valid;
     wire        mem_instr;
@@ -985,6 +985,7 @@ module top #(
         .mem_wstrb(mem_wstrb),
         .mem_ready(weight_ready),
         .mem_rdata(weight_rdata),
+        .weight_boot_done(weight_boot_done_o),
         .spi_cs_n (weight_spi_cs_n_o),
         .spi_clk  (weight_spi_clk_o),
         .spi_mosi (weight_spi_mosi_o),
@@ -1233,7 +1234,7 @@ module top #(
         .mem_valid_i(mem_valid),     // CPU memory-access valid (for idle detection)
         .irqc_wake_req_i(irqc_wake_req), // interrupt controller forces wake
 
-        .watchdog_o(watchdog_w)
+        .watchdog_o(watchdog_w),
         .feat_en_o(feat_en),
         .ml_en_o(ml_en),
         .cpu_en_o(cpu_clk_en),
@@ -1256,6 +1257,6 @@ module top #(
 
     assign epoch_end_o = epoch_end_w;
     assign alarm_o = 1'b0;
-    assign weight_boot_done_o = 1'b1;
+    // weight_boot_done_o driven directly from weight_flash_axi port above
 
 endmodule
