@@ -10,7 +10,8 @@ real debug-bus and test-mode logic used by `chip_top`.
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, Timer
+from cocotb.handle import Force
+from cocotb.triggers import ClockCycles, RisingEdge, Timer
 
 
 DEBUG_BUS_LO = 7
@@ -18,6 +19,23 @@ DEBUG_BUS_HI = 22
 DEBUG_BUS_MASK = (1 << (DEBUG_BUS_HI - DEBUG_BUS_LO + 1)) - 1
 FORCE_IRQ_PAD = 37
 FORCE_WAKE_PAD = 38
+TIMER_CTRL_ADDR = 0x0300_2000
+
+# Tiny RV32I program used to provoke one real Pico MMIO store in the cheap
+# chip_core harness:
+#   lui  x1, 0x03002      ; x1 = 0x0300_2000 (timer MMIO base)
+#   addi x2, x0, 3        ; x2 = 0x0000_0003
+#   sw   x2, 0(x1)        ; write TIMER_CTRL = 3
+#   jal  x0, 0            ; spin forever
+#
+# This lets mode 01000 observe an actual CPU-issued write even though the bare
+# chip_core DFT harness does not have a boot-flash model attached.
+PICO_TIMER_WRITE_PROGRAM = (
+    0x030020B7,
+    0x00300113,
+    0x0020A023,
+    0x0000006F,
+)
 
 
 def _set_defaults(dut) -> None:
@@ -48,6 +66,30 @@ async def _start_up(dut) -> None:
     _set_defaults(dut)
     cocotb.start_soon(Clock(dut.clk, 20, unit="ns").start())
     dut.rst_n.value = 0
+    await Timer(200, unit="ns")
+    dut.rst_n.value = 1
+    await ClockCycles(dut.clk, 5)
+
+
+def _preload_sram_words(dut, words) -> None:
+    """Write a small program directly into top.sram before releasing reset."""
+    for index, word in enumerate(words):
+        dut.u_top.sram.mem[index].value = word & 0xFFFF_FFFF
+
+
+async def _start_up_with_preloaded_program(dut, words) -> None:
+    """Bring up chip_core with a tiny SRAM-resident Pico program.
+
+    The bare chip_core harness ties the boot-flash input high internally, so
+    there is no real firmware source. For CPU-summary DFT modes we can still
+    exercise genuine Pico bus activity by preloading SRAM and forcing boot_done
+    high before reset release.
+    """
+    _set_defaults(dut)
+    cocotb.start_soon(Clock(dut.clk, 20, unit="ns").start())
+    dut.rst_n.value = 0
+    _preload_sram_words(dut, words)
+    dut.u_top.boot_done.value = Force(1)
     await Timer(200, unit="ns")
     dut.rst_n.value = 1
     await ClockCycles(dut.clk, 5)
@@ -86,6 +128,70 @@ def _debug_bit(dut, bit_index: int) -> int:
 def _u16(value: int) -> int:
     """Normalize Python ints to the unsigned 16-bit bus representation."""
     return value & 0xFFFF
+
+
+def _debug_bus_str(dut) -> str:
+    """Return the debug bus as a 16-bit MSB->LSB string, preserving X/Z."""
+    return str(dut.bidir_out.value[DEBUG_BUS_HI:DEBUG_BUS_LO]).upper()
+
+
+def _bit_str(signal) -> str:
+    """Return a single-bit cocotb value as `0/1/X/Z`."""
+    return str(signal.value).upper()
+
+
+def _bits_str(signal) -> str:
+    """Return a vector cocotb value as an MSB->LSB `0/1/X/Z` string."""
+    return str(signal.value).upper()
+
+
+def _pack_pico_state_summary_str(dut) -> str:
+    """Mirror chip_core mode 00111 exactly as a 16-bit bitstring.
+
+    Layout:
+      [15] trap
+      [14] cpu_clk_en
+      [13] mem_valid
+      [12] mem_instr
+      [11] mem_ready
+      [10:7] mem_wstrb
+      [6:0] mem_addr[6:0]
+    """
+    return (
+        _bit_str(dut.u_top.pico_trap_o)
+        + _bit_str(dut.u_top.pico_cpu_clk_en_o)
+        + _bit_str(dut.u_top.pico_mem_valid_o)
+        + _bit_str(dut.u_top.pico_mem_instr_o)
+        + _bit_str(dut.u_top.pico_mem_ready_o)
+        + _bits_str(dut.u_top.pico_mem_wstrb_o)
+        + str(dut.u_top.pico_mem_addr_o.value[6:0]).upper()
+    )
+
+
+def _pack_pico_mmio_write_summary_str(dut) -> str:
+    """Mirror chip_core mode 01000 exactly as a 16-bit bitstring.
+
+    Layout:
+      [15] mem_valid && any byte strobe
+      [14] trap
+      [13] any byte strobe
+      [12] full-word write
+      [11:4] mem_addr[7:0]
+      [3:0] mem_wdata[3:0]
+    """
+    mem_valid = _bit_str(dut.u_top.pico_mem_valid_o)
+    wstrb = _bits_str(dut.u_top.pico_mem_wstrb_o)
+    any_wstrb = "1" if "1" in wstrb else ("0" if "x" not in wstrb.lower() and "z" not in wstrb.lower() else "X")
+    full_wstrb = "1" if wstrb == "1111" else ("0" if "x" not in wstrb.lower() and "z" not in wstrb.lower() else "X")
+    write_qual = "1" if (mem_valid == "1" and any_wstrb == "1") else ("0" if mem_valid == "0" or any_wstrb == "0" else "X")
+    return (
+        write_qual
+        + _bit_str(dut.u_top.pico_trap_o)
+        + any_wstrb
+        + full_wstrb
+        + str(dut.u_top.pico_mem_addr_o.value[7:0]).upper()
+        + str(dut.u_top.pico_mem_wdata_o.value[3:0]).upper()
+    )
 
 
 def _assert_mode_enables(dut, *, feat_en: int, ml_en: int, cpu_en: int, sleeping: int) -> None:
@@ -224,6 +330,65 @@ async def test_mode_01010_force_irq_reflects_pad(dut):
     _drive_bidir_input(dut, FORCE_IRQ_PAD, 0)
     await ClockCycles(dut.clk, 2)
     assert _debug_bit(dut, 15) == 0, "expected force IRQ summary bit to clear after releasing bidir_in[37]"
+
+
+@cocotb.test()
+async def test_mode_00111_pico_state_summary_matches_internal_signals(dut):
+    """Pico state summary mode should mirror the packed CPU-state view."""
+    await _start_up(dut)
+    _set_test_mode(dut, 0b00111)
+    await ClockCycles(dut.clk, 4)
+
+    assert _debug_oe(dut) == 0xFFFF, f"expected debug OE enabled, got 0x{_debug_oe(dut):04x}"
+    _assert_mode_enables(dut, feat_en=0, ml_en=0, cpu_en=1, sleeping=0)
+
+    for _ in range(32):
+        await RisingEdge(dut.clk)
+        expected = _pack_pico_state_summary_str(dut)
+        got = _debug_bus_str(dut)
+        assert got == expected, (
+            f"pico state summary mismatch: expected {expected}, got {got}"
+        )
+
+
+@cocotb.test()
+async def test_mode_01000_pico_mmio_write_summary_matches_internal_signals(dut):
+    """Pico MMIO write-summary mode should show a real Pico MMIO store.
+
+    This test still checks the exact debug-bus packing every cycle, but it also
+    injects a tiny SRAM-resident Pico program so we can observe at least one
+    genuine CPU write in the otherwise minimal chip_core harness.
+    """
+    await _start_up_with_preloaded_program(dut, PICO_TIMER_WRITE_PROGRAM)
+    _set_test_mode(dut, 0b01000)
+    await ClockCycles(dut.clk, 4)
+
+    assert _debug_oe(dut) == 0xFFFF, f"expected debug OE enabled, got 0x{_debug_oe(dut):04x}"
+    _assert_mode_enables(dut, feat_en=0, ml_en=0, cpu_en=1, sleeping=0)
+
+    saw_write_qualifier = False
+    for _ in range(200):
+        await RisingEdge(dut.clk)
+        expected = _pack_pico_mmio_write_summary_str(dut)
+        got = _debug_bus_str(dut)
+        assert got == expected, (
+            f"pico MMIO write summary mismatch: expected {expected}, got {got}"
+        )
+        if expected[0] == "1":
+            saw_write_qualifier = True
+            assert int(dut.u_top.pico_mem_addr_o.value) == TIMER_CTRL_ADDR, (
+                f"expected Pico MMIO write to TIMER_CTRL 0x{TIMER_CTRL_ADDR:08x}, "
+                f"got 0x{int(dut.u_top.pico_mem_addr_o.value):08x}"
+            )
+            assert int(dut.u_top.pico_mem_wstrb_o.value) == 0xF, (
+                f"expected full-word Pico store, got wstrb=0x{int(dut.u_top.pico_mem_wstrb_o.value):x}"
+            )
+            assert int(dut.u_top.pico_mem_wdata_o.value) == 0x3, (
+                f"expected TIMER_CTRL write data 0x00000003, got 0x{int(dut.u_top.pico_mem_wdata_o.value):08x}"
+            )
+            break
+
+    assert saw_write_qualifier, "expected at least one real Pico MMIO write in mode 01000"
 
 
 @cocotb.test()
