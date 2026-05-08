@@ -479,6 +479,7 @@ TOP_FEATURE_ML_CPU_SOURCES := \
 	$(RTL_DIR)/ml_axil_bridge_mmio.v \
 	$(RTL_DIR)/weight_flash_axi.v \
 	$(RTL_DIR)/irq_ctrl_mmio.v \
+	$(RTL_DIR)/alarm_mmio.v \
 	$(RTL_DIR)/taketwo_wrap.v \
 	$(RTL_DIR)/taketwo.v \
 	$(RTL_DIR)/pwrctrl_mmio.v \
@@ -524,6 +525,7 @@ TOP_FEATURE_ML_CPU_SPI_FLASH_SOURCES := \
 	$(RTL_DIR)/ml_axil_bridge_mmio.v \
 	$(RTL_DIR)/weight_flash_axi.v \
 	$(RTL_DIR)/irq_ctrl_mmio.v \
+	$(RTL_DIR)/alarm_mmio.v \
 	$(RTL_DIR)/taketwo_wrap.v \
 	$(RTL_DIR)/taketwo.v \
 	$(RTL_DIR)/pwrctrl_mmio.v \
@@ -574,6 +576,7 @@ TOP_SPI_INIT_UNIFIED_SOURCES := \
 	$(RTL_DIR)/ml_axil_bridge_mmio.v \
 	$(RTL_DIR)/weight_flash_axi.v \
 	$(RTL_DIR)/irq_ctrl_mmio.v \
+	$(RTL_DIR)/alarm_mmio.v \
 	$(RTL_DIR)/taketwo_wrap.v \
 	$(RTL_DIR)/taketwo.v \
 	$(RTL_DIR)/pwrctrl_mmio.v \
@@ -698,6 +701,7 @@ TOP_ML_CONTROL_UNIFIED_SOURCES := \
 	$(RTL_DIR)/ml_axil_bridge_mmio.v \
 	$(RTL_DIR)/weight_flash_axi.v \
 	$(RTL_DIR)/irq_ctrl_mmio.v \
+	$(RTL_DIR)/alarm_mmio.v \
 	$(RTL_DIR)/taketwo_wrap.v \
 	$(RTL_DIR)/taketwo.v \
 	$(RTL_DIR)/pwrctrl_mmio.v \
@@ -743,6 +747,7 @@ TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES := \
 	$(RTL_DIR)/ml_axil_bridge_mmio.v \
 	$(RTL_DIR)/weight_flash_axi.v \
 	$(RTL_DIR)/irq_ctrl_mmio.v \
+	$(RTL_DIR)/alarm_mmio.v \
 	$(RTL_DIR)/taketwo_wrap.v \
 	$(RTL_DIR)/taketwo.v \
 	$(RTL_DIR)/pwrctrl_mmio.v \
@@ -792,6 +797,7 @@ TOP_SLEEP_WAKE_UNIFIED_SOURCES := \
 	$(RTL_DIR)/ml_axil_bridge_mmio.v \
 	$(RTL_DIR)/weight_flash_axi.v \
 	$(RTL_DIR)/irq_ctrl_mmio.v \
+	$(RTL_DIR)/alarm_mmio.v \
 	$(RTL_DIR)/taketwo_wrap.v \
 	$(RTL_DIR)/taketwo.v \
 	$(RTL_DIR)/pwrctrl_mmio.v \

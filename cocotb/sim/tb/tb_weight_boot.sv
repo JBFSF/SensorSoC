@@ -2,16 +2,15 @@
 //
 // tb_weight_boot.sv
 //
-// Verifies the weight_flash_axi path: taketwo reads ML weights directly
-// from the dedicated SPI flash at inference time (no boot-time SRAM load).
-//
-// weight_boot_done_o is permanently 1'b1 — no boot stage needed.
+// Verifies the weight_flash_axi path: a one-time SPI boot loads ML weights into
+// SRAM macros, then taketwo reads those cached weights over AXI during inference.
 //
 // Checks:
-//   1. taketwo issued at least one AXI read within the WEIGHT_BASE range.
-//   2. taketwo issued >= MIN_AXI_BEATS AXI read beats (one full inference pass).
-//   3. weight SPI CS was asserted (flash was accessed during inference).
-//   4. >= MIN_SPI_BITS SPI clock edges seen (at least all weight data bits).
+//   1. weight_boot_done asserts after reset (boot-load completed).
+//   2. taketwo issued at least one AXI read within the WEIGHT_BASE range.
+//   3. taketwo issued >= MIN_AXI_BEATS AXI read beats (one full inference pass).
+//   4. weight SPI CS was asserted and enough SPI clock edges were seen to prove
+//      the off-chip flash was actually consumed during the boot-load.
 //
 // Run via: make sim-weight-boot
 //
@@ -243,20 +242,27 @@ initial begin
     failures = 0;
 
     $display("[TB] tb_weight_boot start");
-    $display("     weight_boot_done_o is tied 1 — flash bridge active at inference time");
+    $display("     waiting for SPI boot-load into cached weight SRAM");
 
     repeat (10) @(posedge clk);
     reset = 1'b0;
     $display("[%0t] Reset released", $time);
 
-    // weight_boot_done is permanently 1'b1 — skip straight to Stage 2.
-    repeat (20) @(posedge clk);
-    cycles = 20;
+    tw = 0;
+    while (!weight_boot_done && tw < S2_TIMEOUT) begin
+        @(posedge clk);
+        cycles = cycles + 1;
+        tw     = tw + 1;
+    end
 
     if (!weight_boot_done) begin
-        $display("FAIL: weight_boot_done not asserted after reset (should be tied 1)");
+        $display("FAIL: weight_boot_done never asserted after reset");
         $fatal(1);
     end
+
+    $display("[cyc %0d] weight_boot_done asserted", cycles);
+    repeat (5) @(posedge clk);
+    cycles = cycles + 5;
 
     // Stage 2: trigger taketwo to run one inference pass via weight_flash_axi.
     $display("[cyc %0d] Stage 2 start — enabling ML domain", cycles);
@@ -299,7 +305,7 @@ initial begin
         failures = failures + 1;
     end
 
-    // --- Check 3: SPI CS was asserted (flash was accessed during inference) ---
+    // --- Check 3: SPI CS was asserted (flash was accessed during boot-load) ---
     if (spi_cs_asserts == 0) begin
         $display("FAIL: weight SPI CS never asserted during inference");
         failures = failures + 1;
@@ -314,10 +320,10 @@ initial begin
 
     if (failures == 0) begin
         $display("PASS: tb_weight_boot — all 4 checks passed");
+        $display("  Boot:    weight_boot_done=%0d  cs_asserts=%0d  spi_bits=%0d",
+                 weight_boot_done, spi_cs_asserts, spi_bit_count);
         $display("  Stage 2: wram_araddr_ok=%0d  wram_read_beats=%0d",
                  wram_araddr_ok, wram_read_beats);
-        $display("  SPI:     cs_asserts=%0d  spi_bits=%0d",
-                 spi_cs_asserts, spi_bit_count);
         $finish;
     end else begin
         $display("FAIL: tb_weight_boot — %0d check(s) failed", failures);

@@ -68,7 +68,7 @@ async def test_unified_top_reset_and_init_state(dut):
     assert _u(dut.irq_pending) == 0, "IRQC pending came up stale after reset release"
     assert _u(dut.pwr_wake_status) == 0, "wake status came up stale after reset release"
     assert _u(dut.pwr_wake_reason) == 0, "wake reason came up stale after reset release"
-    assert _u(dut.pico_sleeping) == 1, "CPU should default to sleep after reset release"
+    assert _u(dut.pico_sleeping) == 0, "CPU should remain in BOOT/IDLE, not sleep, immediately after reset release"
     assert _u(dut.pico_trap) == 0, "CPU trap should not assert immediately after reset release"
 
     # With the hardware SPI boot path, the CPU stays reset until boot_done.
@@ -88,7 +88,13 @@ async def test_unified_top_reset_and_init_state(dut):
 
     assert _u(dut.boot_done) == 1, "hardware boot controller never asserted boot_done"
     assert _u(dut.weight_boot_done) == 1, "hardware weight boot controller never asserted weight_boot_done"
-    assert _u(dut.pico_sleeping) == 1, "CPU should remain asleep after boot until a wake source arrives"
+
+    # `boot_done` arrives before the FSM completes the BOOT->IDLE->SLEEP
+    # transition, so give that handoff a few cycles to settle before checking
+    # the reset-time sleep posture that the runtime tests rely on.
+    await ClockCycles(dut.clk, 8)
+    await ReadOnly()
+    assert _u(dut.pico_sleeping) == 1, "CPU should settle into sleep after boot until a wake source arrives"
 
     await pulse_forced_wake(dut)
 

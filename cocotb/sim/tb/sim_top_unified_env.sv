@@ -105,6 +105,10 @@ module sim_top_unified_env;
   wire        boot_spi_mosi;
   wire        boot_spi_miso;
   wire        boot_spi_cs_n;
+  wire        weight_spi_clk;
+  wire        weight_spi_mosi;
+  wire        weight_spi_miso;
+  wire        weight_spi_cs_n;
   wire        host_i2c_scl;
   tri1        host_i2c_sda;
 
@@ -121,6 +125,8 @@ module sim_top_unified_env;
   wire [2:0]                irq_eoi;
   wire                      boot_done;
   wire                      weight_boot_done;
+  wire signed [15:0]        logit0;
+  wire signed [15:0]        logit1;
   wire                      pico_trap;
   wire                      pico_cpu_clk_en;
   wire                      pico_mem_valid;
@@ -241,8 +247,15 @@ module sim_top_unified_env;
     .boot_spi_mosi_o(boot_spi_mosi),
     .boot_spi_miso_i(boot_spi_miso),
     .boot_spi_cs_n_o(boot_spi_cs_n),
+    .weight_spi_clk_o(weight_spi_clk),
+    .weight_spi_mosi_o(weight_spi_mosi),
+    .weight_spi_miso_i(weight_spi_miso),
+    .weight_spi_cs_n_o(weight_spi_cs_n),
     .epoch_end_o(epoch_end),
+    .start_i(1'b1),
     .alarm_o(alarm),
+    .logit0(logit0),
+    .logit1(logit1),
     .test_mode_i(4'b0000),
     .test_force_irq_i(test_force_irq),
     .test_force_wake_i(test_force_wake),
@@ -303,6 +316,19 @@ module sim_top_unified_env;
 
   // Simulated SPI flash used by firmware boot/load flows. The parameter image
   // is the same generated taketwo payload used by the other unified-top tests.
+  spi_flash_model #(
+    .FLASH_WORDS(208),
+    .FLASH_INIT_HEX("firmware/build/generated/taketwo_params.hex")
+  ) u_weight_flash (
+    .spi_clk(weight_spi_clk),
+    .spi_cs_n(weight_spi_cs_n),
+    .spi_mosi(weight_spi_mosi),
+    .spi_miso(weight_spi_miso)
+  );
+
+  // The legacy CPU-visible SPI master still has its own flash model in the
+  // unified wrapper so firmware paths that touch the normal SPI MMIO block
+  // continue to see a stable device.
   spi_flash_model #(
     .FLASH_WORDS(208),
     .FLASH_INIT_HEX("firmware/build/generated/taketwo_params.hex")

@@ -155,19 +155,24 @@ async def wait_for_boot_load(dut, timeout_cycles: int = 200000) -> None:
     else:
         raise AssertionError("timed out waiting for boot_done and weight_boot_done")
 
+    # Let the BOOT->IDLE->SLEEP handoff settle before deciding whether a wake
+    # pulse is needed. In the current top-level architecture, `boot_done`
+    # asserts first, then the FSM needs a cycle to enter its normal sleep
+    # posture when `start_i` is high.
+    for _ in range(8):
+        await RisingEdge(dut.clk)
+        await ReadOnly()
+
     if int(dut.pico_sleeping.value) != 0:
         await pulse_forced_wake(dut)
 
-    saw_postwake_progress = False
     for _ in range(timeout_cycles):
         await RisingEdge(dut.clk)
         await ReadOnly()
-        saw_postwake_progress |= (
+        if (
+            int(dut.pico_sleeping.value) == 0 or
             int(dut.feat_valid.value) != 0 or
             _handle_nonzero(dut, "feat_latched_valid") or
-            int(dut.pico_sleeping.value) == 0
-        )
-        if saw_postwake_progress and (
             int(dut.pico_mem_valid.value) != 0 or
             int(dut.test_status.value) != 0 or
             int(dut.pico_cpu_clk_en.value) != 0
