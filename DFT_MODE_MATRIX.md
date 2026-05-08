@@ -65,12 +65,89 @@ Currently covered modes:
 
 - `00000`
   - checks that the debug bus is disabled / zero in normal mode
-  - checks that the system settles into the expected idle/sleep posture in this
+  - checks that the system settles into the expected idle/no-forcing posture in this
     no-stimulus environment:
     - `feat_en = 0`
+    - `cpu_en = 0`
+- `00001`
+  - checks that the debug bus is enabled
+  - uses the explicit debug-stim override path to drive a known MSSD value
+  - checks that `bidir[22:7]` exactly matches the injected `mssd_feat[15:0]`
+  - checks the expected `FEAT_ONLY` posture:
+    - `feat_en = 1`
     - `ml_en = 0`
     - `cpu_en = 0`
-    - `sleeping = 1`
+    - `sleeping = 0`
+- `00010`
+  - checks that the debug bus is enabled
+  - uses the explicit debug-stim override path to drive a known delta-HR value
+  - checks that `bidir[22:7]` exactly matches the injected `delta_hr_feat[15:0]`
+  - checks the expected `FEAT_ONLY` posture:
+    - `feat_en = 1`
+    - `ml_en = 0`
+    - `cpu_en = 0`
+    - `sleeping = 0`
+- `00011`
+  - checks that the debug bus is enabled
+  - uses the explicit debug-stim override path to drive a known time-feature value
+  - checks that `bidir[22:7]` exactly matches the injected `time_feat[15:0]`
+  - checks the expected `FEAT_ONLY` posture:
+    - `feat_en = 1`
+    - `ml_en = 0`
+    - `cpu_en = 0`
+    - `sleeping = 0`
+- `00100`
+  - checks that the debug bus is enabled
+  - uses the explicit debug-stim override path to drive a known motion-feature value
+  - checks that `bidir[22:7]` exactly matches the injected `motion_feat[15:0]`
+  - checks the expected `FEAT_ONLY` posture:
+    - `feat_en = 1`
+    - `ml_en = 0`
+    - `cpu_en = 0`
+    - `sleeping = 0`
+- `00111`
+  - checks that the debug bus is enabled
+  - checks that the 16-bit Pico state summary matches the live internal packed view
+    of:
+    - `pico_trap`
+    - `pico_cpu_clk_en`
+    - `pico_mem_valid`
+    - `pico_mem_instr`
+    - `pico_mem_ready`
+    - `pico_mem_wstrb`
+    - `pico_mem_addr[6:0]`
+  - checks the expected `CPU_ONLY` posture:
+    - `feat_en = 0`
+    - `ml_en = 0`
+    - `cpu_en = 1`
+    - `sleeping = 0`
+  - also has a stronger firmware-stimulated smoke test:
+    - preloads a tiny Pico program directly into SRAM
+    - forces `boot_done` high in the cheap `chip_core` harness
+    - checks that the summary bus stays bit-exact while the CPU performs:
+      - instruction fetches
+      - an SRAM load
+      - an SRAM store
+      - an MMIO store
+    - checks that no unexpected Pico trap occurs during that execution window
+- `01000`
+  - checks that the debug bus is enabled
+  - checks that the 16-bit Pico MMIO write summary matches the live internal packed view
+    of:
+    - `mem_valid && any_wstrb`
+    - `pico_trap`
+    - `any_wstrb`
+    - `full_word_write`
+    - `pico_mem_addr[7:0]`
+    - `pico_mem_wdata[3:0]`
+  - preloads a tiny Pico program into SRAM so the CPU performs a real MMIO store
+    to `TIMER_CTRL`
+  - checks that at least one real write-qualified cycle is observed
+  - checks the expected `CPU_ONLY` posture:
+    - `feat_en = 0`
+    - `ml_en = 0`
+    - `cpu_en = 1`
+    - `sleeping = 0`
 - `01010`
   - checks that the debug bus is enabled
   - checks that bit 15 reflects the forced IRQ input on `bidir[37]`
@@ -96,6 +173,12 @@ Current coverage note:
   on the external GF180 pad-model setup
 - this still validates the real test-mode and debug-bus logic that `chip_top`
   uses
+- the current smoke suite contains 10 passing tests total:
+  - the covered modes above
+  - plus a second, stronger execution-visibility test for `00111`
+- the new `01000` smoke check uses a tiny SRAM-preloaded Pico program to
+  create one real CPU MMIO store inside the otherwise minimal `chip_core`
+  harness
 
 ## Best First Tests
 

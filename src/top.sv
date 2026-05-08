@@ -8,6 +8,7 @@ module top #(
     parameter         FIRMWARE_HEX = "",
     parameter         WEIGHT_INIT_HEX = "",
 
+    parameter ALARM_BASE   = 32'h0300_0000,
     parameter PWR_BASE     = 32'h0300_1000,
     parameter TIMER_BASE   = 32'h0300_2000,
     parameter ML_BASE      = 32'h0300_3000,
@@ -306,6 +307,7 @@ module top #(
     wire irqc_sel;
     wire spi_sel;
     wire test_sel;
+    wire alarm_sel;
     wire [31:0] weight_off_sel;
 
     wire        sram_ready;
@@ -325,6 +327,10 @@ module top #(
     wire        pwr_ready;
     wire [31:0] pwr_rdata;
     wire        sleep_req;
+
+    wire        alarm_ready;
+    wire [31:0] alarm_rdata;
+    
 
     wire        feat_mmio_ready;
     logic [31:0] feat_mmio_rdata;
@@ -527,6 +533,7 @@ module top #(
     assign irqc_sel   = mmio_sel && (mem_addr[31:12] == IRQC_BASE[31:12]);
     assign spi_sel    = mmio_sel && (mem_addr[31:12] == SPI_BASE[31:12]);
     assign test_sel   = mmio_sel && (mem_addr[31:12] == TEST_BASE[31:12]);
+    assign alarm_sel  = mmio_sel && (mem_addr[31:12] == ALARM_BASE[31:12]); 
 
     // Temporary CPU memory backing store for simulation. This is the block
     // planned to be replaced by macro-backed SRAM plus a flash boot path later.
@@ -1197,7 +1204,8 @@ module top #(
         (irqc_sel && irqc_ready) |
         (spi_sel && spi_ready) |
         (test_sel && test_ready) |
-        feat_mmio_ready;
+        feat_mmio_ready |
+        (alarm_sel && alarm_ready);
     wire [31:0] mmio_rdata =
         (pwr_sel && pwr_ready)        ? pwr_rdata      :
         (timer_sel && timer_ready)    ? timer_rdata    :
@@ -1207,6 +1215,7 @@ module top #(
         (spi_sel && spi_ready)        ? spi_rdata      :
         (test_sel && test_ready)      ? test_rdata     :
         feat_mmio_ready? feat_mmio_rdata:
+        (alarm_sel && alarm_ready)    ?  alarm_rdata   :
         32'h0000_0000;
 
     assign mem_ready = sram_ready | mmio_ready | invalid_sel;
@@ -1240,6 +1249,21 @@ module top #(
         .cpu_en_o(cpu_clk_en),
         .sleeping_o(sleeping_r)
     );
+
+    alarm_mmio #(.BASE_ADDR(ALARM_BASE)) u_alarm_mmio (
+        .clk(clk_i),
+        .resetn(~reset_i),
+
+        .mem_valid(mmio_sel),
+        .mem_addr(mem_addr),
+        .mem_wdata(mem_wdata),
+        .mem_wstrb(mem_wstrb),
+
+        .mem_ready(alarm_ready),
+        .mem_rdata(alarm_rdata),
+
+        .alarm_o(alarm_o)
+    );
     
     assign pico_trap_o       = trap;
     assign pico_cpu_clk_en_o = cpu_clk_en_lat;
@@ -1256,7 +1280,7 @@ module top #(
     assign timer_event_o     = timer_event;
 
     assign epoch_end_o = epoch_end_w;
-    assign alarm_o = 1'b0;
-    // weight_boot_done_o driven directly from weight_flash_axi port above
+    //assign alarm_o = 1'b0;
+    assign weight_boot_done_o = 1'b1;
 
 endmodule
