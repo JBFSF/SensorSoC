@@ -992,6 +992,7 @@ module top #(
         .mem_wstrb(mem_wstrb),
         .mem_ready(weight_ready),
         .mem_rdata(weight_rdata),
+        .weight_boot_done(weight_boot_done_o),
         .spi_cs_n (weight_spi_cs_n_o),
         .spi_clk  (weight_spi_clk_o),
         .spi_mosi (weight_spi_mosi_o),
@@ -1280,6 +1281,6 @@ module top #(
 
     assign epoch_end_o = epoch_end_w;
     //assign alarm_o = 1'b0;
-    assign weight_boot_done_o = 1'b1;
+    // assign weight_boot_done_o = 1'b1;
 
 endmodule
