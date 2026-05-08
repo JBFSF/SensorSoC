@@ -2,6 +2,7 @@ from pathlib import Path
 
 import cocotb
 from cocotb.clock import Clock
+from cocotb.types import LogicArray
 from cocotb.triggers import ClockCycles, ReadOnly, RisingEdge, Timer
 
 from ref_pipeline.pipeline_ref import PipelineReference, PipelineStepInputs, TopPipelineConfig
@@ -19,6 +20,63 @@ MODE_TO_NAME = {
     0x3: "time",
     0x4: "motion",
 }
+
+
+DEBUG_BUS_LO = 7
+DEBUG_BUS_HI = 22
+FORCE_IRQ_PAD = 37
+FORCE_WAKE_PAD = 38
+
+
+def _bidir_drive(width: int, driven_bits: dict[int, int] | None = None) -> LogicArray:
+    bits = ["Z"] * width
+    for index, value in (driven_bits or {}).items():
+        bits[width - 1 - index] = "1" if value else "0"
+    return LogicArray("".join(bits))
+
+
+async def chip_top_startup(dut) -> None:
+    dut.VDD.value = 1
+    dut.VSS.value = 0
+    dut.input_PAD.value = 0
+    dut.bidir_PAD.value = _bidir_drive(len(dut.bidir_PAD))
+    cocotb.start_soon(Clock(dut.clk_PAD, 10, unit="ns").start())
+    dut.rst_n_PAD.value = 0
+    await ClockCycles(dut.clk_PAD, 5)
+    dut.rst_n_PAD.value = 1
+    await ClockCycles(dut.clk_PAD, 2)
+
+
+async def read_chip_top_debug_bus(dut) -> str:
+    await Timer(50, unit="ns")
+    value = dut.bidir_PAD.value[DEBUG_BUS_HI:DEBUG_BUS_LO]
+    dut._log.info("chip_top debug pad slice [%d:%d]=%s", DEBUG_BUS_HI, DEBUG_BUS_LO, value)
+    return str(value)
+
+
+@cocotb.test()
+async def test_chip_top_debug_modes_force_inputs_reach_debug_bus(dut):
+    """Gate-level chip_top pad test for debug modes 01010 and 01011."""
+
+    await chip_top_startup(dut)
+
+    dut.input_PAD.value = 0x0A
+    dut.bidir_PAD.value = _bidir_drive(len(dut.bidir_PAD), {FORCE_IRQ_PAD: 0})
+    got = await read_chip_top_debug_bus(dut)
+    assert got[0] == "0", f"force-IRQ mode should see bidir[37]=0, got {got}"
+
+    dut.bidir_PAD.value = _bidir_drive(len(dut.bidir_PAD), {FORCE_IRQ_PAD: 1})
+    got = await read_chip_top_debug_bus(dut)
+    assert got[0] == "1", f"force-IRQ mode should see bidir[37]=1, got {got}"
+
+    dut.input_PAD.value = 0x0B
+    dut.bidir_PAD.value = _bidir_drive(len(dut.bidir_PAD), {FORCE_WAKE_PAD: 0})
+    got = await read_chip_top_debug_bus(dut)
+    assert got[0] == "0", f"force-wake mode should see bidir[38]=0, got {got}"
+
+    dut.bidir_PAD.value = _bidir_drive(len(dut.bidir_PAD), {FORCE_WAKE_PAD: 1})
+    got = await read_chip_top_debug_bus(dut)
+    assert got[0] == "1", f"force-wake mode should see bidir[38]=1, got {got}"
 
 
 async def reset_dut(dut) -> None:
@@ -223,6 +281,7 @@ async def test_chip_core_debug_modes_match_real_pipeline_features(dut):
 
     await reset_dut(dut)
     dut.stim_override_en.value = 0
+    dut.mode_sel.value = 0x1
 
     for _ in range(20):
         await RisingEdge(dut.clk)

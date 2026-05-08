@@ -27,6 +27,7 @@ module motion_process_tb;
   motion_process dut (
     .clk(clk),
     .rst_i(rst_i),
+    .en_i(1'b1),
 
     .sample_valid_i(sample_valid),
     .ax_i(ax),

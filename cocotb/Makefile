@@ -1144,7 +1144,7 @@ sim-accel-reader: $(ACCEL_READER_VVP)
 
 MSSD_ENGINE_TOP     := mssd_engine_tb
 MSSD_ENGINE_VVP     := $(BUILD_DIR)/$(MSSD_ENGINE_TOP).vvp
-MSSD_ENGINE_SOURCES := sim/tb/mssd_engine_tb.sv $(RTL_DIR)/mssd_engine.sv $(RTL_DIR)/ewma_baseline.sv
+MSSD_ENGINE_SOURCES := sim/tb/mssd_engine_tb.sv $(RTL_DIR)/mssd_engine.sv
 MSSD_ENGINE_VCD     := $(WAVE_DIR)/mssd_engine_tb.vcd
 
 $(MSSD_ENGINE_VVP): $(MSSD_ENGINE_SOURCES)

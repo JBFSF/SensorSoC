@@ -18,6 +18,7 @@ module sim_mssd_engine_ref;
   ) dut (
     .clk_i(clk),
     .rst_i(rst_i),
+    .en_i(1'b1),
     .rr_interval_i(rr_interval),
     .rr_valid_i(rr_valid),
     .rr_accepted_i(rr_accepted),

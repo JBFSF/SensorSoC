@@ -32,6 +32,13 @@ module sim_top_sensor_pipeline;
   wire        spi_clk;
   wire        spi_mosi;
   wire        spi_cs_n;
+  wire        boot_spi_clk;
+  wire        boot_spi_mosi;
+  wire        boot_spi_cs_n;
+  wire        weight_spi_clk;
+  wire        weight_spi_mosi;
+  wire        weight_spi_cs_n;
+  wire        weight_boot_done;
   wire        host_i2c_scl;
   tri1        host_i2c_sda;
 
@@ -128,10 +135,15 @@ module sim_top_sensor_pipeline;
     .spi_mosi_o(spi_mosi),
     .spi_miso_i(1'b1),
     .spi_cs_n_o(spi_cs_n),
-    .boot_spi_clk_o(),
-    .boot_spi_mosi_o(),
+    .boot_spi_clk_o(boot_spi_clk),
+    .boot_spi_mosi_o(boot_spi_mosi),
     .boot_spi_miso_i(1'b1),
-    .boot_spi_cs_n_o(),
+    .boot_spi_cs_n_o(boot_spi_cs_n),
+    .weight_spi_clk_o(weight_spi_clk),
+    .weight_spi_mosi_o(weight_spi_mosi),
+    .weight_spi_miso_i(1'b1),
+    .weight_spi_cs_n_o(weight_spi_cs_n),
+    .weight_boot_done_o(weight_boot_done),
     .feat_valid_o(feat_valid_o),
     .time_feat_o(time_feat_o),
     .motion_feat_o(motion_feat_o),
@@ -140,7 +152,11 @@ module sim_top_sensor_pipeline;
     .ml_update_gate_o(ml_update_gate_o),
     .invalid_reason_o(invalid_reason_o),
     .epoch_end_o(epoch_end_o),
+    .start_i(1'b0),
     .alarm_o(alarm),
+    .logit0(),
+    .logit1(),
+    .test_mode_i(4'b0001),
     .test_force_irq_i(1'b0),
     .test_force_wake_i(1'b0),
     .test_irq_src_i(3'b000),

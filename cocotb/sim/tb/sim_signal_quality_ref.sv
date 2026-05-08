@@ -26,6 +26,7 @@ module sim_signal_quality_ref;
   signal_quality dut (
     .clk_i(clk),
     .rst_i(rst_i),
+    .en_i(1'b1),
     .epoch_end_i(epoch_end),
     .beat_event_i(beat_event),
     .beat_quality_i(beat_quality),

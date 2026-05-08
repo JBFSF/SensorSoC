@@ -37,6 +37,7 @@ module sim_ppg_process_ref;
   ppg_process dut (
     .clk_i(clk),
     .rst_i(rst_i),
+    .en_i(1'b1),
     .ppg_sample_i(ppg_sample),
     .ppg_valid_i(ppg_valid),
     .ppg_sample_time_i(ppg_sample_time),
