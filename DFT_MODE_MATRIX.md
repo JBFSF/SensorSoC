@@ -121,6 +121,15 @@ Currently covered modes:
     - `ml_en = 0`
     - `cpu_en = 1`
     - `sleeping = 0`
+  - also has a stronger firmware-stimulated smoke test:
+    - preloads a tiny Pico program directly into SRAM
+    - forces `boot_done` high in the cheap `chip_core` harness
+    - checks that the summary bus stays bit-exact while the CPU performs:
+      - instruction fetches
+      - an SRAM load
+      - an SRAM store
+      - an MMIO store
+    - checks that no unexpected Pico trap occurs during that execution window
 - `01000`
   - checks that the debug bus is enabled
   - checks that the 16-bit Pico MMIO write summary matches the live internal packed view
@@ -164,6 +173,9 @@ Current coverage note:
   on the external GF180 pad-model setup
 - this still validates the real test-mode and debug-bus logic that `chip_top`
   uses
+- the current smoke suite contains 10 passing tests total:
+  - the covered modes above
+  - plus a second, stronger execution-visibility test for `00111`
 - the new `01000` smoke check uses a tiny SRAM-preloaded Pico program to
   create one real CPU MMIO store inside the otherwise minimal `chip_core`
   harness
