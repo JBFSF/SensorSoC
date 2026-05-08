@@ -129,6 +129,7 @@ def chip_top_runner():
         ]
 
     build_args = []
+    parameters = {}
 
     if sim == "icarus":
         # For debugging
@@ -138,11 +139,15 @@ def chip_top_runner():
     if sim == "verilator":
         build_args = ["--timing", "--trace", "--trace-fst", "--trace-structs"]
 
+    if hdl_toplevel == "chip_core":
+        parameters["DEBUG_STIM_EN"] = 1
+
     runner = get_runner(sim)
     runner.build(
         sources=sources,
         hdl_toplevel=hdl_toplevel,
         defines=defines,
+        parameters=parameters,
         always=True,
         includes=includes,
         build_args=build_args,

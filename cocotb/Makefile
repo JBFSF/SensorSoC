@@ -221,6 +221,7 @@ UNIFIED_TOP_RTL_SRCS := \
   $(RTL_DIR)/ml_axil_bridge_mmio.v \
   $(RTL_DIR)/weight_flash_axi.v \
   $(RTL_DIR)/irq_ctrl_mmio.v \
+  $(RTL_DIR)/alarm_mmio.v \
   $(RTL_DIR)/taketwo_wrap.v \
   $(RTL_DIR)/taketwo.v \
   $(RTL_DIR)/pwrctrl_mmio.v \
