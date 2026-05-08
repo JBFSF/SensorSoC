@@ -20,6 +20,7 @@ DEBUG_BUS_MASK = (1 << (DEBUG_BUS_HI - DEBUG_BUS_LO + 1)) - 1
 FORCE_IRQ_PAD = 37
 FORCE_WAKE_PAD = 38
 TIMER_CTRL_ADDR = 0x0300_2000
+SRAM_DATA_ADDR = 0x0000_0040
 
 # Tiny RV32I program used to provoke one real Pico MMIO store in the cheap
 # chip_core harness:
@@ -36,6 +37,27 @@ PICO_TIMER_WRITE_PROGRAM = (
     0x0020A023,
     0x0000006F,
 )
+
+# Tiny RV32I program for richer Pico-state visibility:
+#   addi x1, x0, 64       ; x1 = SRAM data address 0x40
+#   lw   x2, 0(x1)        ; real SRAM load
+#   sw   x2, 4(x1)        ; real SRAM store
+#   lui  x3, 0x03002      ; x3 = 0x0300_2000 (timer MMIO base)
+#   sw   x2, 0(x3)        ; real MMIO store
+#   jal  x0, 0            ; spin forever
+#
+# Preload word 16 in SRAM with a known value so the load path has real data.
+PICO_STATE_VISIBILITY_PROGRAM = (
+    0x04000093,
+    0x0000A103,
+    0x0020A223,
+    0x030021B7,
+    0x0021A023,
+    0x0000006F,
+)
+PICO_STATE_VISIBILITY_DATA = {
+    16: 0x12345678,  # byte address 0x40
+}
 
 
 def _set_defaults(dut) -> None:
@@ -77,6 +99,12 @@ def _preload_sram_words(dut, words) -> None:
         dut.u_top.sram.mem[index].value = word & 0xFFFF_FFFF
 
 
+def _preload_sram_map(dut, word_map) -> None:
+    """Write sparse data words into top.sram before releasing reset."""
+    for index, word in word_map.items():
+        dut.u_top.sram.mem[index].value = word & 0xFFFF_FFFF
+
+
 async def _start_up_with_preloaded_program(dut, words) -> None:
     """Bring up chip_core with a tiny SRAM-resident Pico program.
 
@@ -89,6 +117,19 @@ async def _start_up_with_preloaded_program(dut, words) -> None:
     cocotb.start_soon(Clock(dut.clk, 20, unit="ns").start())
     dut.rst_n.value = 0
     _preload_sram_words(dut, words)
+    dut.u_top.boot_done.value = Force(1)
+    await Timer(200, unit="ns")
+    dut.rst_n.value = 1
+    await ClockCycles(dut.clk, 5)
+
+
+async def _start_up_with_preloaded_program_and_data(dut, words, word_map) -> None:
+    """Bring up chip_core with a tiny Pico program plus sparse SRAM data."""
+    _set_defaults(dut)
+    cocotb.start_soon(Clock(dut.clk, 20, unit="ns").start())
+    dut.rst_n.value = 0
+    _preload_sram_words(dut, words)
+    _preload_sram_map(dut, word_map)
     dut.u_top.boot_done.value = Force(1)
     await Timer(200, unit="ns")
     dut.rst_n.value = 1
@@ -349,6 +390,63 @@ async def test_mode_00111_pico_state_summary_matches_internal_signals(dut):
         assert got == expected, (
             f"pico state summary mismatch: expected {expected}, got {got}"
         )
+
+
+@cocotb.test()
+async def test_mode_00111_pico_state_summary_shows_real_cpu_execution(dut):
+    """Pico state summary mode should reflect real fetch/load/store activity.
+
+    This complements the cheap structural summary check with a tiny SRAM-
+    preloaded Pico program so we can see instruction fetches plus real data-side
+    accesses from the CPU itself.
+    """
+    await _start_up_with_preloaded_program_and_data(
+        dut,
+        PICO_STATE_VISIBILITY_PROGRAM,
+        PICO_STATE_VISIBILITY_DATA,
+    )
+    _set_test_mode(dut, 0b00111)
+    await ClockCycles(dut.clk, 4)
+
+    assert _debug_oe(dut) == 0xFFFF, f"expected debug OE enabled, got 0x{_debug_oe(dut):04x}"
+    _assert_mode_enables(dut, feat_en=0, ml_en=0, cpu_en=1, sleeping=0)
+
+    saw_instr_fetch = False
+    saw_data_load = False
+    saw_data_store = False
+    saw_mmio_store = False
+
+    for _ in range(200):
+        await RisingEdge(dut.clk)
+        expected = _pack_pico_state_summary_str(dut)
+        got = _debug_bus_str(dut)
+        assert got == expected, (
+            f"pico state summary mismatch during execution: expected {expected}, got {got}"
+        )
+
+        mem_valid = int(dut.u_top.pico_mem_valid_o.value)
+        mem_instr = int(dut.u_top.pico_mem_instr_o.value)
+        mem_ready = int(dut.u_top.pico_mem_ready_o.value)
+        wstrb = int(dut.u_top.pico_mem_wstrb_o.value)
+        addr = int(dut.u_top.pico_mem_addr_o.value)
+
+        if mem_valid and mem_instr:
+            saw_instr_fetch = True
+        if mem_valid and not mem_instr and mem_ready and wstrb == 0:
+            saw_data_load = True
+            assert addr == SRAM_DATA_ADDR, (
+                f"expected Pico SRAM load from 0x{SRAM_DATA_ADDR:08x}, got 0x{addr:08x}"
+            )
+        if mem_valid and not mem_instr and mem_ready and wstrb != 0:
+            saw_data_store = True
+            if addr == TIMER_CTRL_ADDR:
+                saw_mmio_store = True
+
+    assert int(dut.u_top.pico_trap_o.value) == 0, "unexpected Pico trap during execution-visibility test"
+    assert saw_instr_fetch, "expected to observe at least one Pico instruction fetch"
+    assert saw_data_load, "expected to observe at least one real Pico SRAM load"
+    assert saw_data_store, "expected to observe at least one real Pico store"
+    assert saw_mmio_store, f"expected to observe Pico MMIO store to 0x{TIMER_CTRL_ADDR:08x}"
 
 
 @cocotb.test()
