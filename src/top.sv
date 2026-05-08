@@ -1281,6 +1281,6 @@ module top #(
 
     assign epoch_end_o = epoch_end_w;
     //assign alarm_o = 1'b0;
-    assign weight_boot_done_o = 1'b1;
+    // assign weight_boot_done_o = 1'b1;
 
 endmodule
