@@ -529,7 +529,6 @@ TOP_FEATURE_ML_CPU_SPI_FLASH_SOURCES := \
 	$(RTL_DIR)/taketwo_wrap.v \
 	$(RTL_DIR)/taketwo.v \
 	$(RTL_DIR)/pwrctrl_mmio.v \
-	$(RTL_DIR)/alarm_mmio.v \
 	$(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v \
 	sensors/i2c_slave_lis2dw12.sv \
 	sensors/i2c_slave_adpd144ri.sv
