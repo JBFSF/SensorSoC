@@ -2,6 +2,13 @@
 
 `include "taketwo_feature_bridge.sv"
 
+`ifdef SIM
+`define TOP_HAS_SENSOR_SIM_BUS
+`endif
+`ifdef SENSOR_SIM_PAD_BRIDGE
+`define TOP_HAS_SENSOR_SIM_BUS
+`endif
+
 module top #(
     parameter integer MEM_WORDS    = 1024,
     parameter integer BOOT_WORDS   = 1024,
@@ -54,7 +61,7 @@ module top #(
     input  logic i2c_sda_i,
     output logic i2c_sda_drive_low_o,
 
-    `ifdef SIM 
+    `ifdef TOP_HAS_SENSOR_SIM_BUS
         // Functional simulation bus to sensor models (through i2c_master).
         output logic        sim_req_o,     // request strobe from i2c_master into simulated sensor bus
         output logic [6:0]  sim_addr_o,    // 7-bit I2C address for the active simulated sensor transaction
@@ -249,7 +256,7 @@ module top #(
     logic       sim_rlast_w;
     logic       sim_err_w;
 
-`ifdef SIM
+`ifdef TOP_HAS_SENSOR_SIM_BUS
     assign sim_req_o = sim_req_w;
     assign sim_addr_o = sim_addr_w;
     assign sim_reg_o = sim_reg_w;
