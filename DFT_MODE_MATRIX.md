@@ -166,7 +166,23 @@ Currently covered modes:
   - briefly forces the trap source in the chip-core harness to verify bit 15
 - `01010`
   - checks that the debug bus is enabled
-  - checks that bit 15 reflects the forced IRQ input on `bidir[37]`
+  - checks that the full 16-bit packed summary matches the live internal view
+    of:
+    - `test_force_irq`
+    - `pico_trap`
+    - `pico_cpu_clk_en`
+    - `pico_mem_instr`
+    - `pico_mem_valid`
+    - `pico_mem_ready`
+    - `pico_mem_addr[9:0]`
+  - toggles `bidir[37]` and checks both the debug summary bit and the routed
+    Pico IRQ bit
+  - preloads a tiny SRAM Pico program and checks that the summary exposes real:
+    - instruction fetch
+    - `mem_valid`
+    - `mem_ready`
+    - SRAM data access address bits
+    - MMIO store address bits
   - checks that the expected CPU-only mode posture is active:
     - `feat_en = 0`
     - `ml_en = 0`
@@ -174,7 +190,18 @@ Currently covered modes:
     - `sleeping = 0`
 - `01011`
   - checks that the debug bus is enabled
+  - checks that the full 16-bit packed summary matches the live internal view
+    of:
+    - `test_force_wake`
+    - `host_i2c_irq_event`
+    - `ml_irq`
+    - `timer_event`
+    - hard-zero low 12 bits
   - checks that bit 15 reflects the forced wake input on `bidir[38]`
+  - forces the internal ML IRQ and timer-event sources to prove bits 13 and 12
+  - intentionally does not add host-I2C IRQ stimulus because that path is
+    transitional and planned for removal
+  - checks that the host-I2C bit stays low in the unstimulated harness
   - checks that the low 12 bits remain zero as expected for this summary mode
   - checks that the expected CPU-only mode posture is active:
     - `feat_en = 0`

@@ -256,6 +256,51 @@ def _pack_pico_sleep_irq_summary_str(dut) -> str:
     )
 
 
+def _pack_force_irq_summary_str(dut) -> str:
+    """Mirror chip_core mode 01010 exactly as a 16-bit bitstring.
+
+    Layout:
+      [15] DFT force-IRQ pad
+      [14] trap
+      [13] CPU clock enable
+      [12] instruction access
+      [11] memory valid
+      [10] memory ready
+      [9:0] mem_addr[9:0]
+    """
+    return (
+        str(dut.bidir_in.value[FORCE_IRQ_PAD]).upper()
+        + _bit_str(dut.u_top.pico_trap_o)
+        + _bit_str(dut.u_top.pico_cpu_clk_en_o)
+        + _bit_str(dut.u_top.pico_mem_instr_o)
+        + _bit_str(dut.u_top.pico_mem_valid_o)
+        + _bit_str(dut.u_top.pico_mem_ready_o)
+        + str(dut.u_top.pico_mem_addr_o.value[9:0]).upper()
+    )
+
+
+def _pack_force_wake_summary_str(dut) -> str:
+    """Mirror chip_core mode 01011 exactly as a 16-bit bitstring.
+
+    Layout:
+      [15] DFT force-wake pad
+      [14] host I2C IRQ event
+      [13] ML IRQ
+      [12] timer event
+      [11:0] zero
+
+    The host-I2C bit is intentionally observed but not stimulated here; that
+    block is transitional and should not become a new DFT dependency.
+    """
+    return (
+        str(dut.bidir_in.value[FORCE_WAKE_PAD]).upper()
+        + _bit_str(dut.u_top.host_i2c_irq_event_o)
+        + _bit_str(dut.u_top.ml_irq_o)
+        + _bit_str(dut.u_top.timer_event_o)
+        + "0" * 12
+    )
+
+
 def _assert_mode_enables(dut, *, feat_en: int, ml_en: int, cpu_en: int, sleeping: int) -> None:
     """Check the high-level posture that top_fsm should force for a mode.
 
@@ -381,8 +426,17 @@ async def test_mode_00100_motion_feature_view(dut):
 
 @cocotb.test()
 async def test_mode_01010_force_irq_reflects_pad(dut):
-    """Force-IRQ mode should enable the debug bus and mirror bidir_in[37] in bit 15."""
-    await _start_up(dut)
+    """Force-IRQ mode should expose force IRQ plus live Pico bus activity.
+
+    This strengthens the original bit-only smoke check: the test now compares
+    the whole 01010 packed summary every cycle while a tiny SRAM program causes
+    real instruction fetch, load, store, and MMIO-store traffic.
+    """
+    await _start_up_with_preloaded_program_and_data(
+        dut,
+        PICO_STATE_VISIBILITY_PROGRAM,
+        PICO_STATE_VISIBILITY_DATA,
+    )
     _set_test_mode(dut, 0b01010)
     await ClockCycles(dut.clk, 4)
 
@@ -391,15 +445,63 @@ async def test_mode_01010_force_irq_reflects_pad(dut):
 
     _drive_bidir_input(dut, FORCE_IRQ_PAD, 0)
     await ClockCycles(dut.clk, 2)
-    assert _debug_bit(dut, 15) == 0, "expected force IRQ summary bit low before forcing"
+    assert _debug_bus_str(dut) == _pack_force_irq_summary_str(dut), (
+        f"force IRQ summary mismatch: expected {_pack_force_irq_summary_str(dut)}, "
+        f"got {_debug_bus_str(dut)}"
+    )
+    assert _debug_bit(dut, 15) == 0, "expected force IRQ bit low before forcing"
 
     _drive_bidir_input(dut, FORCE_IRQ_PAD, 1)
     await ClockCycles(dut.clk, 2)
-    assert _debug_bit(dut, 15) == 1, "expected force IRQ summary bit high when bidir_in[37] is high"
+    assert _debug_bus_str(dut) == _pack_force_irq_summary_str(dut), (
+        f"force IRQ summary mismatch after forcing IRQ: expected {_pack_force_irq_summary_str(dut)}, "
+        f"got {_debug_bus_str(dut)}"
+    )
+    assert _debug_bit(dut, 15) == 1, "expected force IRQ bit high when bidir_in[37] is high"
+    assert (int(dut.u_top.pico_irq_o.value) & 1) == 1, "expected force IRQ to reach Pico IRQ bit 0"
 
     _drive_bidir_input(dut, FORCE_IRQ_PAD, 0)
     await ClockCycles(dut.clk, 2)
-    assert _debug_bit(dut, 15) == 0, "expected force IRQ summary bit to clear after releasing bidir_in[37]"
+    assert _debug_bus_str(dut) == _pack_force_irq_summary_str(dut), (
+        f"force IRQ summary mismatch after releasing IRQ: expected {_pack_force_irq_summary_str(dut)}, "
+        f"got {_debug_bus_str(dut)}"
+    )
+    assert _debug_bit(dut, 15) == 0, "expected force IRQ bit to clear after releasing bidir_in[37]"
+
+    saw_instr_fetch = False
+    saw_mem_valid = False
+    saw_mem_ready = False
+    saw_sram_data_access = False
+    saw_timer_mmio_store = False
+
+    for _ in range(200):
+        await RisingEdge(dut.clk)
+        expected = _pack_force_irq_summary_str(dut)
+        got = _debug_bus_str(dut)
+        assert got == expected, (
+            f"force IRQ summary mismatch during Pico execution: expected {expected}, got {got}"
+        )
+
+        mem_valid = int(dut.u_top.pico_mem_valid_o.value)
+        mem_instr = int(dut.u_top.pico_mem_instr_o.value)
+        mem_ready = int(dut.u_top.pico_mem_ready_o.value)
+        wstrb = int(dut.u_top.pico_mem_wstrb_o.value)
+        addr = int(dut.u_top.pico_mem_addr_o.value)
+
+        saw_instr_fetch |= bool(mem_valid and mem_instr)
+        saw_mem_valid |= bool(mem_valid)
+        saw_mem_ready |= bool(mem_valid and mem_ready)
+        if mem_valid and not mem_instr and mem_ready and addr in (SRAM_DATA_ADDR, SRAM_DATA_ADDR + 4):
+            saw_sram_data_access = True
+        if mem_valid and not mem_instr and mem_ready and wstrb != 0 and addr == TIMER_CTRL_ADDR:
+            saw_timer_mmio_store = True
+
+    assert int(dut.u_top.pico_trap_o.value) == 0, "unexpected Pico trap during force-IRQ summary test"
+    assert saw_instr_fetch, "expected mode 01010 to expose at least one Pico instruction fetch"
+    assert saw_mem_valid, "expected mode 01010 to expose Pico mem_valid activity"
+    assert saw_mem_ready, "expected mode 01010 to expose Pico mem_ready activity"
+    assert saw_sram_data_access, "expected mode 01010 to expose SRAM data access address bits"
+    assert saw_timer_mmio_store, f"expected mode 01010 to expose MMIO store to 0x{TIMER_CTRL_ADDR:08x}"
 
 
 @cocotb.test()
@@ -582,7 +684,7 @@ async def test_mode_01001_pico_sleep_irq_summary_tracks_sleep_irq_cpu_and_trap(d
 
 @cocotb.test()
 async def test_mode_01011_force_wake_reflects_pad(dut):
-    """Force-wake mode should enable the debug bus and mirror bidir_in[38] in bit 15."""
+    """Force-wake mode should expose wake/IRQ sources without host-I2C stimulus."""
     await _start_up(dut)
     _set_test_mode(dut, 0b01011)
     await ClockCycles(dut.clk, 4)
@@ -592,14 +694,48 @@ async def test_mode_01011_force_wake_reflects_pad(dut):
 
     _drive_bidir_input(dut, FORCE_WAKE_PAD, 0)
     await ClockCycles(dut.clk, 2)
-    assert ((_debug_bus(dut) >> 15) & 1) == 0, f"expected force wake bit low, got 0x{_debug_bus(dut):04x}"
+    assert _debug_bus_str(dut) == _pack_force_wake_summary_str(dut), (
+        f"force wake summary mismatch: expected {_pack_force_wake_summary_str(dut)}, "
+        f"got {_debug_bus_str(dut)}"
+    )
+    assert _debug_bit(dut, 15) == 0, f"expected force wake bit low, got 0x{_debug_bus(dut):04x}"
+    assert _debug_bit(dut, 14) == 0, "host I2C IRQ bit should stay low when not stimulated"
     assert (_debug_bus(dut) & 0x0FFF) == 0, f"expected low 12 bits zero, got 0x{_debug_bus(dut):04x}"
 
     _drive_bidir_input(dut, FORCE_WAKE_PAD, 1)
     await ClockCycles(dut.clk, 2)
-    assert ((_debug_bus(dut) >> 15) & 1) == 1, f"expected force wake bit high, got 0x{_debug_bus(dut):04x}"
+    assert _debug_bus_str(dut) == _pack_force_wake_summary_str(dut), (
+        f"force wake summary mismatch after forcing wake: expected {_pack_force_wake_summary_str(dut)}, "
+        f"got {_debug_bus_str(dut)}"
+    )
+    assert _debug_bit(dut, 15) == 1, f"expected force wake bit high, got 0x{_debug_bus(dut):04x}"
     assert (_debug_bus(dut) & 0x0FFF) == 0, f"expected low 12 bits zero, got 0x{_debug_bus(dut):04x}"
+
+    dut.u_top.ml_irq.value = Force(1)
+    await Timer(1, unit="ns")
+    assert _debug_bus_str(dut) == _pack_force_wake_summary_str(dut), (
+        f"force wake summary mismatch after forcing ML IRQ: expected {_pack_force_wake_summary_str(dut)}, "
+        f"got {_debug_bus_str(dut)}"
+    )
+    assert _debug_bit(dut, 13) == 1, "expected ML IRQ summary bit high"
+
+    dut.u_top.timer_event.value = Force(1)
+    await Timer(1, unit="ns")
+    assert _debug_bus_str(dut) == _pack_force_wake_summary_str(dut), (
+        f"force wake summary mismatch after forcing timer event: expected {_pack_force_wake_summary_str(dut)}, "
+        f"got {_debug_bus_str(dut)}"
+    )
+    assert _debug_bit(dut, 12) == 1, "expected timer-event summary bit high"
+
+    dut.u_top.ml_irq.value = Release()
+    dut.u_top.timer_event.value = Release()
+    await Timer(1, unit="ns")
 
     _drive_bidir_input(dut, FORCE_WAKE_PAD, 0)
     await ClockCycles(dut.clk, 2)
-    assert ((_debug_bus(dut) >> 15) & 1) == 0, f"expected force wake bit cleared, got 0x{_debug_bus(dut):04x}"
+    assert _debug_bus_str(dut) == _pack_force_wake_summary_str(dut), (
+        f"force wake summary mismatch after release: expected {_pack_force_wake_summary_str(dut)}, "
+        f"got {_debug_bus_str(dut)}"
+    )
+    assert _debug_bit(dut, 15) == 0, f"expected force wake bit cleared, got 0x{_debug_bus(dut):04x}"
+    assert _debug_bit(dut, 14) == 0, "host I2C IRQ bit should remain low without host-I2C stimulus"
