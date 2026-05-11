@@ -10,7 +10,7 @@ real debug-bus and test-mode logic used by `chip_top`.
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.handle import Force
+from cocotb.handle import Force, Release
 from cocotb.triggers import ClockCycles, RisingEdge, Timer
 
 
@@ -235,6 +235,27 @@ def _pack_pico_mmio_write_summary_str(dut) -> str:
     )
 
 
+def _pack_pico_sleep_irq_summary_str(dut) -> str:
+    """Mirror chip_core mode 01001 exactly as a 16-bit bitstring.
+
+    Layout:
+      [15] trap
+      [14] top/FSM sleeping state
+      [13] CPU clock enable
+      [12] any Pico IRQ
+      [11:0] zero
+    """
+    irq_bits = _bits_str(dut.u_top.pico_irq_o)
+    irq_any = "1" if "1" in irq_bits else ("X" if any(bit in irq_bits for bit in "XZ") else "0")
+    return (
+        _bit_str(dut.u_top.pico_trap_o)
+        + _bit_str(dut.u_top.pico_sleeping_o)
+        + _bit_str(dut.u_top.pico_cpu_clk_en_o)
+        + irq_any
+        + "0" * 12
+    )
+
+
 def _assert_mode_enables(dut, *, feat_en: int, ml_en: int, cpu_en: int, sleeping: int) -> None:
     """Check the high-level posture that top_fsm should force for a mode.
 
@@ -253,6 +274,14 @@ def _assert_mode_enables(dut, *, feat_en: int, ml_en: int, cpu_en: int, sleeping
     assert int(dut.u_top.sleeping_r.value) == sleeping, (
         f"expected sleeping_r={sleeping}, got {int(dut.u_top.sleeping_r.value)}"
     )
+
+
+def _assert_sleep_irq_summary(dut, *, trap: str, sleeping: str, cpu_clk_en: str, irq: str) -> None:
+    expected = trap + sleeping + cpu_clk_en + irq + "0" * 12
+    packed = _pack_pico_sleep_irq_summary_str(dut)
+    got = _debug_bus_str(dut)
+    assert got == expected, f"mode 01001 summary mismatch: expected {expected}, got {got}"
+    assert got == packed, f"mode 01001 did not mirror internal signals: expected {packed}, got {got}"
 
 
 async def _assert_feature_view_mode(
@@ -487,6 +516,68 @@ async def test_mode_01000_pico_mmio_write_summary_matches_internal_signals(dut):
             break
 
     assert saw_write_qualifier, "expected at least one real Pico MMIO write in mode 01000"
+
+
+@cocotb.test()
+async def test_mode_01001_pico_sleep_irq_summary_tracks_sleep_irq_cpu_and_trap(dut):
+    """Pico sleep/IRQ summary mode should observe live FSM and IRQ state.
+
+    Mode 01001 is intentionally an observer mode: it should not force CPU_ONLY,
+    otherwise the debug bus could never show a real sleeping state. This test
+    drives the normal FSM into SLEEP, toggles the DFT IRQ/wake inputs, then uses
+    a neighboring CPU-only DFT mode to prove the CPU-clock summary bit.
+    """
+    _set_defaults(dut)
+    cocotb.start_soon(Clock(dut.clk, 20, unit="ns").start())
+
+    dut.rst_n.value = 0
+    dut.u_top.boot_done.value = Force(1)
+    dut.u_top.start_i.value = Force(1)
+    _set_test_mode(dut, 0b01001)
+    await Timer(200, unit="ns")
+    dut.rst_n.value = 1
+    await ClockCycles(dut.clk, 6)
+
+    assert _debug_oe(dut) == 0xFFFF, f"expected debug OE enabled, got 0x{_debug_oe(dut):04x}"
+    _assert_sleep_irq_summary(dut, trap="0", sleeping="1", cpu_clk_en="0", irq="0")
+    _assert_mode_enables(dut, feat_en=0, ml_en=0, cpu_en=0, sleeping=1)
+
+    _drive_bidir_input(dut, FORCE_IRQ_PAD, 1)
+    await ClockCycles(dut.clk, 2)
+    _assert_sleep_irq_summary(dut, trap="0", sleeping="1", cpu_clk_en="0", irq="1")
+
+    _drive_bidir_input(dut, FORCE_IRQ_PAD, 0)
+    await ClockCycles(dut.clk, 2)
+    _assert_sleep_irq_summary(dut, trap="0", sleeping="1", cpu_clk_en="0", irq="0")
+
+    _drive_bidir_input(dut, FORCE_WAKE_PAD, 1)
+    await ClockCycles(dut.clk, 2)
+    _assert_sleep_irq_summary(dut, trap="0", sleeping="0", cpu_clk_en="0", irq="0")
+
+    _drive_bidir_input(dut, FORCE_WAKE_PAD, 0)
+    await ClockCycles(dut.clk, 1)
+
+    # Move through a neighboring CPU-only DFT mode, then return to 01001 to
+    # observe that the CPU clock-enable bit is reflected by this summary view.
+    _set_test_mode(dut, 0b01010)
+    await ClockCycles(dut.clk, 4)
+    _assert_mode_enables(dut, feat_en=0, ml_en=0, cpu_en=1, sleeping=0)
+
+    _set_test_mode(dut, 0b01001)
+    await ClockCycles(dut.clk, 2)
+    _assert_sleep_irq_summary(dut, trap="0", sleeping="0", cpu_clk_en="1", irq="0")
+
+    # The chip_core-only harness has no pad-level trap stimulus. Force the trap
+    # source briefly to verify bit 15 of the debug-bus packing.
+    dut.u_top.trap.value = Force(1)
+    await Timer(1, unit="ns")
+    _assert_sleep_irq_summary(dut, trap="1", sleeping="0", cpu_clk_en="1", irq="0")
+
+    dut.u_top.trap.value = Release()
+    dut.u_top.start_i.value = Release()
+    dut.u_top.boot_done.value = Release()
+    _drive_bidir_input(dut, FORCE_IRQ_PAD, 0)
+    _drive_bidir_input(dut, FORCE_WAKE_PAD, 0)
 
 
 @cocotb.test()
