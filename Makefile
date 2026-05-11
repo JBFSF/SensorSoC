@@ -95,6 +95,14 @@ sim-dft-smoke: ## Run chip_core DFT smoke tests for normal/force-IRQ/force-wake 
 	cd cocotb; CHIP_TOPLEVEL=chip_core COCOTB_TEST_MODULE=chip_core_dft_tb PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} $(PYTHON) chip_top_tb.py
 .PHONY: sim-dft-smoke
 
+sim-gl-dft-smoke: ## Run gate-level chip_top DFT smoke tests for debug pad modes
+	cd cocotb; GL=1 COCOTB_TEST_MODULE=chip_top_dft_tb PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} $(PYTHON) chip_top_tb.py
+.PHONY: sim-gl-dft-smoke
+
+sim-gl-chip-top-debug-modes: ## Run gate-level chip_top debug-mode pad checks
+	cd cocotb; GL=1 COCOTB_TEST_MODULE=chip_top_dft_tb PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} $(PYTHON) chip_top_tb.py
+.PHONY: sim-gl-chip-top-debug-modes
+
 repro-firmware-flow: ## Build irq/prod firmware and run reproducible smoke regressions
 	bash cocotb/tools/repro-firmware-flow.sh
 .PHONY: repro-firmware-flow

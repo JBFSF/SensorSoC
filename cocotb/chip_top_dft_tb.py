@@ -13,19 +13,21 @@ These tests use the real chip-level pad wrapper so we exercise the actual
 `input_PAD` and `bidir_PAD` pin interface that DFT bring-up will rely on.
 """
 
-import os
-
 import cocotb
 from cocotb.triggers import ClockCycles
 
-from chip_top_tb import gl, start_up
+from chip_top_tb import start_up
 
 
 DEBUG_BUS_LO = 7
 DEBUG_BUS_HI = 22
 DEBUG_BUS_WIDTH = DEBUG_BUS_HI - DEBUG_BUS_LO + 1
+DEBUG_BUS_MASK = (1 << DEBUG_BUS_WIDTH) - 1
 FORCE_IRQ_PAD = 37
 FORCE_WAKE_PAD = 38
+EXTERNAL_CLOCK_PAD = 39
+SPI_MISO_PAD = 4
+I2C_SCL_PAD = 5
 
 
 def _as_int(handle) -> int:
@@ -34,13 +36,15 @@ def _as_int(handle) -> int:
 
 def read_debug_bus(dut) -> int:
     value = _as_int(dut.bidir_PAD)
-    return (value >> DEBUG_BUS_LO) & ((1 << DEBUG_BUS_WIDTH) - 1)
+    return (value >> DEBUG_BUS_LO) & DEBUG_BUS_MASK
 
 
 def read_debug_oe(dut) -> int:
-    if gl:
-        return (_as_int(dut.bidir_CORE2PAD_OE) >> DEBUG_BUS_LO) & ((1 << DEBUG_BUS_WIDTH) - 1)
-    return (_as_int(dut.bidir_CORE2PAD_OE) >> DEBUG_BUS_LO) & ((1 << DEBUG_BUS_WIDTH) - 1)
+    return (read_bidir_oe(dut) >> DEBUG_BUS_LO) & DEBUG_BUS_MASK
+
+
+def read_bidir_oe(dut) -> int:
+    return _as_int(dut.bidir_CORE2PAD_OE)
 
 
 def set_test_mode(dut, mode: int) -> None:
@@ -57,6 +61,25 @@ def drive_bidir_input(dut, index: int, value: int) -> None:
     dut.bidir_PAD.value = current
 
 
+def expect_oe_bit(dut, index: int, expected: int) -> None:
+    got = (read_bidir_oe(dut) >> index) & 1
+    assert got == expected, f"expected bidir[{index}] OE={expected}, got {got}"
+
+
+def expect_static_non_debug_oe(dut) -> None:
+    """Check pad directions that should not change when DFT debug is enabled."""
+    for index in (0, 1, 2, 3):
+        expect_oe_bit(dut, index, 1)
+
+    for index in (SPI_MISO_PAD, I2C_SCL_PAD, FORCE_IRQ_PAD, FORCE_WAKE_PAD, EXTERNAL_CLOCK_PAD):
+        expect_oe_bit(dut, index, 0)
+
+
+def expect_debug_bus_oe(dut, expected: int) -> None:
+    debug_oe = read_debug_oe(dut)
+    assert debug_oe == expected, f"expected debug OE=0x{expected:04x}, got 0x{debug_oe:04x}"
+
+
 @cocotb.test()
 async def test_mode_00000_debug_bus_disabled(dut):
     """Normal mode should keep the 16-bit debug bus off/zero."""
@@ -69,6 +92,8 @@ async def test_mode_00000_debug_bus_disabled(dut):
 
     assert debug_oe == 0, f"expected debug OE=0 in normal mode, got 0x{debug_oe:04x}"
     assert debug_bus == 0, f"expected debug bus=0 in normal mode, got 0x{debug_bus:04x}"
+    expect_debug_bus_oe(dut, 0x0000)
+    expect_static_non_debug_oe(dut)
 
 
 @cocotb.test()
@@ -82,6 +107,8 @@ async def test_mode_01010_force_irq_reflects_pad(dut):
     debug_oe = read_debug_oe(dut)
     debug_bus = read_debug_bus(dut)
     assert debug_oe == 0xFFFF, f"expected debug OE fully enabled, got 0x{debug_oe:04x}"
+    expect_debug_bus_oe(dut, 0xFFFF)
+    expect_static_non_debug_oe(dut)
     assert ((debug_bus >> 15) & 1) == 0, f"expected force IRQ bit low, got debug bus 0x{debug_bus:04x}"
 
     drive_bidir_input(dut, FORCE_IRQ_PAD, 1)
@@ -106,6 +133,8 @@ async def test_mode_01011_force_wake_reflects_pad(dut):
     debug_oe = read_debug_oe(dut)
     debug_bus = read_debug_bus(dut)
     assert debug_oe == 0xFFFF, f"expected debug OE fully enabled, got 0x{debug_oe:04x}"
+    expect_debug_bus_oe(dut, 0xFFFF)
+    expect_static_non_debug_oe(dut)
     assert ((debug_bus >> 15) & 1) == 0, f"expected force wake bit low, got debug bus 0x{debug_bus:04x}"
     assert (debug_bus & 0x0FFF) == 0, f"expected low 12 bits hardwired to 0, got 0x{debug_bus:04x}"
 
