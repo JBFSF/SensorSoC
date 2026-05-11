@@ -18,7 +18,10 @@ scl = os.getenv("SCL", "gf180mcu_fd_sc_mcu7t5v0")
 gl = os.getenv("GL", False)
 slot = os.getenv("SLOT", "1x1")
 test_module = os.getenv("COCOTB_TEST_MODULE", "chip_top_tb")
+test_filter = os.getenv("COCOTB_TEST_FILTER")
 toplevel = os.getenv("CHIP_TOPLEVEL", "chip_top")
+netlist_toplevel = os.getenv("CHIP_NETLIST_TOP", "chip_top")
+final_dir = os.getenv("FINAL_DIR")
 
 hdl_toplevel = toplevel
 
@@ -72,6 +75,10 @@ async def test_chip_top_smoke(dut):
     logger.info("Checking normal-mode wiring...")
 
     assert dut.rst_n_PAD.value == 1, "reset should be deasserted after startup"
+    if gl:
+        logger.info("Gate-level smoke test passed.")
+        return
+
     assert dut.i_chip_core.test_mode_w.value.integer == 0, "chip should remain in normal mode"
     assert dut.i_chip_core.core_clk_w.value == dut.i_chip_core.clk.value, \
         "normal mode should use the onboard clock"
@@ -84,6 +91,8 @@ async def test_chip_top_smoke(dut):
 def chip_top_runner():
 
     proj_path = Path(__file__).resolve().parent
+    final_path = Path(final_dir).expanduser() if final_dir else proj_path / "../final"
+    gl_netlist = final_path / "pnl" / f"{netlist_toplevel}.pnl.v"
 
     sources = []
     defines = {f"SLOT_{slot.upper()}": True}
@@ -94,10 +103,25 @@ def chip_top_runner():
         sources.append(Path(pdk_root) / pdk / "libs.ref" / scl / "verilog" / f"{scl}.v")
         sources.append(Path(pdk_root) / pdk / "libs.ref" / scl / "verilog" / "primitives.v")
 
+        if not gl_netlist.exists():
+            raise FileNotFoundError(f"gate-level netlist not found: {gl_netlist}")
+        if "endmodule" not in gl_netlist.read_text(errors="ignore"):
+            raise RuntimeError(f"gate-level netlist appears truncated: {gl_netlist}")
+
         # We use the powered netlist
-        sources.append(proj_path / f"../final/pnl/{hdl_toplevel}.pnl.v")
+        sources.append(gl_netlist)
+        if hdl_toplevel == "sim_chip_top_gl_pad_env":
+            sources.append(proj_path / "sim/tb/sim_chip_top_gl_pad_env.sv")
+        if hdl_toplevel == "sim_chip_top_gl_sensor_bridge_env":
+            sources += [
+                proj_path / "sensors/i2c_slave_lis2dw12.sv",
+                proj_path / "sensors/i2c_slave_adpd144ri.sv",
+                proj_path / "sim/tb/sim_chip_top_gl_sensor_bridge_env.sv",
+            ]
 
         defines = {"FUNCTIONAL": True, "USE_POWER_PINS": True}
+        if hdl_toplevel == "sim_chip_top_gl_sensor_bridge_env":
+            defines["SENSOR_SIM_PAD_BRIDGE"] = True
     else:
         # sources.append(proj_path / "../src/chip_top.sv")
         # sources.append(proj_path / "../src/chip_core.sv")
@@ -114,7 +138,7 @@ def chip_top_runner():
         if hdl_toplevel != "chip_top":
             sources.append(proj_path / "../src/gf180mcu_fd_ip_sram__sram512x8m8wm1.v")
         
-    if hdl_toplevel == "chip_top":
+    if hdl_toplevel in ("chip_top", "sim_chip_top_gl_sensor_bridge_env"):
         sources += [
             # IO pad models
             Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_fd_io.v",
@@ -155,10 +179,13 @@ def chip_top_runner():
     )
 
     plusargs = []
+    if hdl_toplevel == "sim_chip_top_gl_sensor_bridge_env":
+        plusargs.append(f"+DATA_DIR={proj_path / 'sim/data'}")
 
     runner.test(
         hdl_toplevel=hdl_toplevel,
         test_module=test_module,
+        test_filter=test_filter,
         plusargs=plusargs,
         waves=True,
     )

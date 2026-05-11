@@ -2,16 +2,22 @@ MAKEFILE_DIR := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 RUN_TAG = $(shell ls librelane/runs/ | tail -n 1)
 TOP = chip_top
+FINAL_DIR ?= $(if $(wildcard $(MAKEFILE_DIR)/final/pnl/$(TOP).pnl.v),$(MAKEFILE_DIR)/final,$(MAKEFILE_DIR)/librelane/runs/$(RUN_TAG)/final)
 
 PDK_ROOT ?= $(MAKEFILE_DIR)/gf180mcu
 PDK ?= gf180mcuD
 PDK_TAG ?= 1.8.0
 VENV_DIR ?= $(MAKEFILE_DIR)/.venv
 VENV_PYTHON := $(VENV_DIR)/bin/python
+COCOTB_PYENV_PYTHON := $(HOME)/.pyenv/versions/cocotb-env/bin/python
 ifeq ($(wildcard $(VENV_PYTHON)),$(VENV_PYTHON))
 PYTHON ?= $(VENV_PYTHON)
 else
+ifeq ($(wildcard $(COCOTB_PYENV_PYTHON)),$(COCOTB_PYENV_PYTHON))
+PYTHON ?= $(COCOTB_PYENV_PYTHON)
+else
 PYTHON ?= python3
+endif
 endif
 
 AVAILABLE_SLOTS = 1x1 0p5x1 1x0p5 0p5x0p5
@@ -111,8 +117,20 @@ build-riscv-toolchain: ## Build bare-metal RISC-V GCC from third_party/riscv-gnu
 .PHONY: build-riscv-toolchain
 
 sim-gl: ## Run gate-level simulation with cocotb (after copy-final)
-	cd cocotb; GL=1 PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
+	cd cocotb; GL=1 FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} $(PYTHON) chip_top_tb.py
 .PHONY: sim-gl
+
+sim-gl-debug-modes: ## Run gate-level chip_top debug-mode pad smoke test
+	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb GL=1 FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=test_chip_core_debug_modes COCOTB_TEST_FILTER=test_chip_top_debug_modes_force_inputs_reach_debug_bus $(PYTHON) chip_top_tb.py
+.PHONY: sim-gl-debug-modes
+
+sim-gl-sensor-bridge: ## Run full gate-level sensor-model pad bridge feature test
+	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb GL=1 CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=test_chip_top_gl_sensor_bridge COCOTB_TEST_FILTER=test_chip_top_gl_sensor_bridge_debug_features_match_python_reference $(PYTHON) chip_top_tb.py
+.PHONY: sim-gl-sensor-bridge
+
+sim-gl-sensor-bridge-smoke: ## Run gate-level sensor bridge connectivity smoke test
+	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb GL=1 CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=test_chip_top_gl_sensor_bridge COCOTB_TEST_FILTER=test_chip_top_gl_sensor_bridge_reaches_models $(PYTHON) chip_top_tb.py
+.PHONY: sim-gl-sensor-bridge-smoke
 
 sim-view: ## View simulation waveforms in GTKWave
 	gtkwave cocotb/sim_build/chip_top.fst
