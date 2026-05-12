@@ -24,6 +24,8 @@ def s16(x: int) -> int:
 
 async def reset_dut(dut, cycles=10):
     cocotb.start_soon(Clock(dut.CLK, 40, unit="ns").start())
+    if hasattr(dut, "en_i"):
+        dut.en_i.value = 1
     await FallingEdge(dut.CLK)
     dut.RESETN.value = 0
     await ClockCycles(dut.CLK, cycles)
