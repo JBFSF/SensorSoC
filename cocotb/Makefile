@@ -158,6 +158,9 @@ FW_GEN_DIR   := $(FW_DIR)/build/generated
 FW_ML_W_HDR  := $(FW_GEN_DIR)/ml_weights_full.h
 TAKETWO_PARAMS_BIN := $(MAKEFILE_DIR)/sim/tb/ml/taketwo_params.bin
 TAKETWO_PARAMS_HEX := $(FW_GEN_DIR)/taketwo_params.hex
+COMBINE_FLASH_HEX  := $(SCRIPTS_DIR)/combine_flash_hex.py
+COMBINED_FLASH_HEX := $(FW_GEN_DIR)/combined_flash_test_top_spi_boot_weights.hex
+COMBINED_FEATURE_ML_CPU_HEX := $(FW_GEN_DIR)/combined_flash_test_top_feature_ml_cpu.hex
 
 # Ensure output dirs exist
 $(SIM_BUILD) $(FW_BUILD) $(FW_GEN_DIR):
@@ -264,6 +267,8 @@ FW_C_test_top_ml_control_unified := $(FW_TESTS)/test_top_ml_control_unified.c
 FW_C_test_top_sleep_wake_unified := $(FW_TESTS)/test_top_sleep_wake_unified.c
 FW_C_test_top_ml_golden_vector_unified := $(FW_TESTS)/test_top_ml_golden_vector_unified.c
 FW_C_irq_test              := $(FW_DIR)/irq_test.c
+FW_C_test_top_spi_boot_weights := $(FW_TESTS)/test_top_spi_boot_weights.c
+FW_C_test_top_spi_init_unified := $(FW_C_test_top_spi_boot_weights)
 
 # Select the C source based on FW_VARIANT
 FW_SRC = $(FW_C_$(FW_VARIANT))
@@ -282,6 +287,8 @@ FW_ARCH_test_top_ml_control_unified := rv32im
 FW_ARCH_test_top_sleep_wake_unified := rv32im
 FW_ARCH_test_top_ml_golden_vector_unified := rv32im
 FW_ARCH_irq_test := rv32im
+FW_ARCH_test_top_spi_boot_weights := rv32im
+FW_ARCH_test_top_spi_init_unified := rv32im
 FW_ARCH := $(if $(FW_ARCH_$(FW_VARIANT)),$(FW_ARCH_$(FW_VARIANT)),$(FW_ARCH_DEFAULT))
 FW_OPT_DEFAULT := -O2
 FW_OPT_test_ml_cpu_wake_i2c := -O0
@@ -297,6 +304,18 @@ FW_HEX_MAIN := $(FW_DIR)/build/main/firmware.hex
 $(TAKETWO_PARAMS_HEX): $(TAKETWO_PARAMS_BIN) $(BIN2HEX_PY) | $(FW_GEN_DIR)
 	@echo "[FW] Generating weight hex: $@"
 	@$(PYTHON) $(BIN2HEX_PY) $< $@
+
+$(COMBINED_FLASH_HEX): $(FW_DIR)/build/test_top_spi_boot_weights/firmware.hex $(TAKETWO_PARAMS_HEX) $(COMBINE_FLASH_HEX) | $(FW_GEN_DIR)
+	@echo "[FW] Combining boot+weight flash -> $@"
+	@$(PYTHON) $(COMBINE_FLASH_HEX) \
+	  $(FW_DIR)/build/test_top_spi_boot_weights/firmware.hex \
+	  $(TAKETWO_PARAMS_HEX) 1024 $@
+
+$(COMBINED_FEATURE_ML_CPU_HEX): $(FW_DIR)/build/test_top_feature_ml_cpu/firmware.hex $(TAKETWO_PARAMS_HEX) $(COMBINE_FLASH_HEX) | $(FW_GEN_DIR)
+	@echo "[FW] Combining feature-ML boot+weight flash -> $@"
+	@$(PYTHON) $(COMBINE_FLASH_HEX) \
+	  $(FW_DIR)/build/test_top_feature_ml_cpu/firmware.hex \
+	  $(TAKETWO_PARAMS_HEX) 1024 $@
 
 $(FW_ML_W_HDR): $(TAKETWO_PARAMS_HEX) $(HEX2CHDR_PY) | $(FW_GEN_DIR)
 	@echo "[FW] Generating full-weight header: $@"
@@ -437,6 +456,7 @@ TOP_FEATURE_ML_CPU_TOP     := tb_top_feature_ml_cpu
 TOP_FEATURE_ML_CPU_VVP     := $(BUILD_DIR)/$(TOP_FEATURE_ML_CPU_TOP).vvp
 TOP_FEATURE_ML_CPU_SOURCES := \
 	$(TB_DIR)/tb_top_feature_ml_cpu.sv \
+	$(TB_DIR)/spi_flash_model.v \
 	$(RTL_DIR)/top.sv \
 	$(RTL_DIR)/top_fsm.v \
 	$(RTL_DIR)/i2c_master.sv \
@@ -472,6 +492,7 @@ $(TOP_FEATURE_ML_CPU_VVP): $(TOP_FEATURE_ML_CPU_SOURCES)
 sim-top-feature-ml-cpu: $(TOP_FEATURE_ML_CPU_VVP) | $(SIM_BUILD)
 	@$(SELF_MAKE) FW_VARIANT=test_top_feature_ml_cpu firmware
 	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
+	@$(SELF_MAKE) $(COMBINED_FEATURE_ML_CPU_HEX)
 	@echo "== Running $(TOP_FEATURE_ML_CPU_TOP) (FW=$(FW_DIR)/build/test_top_feature_ml_cpu/firmware.hex) =="
 	$(VVP) $(TOP_FEATURE_ML_CPU_VVP)
 
@@ -541,6 +562,37 @@ $(TOP_SPI_BOOT_WEIGHTS_VVP): $(TOP_SPI_BOOT_WEIGHTS_SOURCES)
 sim-top-spi-boot: $(TOP_SPI_BOOT_WEIGHTS_VVP) | $(SIM_BUILD)
 	@echo "== Running $(TOP_SPI_BOOT_WEIGHTS_TOP) =="
 	$(VVP) $(TOP_SPI_BOOT_WEIGHTS_VVP)
+
+# ============================================================
+# Shared flash proof: single S25 flash chip serves both
+# spi_boot_ctrl (Phase 1) and weight_flash_axi (Phase 2).
+# boot_done gates the mux; CPU spi_master_mmio stays idle.
+# ============================================================
+
+TOP_SHARED_FLASH_TOP     := tb_top_shared_flash
+TOP_SHARED_FLASH_VVP     := $(BUILD_DIR)/$(TOP_SHARED_FLASH_TOP).vvp
+TOP_SHARED_FLASH_SOURCES := \
+	$(TB_DIR)/tb_top_shared_flash.sv \
+	$(TB_DIR)/spi_flash_model.v \
+	$(UNIFIED_TOP_RTL_SRCS) \
+	sensors/i2c_slave_lis2dw12.sv \
+	sensors/i2c_slave_adpd144ri.sv
+
+$(TOP_SHARED_FLASH_VVP): $(TOP_SHARED_FLASH_SOURCES)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) \
+	  -s $(TOP_SHARED_FLASH_TOP) -o $@ $(TOP_SHARED_FLASH_SOURCES)
+
+.PHONY: sim-top-shared-flash
+sim-top-shared-flash: $(TOP_SHARED_FLASH_VVP) | $(SIM_BUILD)
+	@$(SELF_MAKE) FW_VARIANT=test_top_spi_boot_weights firmware
+	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
+	@$(SELF_MAKE) $(COMBINED_FLASH_HEX)
+	@echo "== Running $(TOP_SHARED_FLASH_TOP) (FLASH=$(COMBINED_FLASH_HEX)) =="
+	$(VVP) $(TOP_SHARED_FLASH_VVP)
+
+.PHONY: sim-top-spi-init-unified sim-top-spi-weights
+sim-top-spi-init-unified: sim-top-shared-flash
+sim-top-spi-weights: sim-top-shared-flash
 
 # ============================================================
 # Hardware weight boot: SPI flash -> weight_ram_axi -> taketwo SRAMs
@@ -693,10 +745,8 @@ $(IRQ_VVP): $(IRQ_TB_SRCS) $(SOC_RTL_SRCS)
 	  $(IRQ_TB_SRCS) \
 	  $(SOC_RTL_SRCS)
 
-sim-irq: $(IRQ_VVP) | $(SIM_BUILD)
-	@$(SELF_MAKE) FW_VARIANT=main firmware-rebuild
-	@echo "[SIM] Running tb_irq (will read $(FW_HEX_MAIN))"
-	$(VVP) $(IRQ_VVP)
+sim-irq: test-irq-states
+	@echo "[SIM] sim-irq uses the unified top IRQ regression"
 
 # ----------------------------
 # Cocotb: test_mmio
@@ -1050,18 +1100,20 @@ TOP_MLP_FEATURES_VVP    := sim_top_mlp_features.vvp
 TOP_MLP_FEATURES_PYMOD  := test_top_mlp_features
 TOP_MLP_FEATURES_SRCS   := \
   $(TOP_MLP_FEATURES_TOP_V) \
+  $(TB_DIR)/spi_flash_model.v \
   $(UNIFIED_TOP_RTL_SRCS) \
   sensors/i2c_slave_lis2dw12.sv \
   sensors/i2c_slave_adpd144ri.sv
 
 $(TOP_MLP_FEATURES_VVP): $(TOP_MLP_FEATURES_SRCS)
 	@echo "[COCOTB] Building $@"
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) -s $(TOP_MLP_FEATURES_TOP) -o $@ $(TOP_MLP_FEATURES_SRCS)
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) -s $(TOP_MLP_FEATURES_TOP) -o $@ $(TOP_MLP_FEATURES_SRCS)
 
 .PHONY: test-top-mlp-features
 test-top-mlp-features: $(TOP_MLP_FEATURES_VVP)
 	@$(SELF_MAKE) FW_VARIANT=test_top_feature_ml_cpu firmware
 	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
+	@$(SELF_MAKE) $(COMBINED_FEATURE_ML_CPU_HEX)
 	@echo "[COCOTB] Running $(TOP_MLP_FEATURES_PYMOD) on $(TOP_MLP_FEATURES_TOP)"
 	@export COCOTB_TOPLEVEL=$(TOP_MLP_FEATURES_TOP); \
 	export COCOTB_TEST_MODULES=$(TOP_MLP_FEATURES_PYMOD); \
@@ -1461,7 +1513,7 @@ IRQ_STATES_SRCS := \
 
 $(IRQ_STATES_VVP): $(IRQ_STATES_SRCS) | $(BUILD_DIR)
 	@echo "[COCOTB] Building $@"
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -I $(RTL_DIR) \
+	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) \
 	  -s $(IRQ_STATES_TOP) -o $@ $(IRQ_STATES_SRCS)
 
 .PHONY: test-irq-states

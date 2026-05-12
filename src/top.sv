@@ -107,7 +107,23 @@ module top #(
     output logic                      ml_update_gate_o,  // gate: only update ML when signal-quality checks pass
     output logic [7:0]                invalid_reason_o,  // reason code when ML update is gated off    
 
-    // SPI interface which gets handed off after boot
+    // Shared flash SPI bus: spi_boot_ctrl owns before boot_done, weight_flash_axi owns after
+    output logic                      flash_spi_clk_o,
+    output logic                      flash_spi_mosi_o,
+    input  logic                      flash_spi_miso_i,
+    output logic                      flash_spi_cs_n_o,
+
+    // Compatibility/debug views of the two internal flash owners.
+    output logic                      boot_spi_clk_o,
+    output logic                      boot_spi_mosi_o,
+    input  logic                      boot_spi_miso_i,
+    output logic                      boot_spi_cs_n_o,
+    output logic                      weight_spi_clk_o,
+    output logic                      weight_spi_mosi_o,
+    input  logic                      weight_spi_miso_i,
+    output logic                      weight_spi_cs_n_o,
+
+    // CPU SPI master (spi_master_mmio) kept idle in this configuration
     output logic                      spi_clk_o,
     output logic                      spi_mosi_o,
     input  logic                      spi_miso_i,
@@ -425,6 +441,16 @@ module top #(
     wire        weight_spi_clk_w;
     wire        boot_spi_cs_n_w;
     wire        weight_spi_cs_n_w;
+    wire        boot_spi_miso_mux_w;
+    wire        weight_spi_miso_mux_w;
+
+`ifdef SIM
+    assign boot_spi_miso_mux_w   = (flash_spi_miso_i === 1'bz) ? boot_spi_miso_i   : flash_spi_miso_i;
+    assign weight_spi_miso_mux_w = (flash_spi_miso_i === 1'bz) ? weight_spi_miso_i : flash_spi_miso_i;
+`else
+    assign boot_spi_miso_mux_w   = flash_spi_miso_i;
+    assign weight_spi_miso_mux_w = flash_spi_miso_i;
+`endif
 
     // Lightweight feature register bank exposed to firmware. This is the
     // current handoff point between the sensor pipeline and the CPU-owned ML
@@ -973,7 +999,7 @@ module top #(
     weight_flash_axi #(
         .BASE_ADDR (WEIGHT_BASE),
         .CLK_DIV   (8'd2),
-        .FLASH_BASE(24'h00_0000)
+        .FLASH_BASE(24'h00_1000)
     ) u_weight_ram (
         .clk      (clk_i),
         .resetn   (~reset_i),
@@ -987,7 +1013,7 @@ module top #(
         .spi_cs_n (weight_spi_cs_n_w),
         .spi_clk  (weight_spi_clk_w),
         .spi_mosi (weight_spi_mosi_w),
-        .spi_miso ((init_done) ? spi_miso_i : 1'b0),
+        .spi_miso (boot_done ? weight_spi_miso_mux_w : 1'b0),
         // AXI slave — write channel (accept-and-discard)
         .saxi_awid    (wram_awid),
         .saxi_awaddr  (wram_awaddr),
@@ -1042,7 +1068,7 @@ module top #(
         .resetn      (~reset_i),
         .spi_clk_o   (boot_spi_clk_w),
         .spi_mosi_o  (boot_spi_mosi_w),
-        .spi_miso_i  ((init_done) ? 1'b0 : spi_miso_i),
+        .spi_miso_i  (boot_done ? 1'b0 : boot_spi_miso_mux_w),
         .spi_cs_n_o  (boot_spi_cs_n_w),
         .sram_valid_o(boot_sram_valid_w),
         .sram_wstrb_o(boot_sram_wstrb_w),
@@ -1204,8 +1230,22 @@ module top #(
     assign i2c_scl_o           = 1'b1; // SCL idle high
     assign i2c_sda_drive_low_o = 1'b0; // not driving SDA low
 
-    //Logic for handing off spi interface after initalization
-    assign spi_clk_o = (init_done) ? weight_spi_clk_w : boot_spi_clk_w;
-    assign spi_mosi_o = (init_done) ? weight_spi_mosi_w : boot_spi_mosi_w;
-    assign spi_cs_n_o = (init_done) ? weight_spi_cs_n_w : boot_spi_cs_n_w;
+    // Shared flash bus: spi_boot_ctrl drives until boot_done, weight_flash_axi drives after
+    assign flash_spi_clk_o  = boot_done ? weight_spi_clk_w  : boot_spi_clk_w;
+    assign flash_spi_mosi_o = boot_done ? weight_spi_mosi_w : boot_spi_mosi_w;
+    assign flash_spi_cs_n_o = boot_done ? weight_spi_cs_n_w : boot_spi_cs_n_w;
+
+    // Compatibility/debug views for older benches that model boot and weight
+    // flash as separate devices.
+    assign boot_spi_clk_o     = boot_spi_clk_w;
+    assign boot_spi_mosi_o    = boot_spi_mosi_w;
+    assign boot_spi_cs_n_o    = boot_spi_cs_n_w;
+    assign weight_spi_clk_o   = weight_spi_clk_w;
+    assign weight_spi_mosi_o  = weight_spi_mosi_w;
+    assign weight_spi_cs_n_o  = weight_spi_cs_n_w;
+
+    // CPU SPI master not instantiated; keep pins idle.
+    assign spi_clk_o  = 1'b0;
+    assign spi_mosi_o = 1'b0;
+    assign spi_cs_n_o = 1'b1;
 endmodule
