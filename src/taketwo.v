@@ -2,10 +2,6 @@
 
 module taketwo
 (
-  `ifdef USE_POWER_PINS
-  inout VDD,
-  inout VSS,
-  `endif
   input CLK,
   input RESETN,
   output reg irq,
@@ -374,43 +370,58 @@ module taketwo
   reg _saxi_flag_34;
   reg _saxi_flag_35;
   reg _saxi_flag_36;
-  wire signed [32-1:0] _saxi_resetval_0 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_1 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_2 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_3 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_4 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_5 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_6 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_7 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_8 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_9 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_10 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_11 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_12 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_13 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_14 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_15 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_16 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_17 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_18 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_19 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_20 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_21 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_22 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_23 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_24 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_25 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_26 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_27 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_28 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_29 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_30 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_31 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_32 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_33 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_34 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_35 = 32'sd0;
-  wire signed [32-1:0] _saxi_resetval_36 = 32'sd0;
+  reg signed [32-1:0] _saxi_resetval_0;
+  reg signed [32-1:0] _saxi_resetval_1;
+  reg signed [32-1:0] _saxi_resetval_2;
+  reg signed [32-1:0] _saxi_resetval_3;
+  reg signed [32-1:0] _saxi_resetval_4;
+  reg signed [32-1:0] _saxi_resetval_5;
+  reg signed [32-1:0] _saxi_resetval_6;
+  reg signed [32-1:0] _saxi_resetval_7;
+  reg signed [32-1:0] _saxi_resetval_8;
+  reg signed [32-1:0] _saxi_resetval_9;
+  reg signed [32-1:0] _saxi_resetval_10;
+  reg signed [32-1:0] _saxi_resetval_11;
+  reg signed [32-1:0] _saxi_resetval_12;
+  reg signed [32-1:0] _saxi_resetval_13;
+  reg signed [32-1:0] _saxi_resetval_14;
+  reg signed [32-1:0] _saxi_resetval_15;
+  reg signed [32-1:0] _saxi_resetval_16;
+  reg signed [32-1:0] _saxi_resetval_17;
+  reg signed [32-1:0] _saxi_resetval_18;
+  reg signed [32-1:0] _saxi_resetval_19;
+  reg signed [32-1:0] _saxi_resetval_20;
+  reg signed [32-1:0] _saxi_resetval_21;
+  reg signed [32-1:0] _saxi_resetval_22;
+  reg signed [32-1:0] _saxi_resetval_23;
+  reg signed [32-1:0] _saxi_resetval_24;
+  reg signed [32-1:0] _saxi_resetval_25;
+  reg signed [32-1:0] _saxi_resetval_26;
+  reg signed [32-1:0] _saxi_resetval_27;
+  reg signed [32-1:0] _saxi_resetval_28;
+  reg signed [32-1:0] _saxi_resetval_29;
+  reg signed [32-1:0] _saxi_resetval_30;
+  reg signed [32-1:0] _saxi_resetval_31;
+  reg signed [32-1:0] _saxi_resetval_32;
+  reg signed [32-1:0] _saxi_resetval_33;
+  reg signed [32-1:0] _saxi_resetval_34;
+  reg signed [32-1:0] _saxi_resetval_35;
+  reg signed [32-1:0] _saxi_resetval_36;
+  initial begin
+    _saxi_resetval_0  = 32'sd0; _saxi_resetval_1  = 32'sd0; _saxi_resetval_2  = 32'sd0;
+    _saxi_resetval_3  = 32'sd0; _saxi_resetval_4  = 32'sd0; _saxi_resetval_5  = 32'sd0;
+    _saxi_resetval_6  = 32'sd0; _saxi_resetval_7  = 32'sd0; _saxi_resetval_8  = 32'sd0;
+    _saxi_resetval_9  = 32'sd0; _saxi_resetval_10 = 32'sd0; _saxi_resetval_11 = 32'sd0;
+    _saxi_resetval_12 = 32'sd0; _saxi_resetval_13 = 32'sd0; _saxi_resetval_14 = 32'sd0;
+    _saxi_resetval_15 = 32'sd0; _saxi_resetval_16 = 32'sd0; _saxi_resetval_17 = 32'sd0;
+    _saxi_resetval_18 = 32'sd0; _saxi_resetval_19 = 32'sd0; _saxi_resetval_20 = 32'sd0;
+    _saxi_resetval_21 = 32'sd0; _saxi_resetval_22 = 32'sd0; _saxi_resetval_23 = 32'sd0;
+    _saxi_resetval_24 = 32'sd0; _saxi_resetval_25 = 32'sd0; _saxi_resetval_26 = 32'sd0;
+    _saxi_resetval_27 = 32'sd0; _saxi_resetval_28 = 32'sd0; _saxi_resetval_29 = 32'sd0;
+    _saxi_resetval_30 = 32'sd0; _saxi_resetval_31 = 32'sd0; _saxi_resetval_32 = 32'sd0;
+    _saxi_resetval_33 = 32'sd0; _saxi_resetval_34 = 32'sd0; _saxi_resetval_35 = 32'sd0;
+    _saxi_resetval_36 = 32'sd0;
+  end
   localparam _saxi_maskwidth = 6;
   localparam _saxi_mask = { _saxi_maskwidth{ 1'd1 } };
   localparam _saxi_shift = 2;
@@ -577,10 +588,6 @@ module taketwo
   ram_w16_l512_id0_0
   inst_ram_w16_l512_id0_0
   (
-    `ifdef USE_POWER_PINS
-    .VDD(VDD),
-    .VSS(VSS),
-    `endif
     .CLK(CLK),
     .ram_w16_l512_id0_0_0_addr(ram_w16_l512_id0_0_0_addr),
     .ram_w16_l512_id0_0_0_rdata(ram_w16_l512_id0_0_0_rdata),
@@ -610,10 +617,6 @@ module taketwo
   ram_w16_l512_id0_1
   inst_ram_w16_l512_id0_1
   (
-    `ifdef USE_POWER_PINS
-    .VDD(VDD),
-    .VSS(VSS),
-    `endif
     .CLK(CLK),
     .ram_w16_l512_id0_1_0_addr(ram_w16_l512_id0_1_0_addr),
     .ram_w16_l512_id0_1_0_rdata(ram_w16_l512_id0_1_0_rdata),
@@ -643,10 +646,6 @@ module taketwo
   ram_w16_l512_id1_0
   inst_ram_w16_l512_id1_0
   (
-    `ifdef USE_POWER_PINS
-    .VDD(VDD),
-    .VSS(VSS),
-    `endif
     .CLK(CLK),
     .ram_w16_l512_id1_0_0_addr(ram_w16_l512_id1_0_0_addr),
     .ram_w16_l512_id1_0_0_rdata(ram_w16_l512_id1_0_0_rdata),
@@ -676,10 +675,6 @@ module taketwo
   ram_w16_l512_id1_1
   inst_ram_w16_l512_id1_1
   (
-    `ifdef USE_POWER_PINS
-    .VDD(VDD),
-    .VSS(VSS),
-    `endif
     .CLK(CLK),
     .ram_w16_l512_id1_1_0_addr(ram_w16_l512_id1_1_0_addr),
     .ram_w16_l512_id1_1_0_rdata(ram_w16_l512_id1_1_0_rdata),
@@ -709,10 +704,6 @@ module taketwo
   ram_w16_l512_id2_0
   inst_ram_w16_l512_id2_0
   (
-    `ifdef USE_POWER_PINS
-    .VDD(VDD),
-    .VSS(VSS),
-    `endif
     .CLK(CLK),
     .ram_w16_l512_id2_0_0_addr(ram_w16_l512_id2_0_0_addr),
     .ram_w16_l512_id2_0_0_rdata(ram_w16_l512_id2_0_0_rdata),
@@ -742,10 +733,6 @@ module taketwo
   ram_w16_l512_id2_1
   inst_ram_w16_l512_id2_1
   (
-    `ifdef USE_POWER_PINS
-    .VDD(VDD),
-    .VSS(VSS),
-    `endif
     .CLK(CLK),
     .ram_w16_l512_id2_1_0_addr(ram_w16_l512_id2_1_0_addr),
     .ram_w16_l512_id2_1_0_rdata(ram_w16_l512_id2_1_0_rdata),
@@ -775,10 +762,6 @@ module taketwo
   ram_w16_l512_id3_0
   inst_ram_w16_l512_id3_0
   (
-    `ifdef USE_POWER_PINS
-    .VDD(VDD),
-    .VSS(VSS),
-    `endif
     .CLK(CLK),
     .ram_w16_l512_id3_0_0_addr(ram_w16_l512_id3_0_0_addr),
     .ram_w16_l512_id3_0_0_rdata(ram_w16_l512_id3_0_0_rdata),
@@ -808,10 +791,6 @@ module taketwo
   ram_w16_l512_id3_1
   inst_ram_w16_l512_id3_1
   (
-    `ifdef USE_POWER_PINS
-    .VDD(VDD),
-    .VSS(VSS),
-    `endif
     .CLK(CLK),
     .ram_w16_l512_id3_1_0_addr(ram_w16_l512_id3_1_0_addr),
     .ram_w16_l512_id3_1_0_rdata(ram_w16_l512_id3_1_0_rdata),
@@ -841,10 +820,6 @@ module taketwo
   ram_w16_l512_id4_0
   inst_ram_w16_l512_id4_0
   (
-    `ifdef USE_POWER_PINS
-    .VDD(VDD),
-    .VSS(VSS),
-    `endif
     .CLK(CLK),
     .ram_w16_l512_id4_0_0_addr(ram_w16_l512_id4_0_0_addr),
     .ram_w16_l512_id4_0_0_rdata(ram_w16_l512_id4_0_0_rdata),
@@ -874,10 +849,6 @@ module taketwo
   ram_w16_l512_id4_1
   inst_ram_w16_l512_id4_1
   (
-    `ifdef USE_POWER_PINS
-    .VDD(VDD),
-    .VSS(VSS),
-    `endif
     .CLK(CLK),
     .ram_w16_l512_id4_1_0_addr(ram_w16_l512_id4_1_0_addr),
     .ram_w16_l512_id4_1_0_rdata(ram_w16_l512_id4_1_0_rdata),
@@ -8559,6 +8530,8 @@ module taketwo
       matmul_11_arg_objaddr_2 <= 0;
       matmul_11_arg_objaddr_3 <= 0;
       matmul_11_control_param_index <= 0;
+      dbg_logit0 <= 16'sd0;
+      dbg_logit1 <= 16'sd0;
     end else begin
       case(main_fsm)
         main_fsm_init: begin
@@ -8725,7 +8698,9 @@ module taketwo
   ///NEW
 always @(posedge CLK) begin
   if (RST) begin
-    end else begin
+    dbg_logit0 <= 16'sd0;
+    dbg_logit1 <= 16'sd0;
+  end else begin
     if (_stream_matmul_11_stream_oready &&
         _stream_matmul_11_sink_26_sink_wenable &&
         (_stream_matmul_11_sink_26_sink_sel == 5)) begin
@@ -10022,10 +9997,6 @@ endmodule
 
 module ram_w16_l512_id0_0
 (
-  `ifdef USE_POWER_PINS
-  inout VDD,
-  inout VSS,
-  `endif
   input CLK,
   input [8-1:0] ram_w16_l512_id0_0_0_addr,
   output [16-1:0] ram_w16_l512_id0_0_0_rdata,
@@ -10038,10 +10009,8 @@ module ram_w16_l512_id0_0
   input ram_w16_l512_id0_0_1_wenable,
   input ram_w16_l512_id0_0_1_enable
 );
-  `ifndef USE_POWER_PINS
-  supply1 VDD;
-  supply0 VSS;
-  `endif
+  supply1 vdd;
+  supply0 vss;
 
   wire write_en_n;
   wire [8:0] addr;
@@ -10064,8 +10033,8 @@ module ram_w16_l512_id0_0
     .A(addr),
     .D(wdata[15:8]),
     .Q(q_top),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1 
@@ -10077,8 +10046,8 @@ module ram_w16_l512_id0_0
     .A(addr),
     .D(wdata[7:0]),
     .Q(q_bot),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   assign ram_w16_l512_id0_0_0_rdata = {q_top, q_bot};
@@ -10091,10 +10060,6 @@ endmodule
 
 module ram_w16_l512_id0_1
 (
-  `ifdef USE_POWER_PINS
-  inout VDD,
-  inout VSS,
-  `endif
   input CLK,
   input [8-1:0] ram_w16_l512_id0_1_0_addr,
   output [16-1:0] ram_w16_l512_id0_1_0_rdata,
@@ -10108,10 +10073,8 @@ module ram_w16_l512_id0_1
   input ram_w16_l512_id0_1_1_enable
 );
 
-  `ifndef USE_POWER_PINS
-  supply1 VDD;
-  supply0 VSS;
-  `endif
+  supply1 vdd;
+  supply0 vss;
 
   wire write_en_n;
   wire [8:0] addr;
@@ -10134,8 +10097,8 @@ module ram_w16_l512_id0_1
     .A(addr),
     .D(wdata[15:8]),
     .Q(q_top),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1 
@@ -10147,8 +10110,8 @@ module ram_w16_l512_id0_1
     .A(addr),
     .D(wdata[7:0]),
     .Q(q_bot),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   assign ram_w16_l512_id0_1_0_rdata = {q_top, q_bot};
@@ -10161,10 +10124,6 @@ endmodule
 
 module ram_w16_l512_id1_0
 (
-  `ifdef USE_POWER_PINS
-  inout VDD,
-  inout VSS,
-  `endif
   input CLK,
   input [8-1:0] ram_w16_l512_id1_0_0_addr,
   output [16-1:0] ram_w16_l512_id1_0_0_rdata,
@@ -10178,10 +10137,8 @@ module ram_w16_l512_id1_0
   input ram_w16_l512_id1_0_1_enable
 );
 
-  `ifndef USE_POWER_PINS
-  supply1 VDD;
-  supply0 VSS;
-  `endif
+  supply1 vdd;
+  supply0 vss;
 
   wire write_en_n;
   wire [8:0] addr;
@@ -10204,8 +10161,8 @@ module ram_w16_l512_id1_0
     .A(addr),
     .D(wdata[15:8]),
     .Q(q_top),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1 
@@ -10217,8 +10174,8 @@ module ram_w16_l512_id1_0
     .A(addr),
     .D(wdata[7:0]),
     .Q(q_bot),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   assign ram_w16_l512_id1_0_0_rdata = {q_top, q_bot};
@@ -10231,10 +10188,6 @@ endmodule
 
 module ram_w16_l512_id1_1
 (
-  `ifdef USE_POWER_PINS
-  inout VDD,
-  inout VSS,
-  `endif
   input CLK,
   input [8-1:0] ram_w16_l512_id1_1_0_addr,
   output [16-1:0] ram_w16_l512_id1_1_0_rdata,
@@ -10248,10 +10201,8 @@ module ram_w16_l512_id1_1
   input ram_w16_l512_id1_1_1_enable
 );
 
-  `ifndef USE_POWER_PINS
-  supply1 VDD;
-  supply0 VSS;
-  `endif
+  supply1 vdd;
+  supply0 vss;
 
   wire write_en_n;
   wire [8:0] addr;
@@ -10274,8 +10225,8 @@ module ram_w16_l512_id1_1
     .A(addr),
     .D(wdata[15:8]),
     .Q(q_top),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1 
@@ -10287,8 +10238,8 @@ module ram_w16_l512_id1_1
     .A(addr),
     .D(wdata[7:0]),
     .Q(q_bot),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   assign ram_w16_l512_id1_1_0_rdata = {q_top, q_bot};
@@ -10301,10 +10252,6 @@ endmodule
 
 module ram_w16_l512_id2_0
 (
-  `ifdef USE_POWER_PINS
-  inout VDD,
-  inout VSS,
-  `endif
   input CLK,
   input [8-1:0] ram_w16_l512_id2_0_0_addr,
   output [16-1:0] ram_w16_l512_id2_0_0_rdata,
@@ -10318,10 +10265,8 @@ module ram_w16_l512_id2_0
   input ram_w16_l512_id2_0_1_enable
 );
 
-  `ifndef USE_POWER_PINS
-  supply1 VDD;
-  supply0 VSS;
-  `endif
+  supply1 vdd;
+  supply0 vss;
 
   wire write_en_n;
   wire [8:0] addr;
@@ -10344,8 +10289,8 @@ module ram_w16_l512_id2_0
     .A(addr),
     .D(wdata[15:8]),
     .Q(q_top),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1 
@@ -10357,8 +10302,8 @@ module ram_w16_l512_id2_0
     .A(addr),
     .D(wdata[7:0]),
     .Q(q_bot),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   assign ram_w16_l512_id2_0_0_rdata = {q_top, q_bot};
@@ -10371,10 +10316,6 @@ endmodule
 
 module ram_w16_l512_id2_1
 (
-  `ifdef USE_POWER_PINS
-  inout VDD,
-  inout VSS,
-  `endif
   input CLK,
   input [8-1:0] ram_w16_l512_id2_1_0_addr,
   output [16-1:0] ram_w16_l512_id2_1_0_rdata,
@@ -10388,10 +10329,8 @@ module ram_w16_l512_id2_1
   input ram_w16_l512_id2_1_1_enable
 );
 
-  `ifndef USE_POWER_PINS
-  supply1 VDD;
-  supply0 VSS;
-  `endif
+  supply1 vdd;
+  supply0 vss;
 
   wire write_en_n;
   wire [8:0] addr;
@@ -10414,8 +10353,8 @@ module ram_w16_l512_id2_1
     .A(addr),
     .D(wdata[15:8]),
     .Q(q_top),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1 
@@ -10427,8 +10366,8 @@ module ram_w16_l512_id2_1
     .A(addr),
     .D(wdata[7:0]),
     .Q(q_bot),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   assign ram_w16_l512_id2_1_0_rdata = {q_top, q_bot};
@@ -10441,10 +10380,6 @@ endmodule
 
 module ram_w16_l512_id3_0
 (
-  `ifdef USE_POWER_PINS
-  inout VDD,
-  inout VSS,
-  `endif
   input CLK,
   input [8-1:0] ram_w16_l512_id3_0_0_addr,
   output [16-1:0] ram_w16_l512_id3_0_0_rdata,
@@ -10458,10 +10393,8 @@ module ram_w16_l512_id3_0
   input ram_w16_l512_id3_0_1_enable
 );
 
-  `ifndef USE_POWER_PINS
-  supply1 VDD;
-  supply0 VSS;
-  `endif
+  supply1 vdd;
+  supply0 vss;
 
   wire write_en_n;
   wire [8:0] addr;
@@ -10484,8 +10417,8 @@ module ram_w16_l512_id3_0
     .A(addr),
     .D(wdata[15:8]),
     .Q(q_top),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1 
@@ -10497,8 +10430,8 @@ module ram_w16_l512_id3_0
     .A(addr),
     .D(wdata[7:0]),
     .Q(q_bot),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   assign ram_w16_l512_id3_0_0_rdata = {q_top, q_bot};
@@ -10511,10 +10444,6 @@ endmodule
 
 module ram_w16_l512_id3_1
 (
-  `ifdef USE_POWER_PINS
-  inout VDD,
-  inout VSS,
-  `endif
   input CLK,
   input [8-1:0] ram_w16_l512_id3_1_0_addr,
   output [16-1:0] ram_w16_l512_id3_1_0_rdata,
@@ -10528,10 +10457,8 @@ module ram_w16_l512_id3_1
   input ram_w16_l512_id3_1_1_enable
 );
 
-  `ifndef USE_POWER_PINS
-  supply1 VDD;
-  supply0 VSS;
-  `endif
+    supply1 vdd;
+  supply0 vss;
 
   wire write_en_n;
   wire [8:0] addr;
@@ -10554,8 +10481,8 @@ module ram_w16_l512_id3_1
     .A(addr),
     .D(wdata[15:8]),
     .Q(q_top),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1 
@@ -10567,8 +10494,8 @@ module ram_w16_l512_id3_1
     .A(addr),
     .D(wdata[7:0]),
     .Q(q_bot),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   assign ram_w16_l512_id3_1_0_rdata = {q_top, q_bot};
@@ -10581,10 +10508,6 @@ endmodule
 
 module ram_w16_l512_id4_0
 (
-  `ifdef USE_POWER_PINS
-  inout VDD,
-  inout VSS,
-  `endif
   input CLK,
   input [8-1:0] ram_w16_l512_id4_0_0_addr,
   output [16-1:0] ram_w16_l512_id4_0_0_rdata,
@@ -10598,10 +10521,8 @@ module ram_w16_l512_id4_0
   input ram_w16_l512_id4_0_1_enable
 );
 
-  `ifndef USE_POWER_PINS
-  supply1 VDD;
-  supply0 VSS;
-  `endif
+  supply1 vdd;
+  supply0 vss;
 
   wire write_en_n;
   wire [8:0] addr;
@@ -10624,8 +10545,8 @@ module ram_w16_l512_id4_0
     .A(addr),
     .D(wdata[15:8]),
     .Q(q_top),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1 
@@ -10637,8 +10558,8 @@ module ram_w16_l512_id4_0
     .A(addr),
     .D(wdata[7:0]),
     .Q(q_bot),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   assign ram_w16_l512_id4_0_0_rdata = {q_top, q_bot};
@@ -10651,10 +10572,6 @@ endmodule
 
 module ram_w16_l512_id4_1
 (
-  `ifdef USE_POWER_PINS
-  inout VDD,
-  inout VSS,
-  `endif
   input CLK,
   input [8-1:0] ram_w16_l512_id4_1_0_addr,
   output [16-1:0] ram_w16_l512_id4_1_0_rdata,
@@ -10668,10 +10585,8 @@ module ram_w16_l512_id4_1
   input ram_w16_l512_id4_1_1_enable
 );
 
-  `ifndef USE_POWER_PINS
-  supply1 VDD;
-  supply0 VSS;
-  `endif
+  supply1 vdd;
+  supply0 vss;
 
   wire write_en_n;
   wire [8:0] addr;
@@ -10694,8 +10609,8 @@ module ram_w16_l512_id4_1
     .A(addr),
     .D(wdata[15:8]),
     .Q(q_top),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1 
@@ -10707,8 +10622,8 @@ module ram_w16_l512_id4_1
     .A(addr),
     .D(wdata[7:0]),
     .Q(q_bot),
-    .VDD(VDD), 
-    .VSS(VSS)
+    .VDD(vdd), 
+    .VSS(vss)
   );
 
   assign ram_w16_l512_id4_1_0_rdata = {q_top, q_bot};
@@ -10834,3 +10749,4 @@ module multiplier_core_0
 
 
 endmodule
+
