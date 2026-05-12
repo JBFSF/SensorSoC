@@ -284,17 +284,14 @@ def _pack_force_wake_summary_str(dut) -> str:
 
     Layout:
       [15] DFT force-wake pad
-      [14] host I2C IRQ event
+      [14] reserved, tied low
       [13] ML IRQ
       [12] timer event
       [11:0] zero
-
-    The host-I2C bit is intentionally observed but not stimulated here; that
-    block is transitional and should not become a new DFT dependency.
     """
     return (
         str(dut.bidir_in.value[FORCE_WAKE_PAD]).upper()
-        + _bit_str(dut.u_top.host_i2c_irq_event_o)
+        + "0"
         + _bit_str(dut.u_top.ml_irq_o)
         + _bit_str(dut.u_top.timer_event_o)
         + "0" * 12
@@ -684,7 +681,7 @@ async def test_mode_01001_pico_sleep_irq_summary_tracks_sleep_irq_cpu_and_trap(d
 
 @cocotb.test()
 async def test_mode_01011_force_wake_reflects_pad(dut):
-    """Force-wake mode should expose wake/IRQ sources without host-I2C stimulus."""
+    """Force-wake mode should expose wake/IRQ sources without retired sideband stimulus."""
     await _start_up(dut)
     _set_test_mode(dut, 0b01011)
     await ClockCycles(dut.clk, 4)
@@ -699,7 +696,7 @@ async def test_mode_01011_force_wake_reflects_pad(dut):
         f"got {_debug_bus_str(dut)}"
     )
     assert _debug_bit(dut, 15) == 0, f"expected force wake bit low, got 0x{_debug_bus(dut):04x}"
-    assert _debug_bit(dut, 14) == 0, "host I2C IRQ bit should stay low when not stimulated"
+    assert _debug_bit(dut, 14) == 0, "reserved wake-source summary bit should stay low"
     assert (_debug_bus(dut) & 0x0FFF) == 0, f"expected low 12 bits zero, got 0x{_debug_bus(dut):04x}"
 
     _drive_bidir_input(dut, FORCE_WAKE_PAD, 1)
@@ -738,4 +735,4 @@ async def test_mode_01011_force_wake_reflects_pad(dut):
         f"got {_debug_bus_str(dut)}"
     )
     assert _debug_bit(dut, 15) == 0, f"expected force wake bit cleared, got 0x{_debug_bus(dut):04x}"
-    assert _debug_bit(dut, 14) == 0, "host I2C IRQ bit should remain low without host-I2C stimulus"
+    assert _debug_bit(dut, 14) == 0, "reserved wake-source summary bit should remain low"

@@ -30,7 +30,7 @@ module sim_irq_test #(
     ) u_top (
         .clk_i               (clk),
         .reset_i             (~resetn),
-        .i2c_scl_i           (1'b1),
+        .i2c_scl_o(),
         .i2c_sda_io          (sda_bus),
         .i2c_sda_i           (1'b1),
         .i2c_sda_drive_low_o (),
@@ -52,10 +52,6 @@ module sim_irq_test #(
         .mssd_feat_o         (),
         .ml_update_gate_o    (),
         .invalid_reason_o    (),
-        .spi_clk_o           (),
-        .spi_mosi_o          (),
-        .spi_miso_i          (1'b1),
-        .spi_cs_n_o          (),
         .boot_spi_clk_o      (boot_spi_clk),
         .boot_spi_mosi_o     (boot_spi_mosi),
         .boot_spi_miso_i     (boot_spi_miso),
@@ -78,7 +74,6 @@ module sim_irq_test #(
         .pico_mem_wdata_o    (),
         .pico_irq_o          (),
         .pico_sleeping_o     (),
-        .host_i2c_irq_event_o(),
         .ml_irq_o            (),
         .timer_event_o       ()
     );

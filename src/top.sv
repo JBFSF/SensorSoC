@@ -416,11 +416,6 @@ module top #(
     wire [31:0] irq_sources;
     wire [31:0] wake_sources;
 
-    // host_i2c_target is disconnected from the physical I2C pads; the pads are
-    // now reserved for i2c_master. These internal stubs keep host_i2c_target
-    // instantiated (and its register file accessible) while isolating it from
-    // the chip-level pins
-
     always_ff @(posedge clk_i) begin
         if (reset_i) begin
             ms_div_q  <= '0;

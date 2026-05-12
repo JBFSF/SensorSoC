@@ -34,13 +34,10 @@
 #   make test-ml-canonical-v1
 #   make sim-top-feature-ml-cpu
 #   make sim-top-feature-ml-cpu-spi-flash
-#   make sim-top-spi-init-unified
 #   make sim-top-ml-control-unified
-#   make sim-top-feature-ml-prod-main-host-i2c
 #   make sim-top-sleep-wake-unified
 #   make test-top-unified-reset-init
 #   make test-top-unified-runtime
-#   make test-top-unified-host-i2c
 #   make test-top-unified-prod-loop
 #   make test-top-unified-forced-wake-irq
 #   make test-top-ml-golden-vector-unified
@@ -58,9 +55,6 @@
 #   make sim-top-feature-ml-cpu-spi-flash
 #     Same CPU-owned ML path, but with weights streamed from simulated SPI flash.
 #
-#   make sim-top-spi-init-unified
-#     Short SPI-only boot-copy proof for unified top.sv.
-#
 #   make sim-top-ml-control-unified
 #     Short ML-control-only proof for unified top.sv.
 #
@@ -71,23 +65,16 @@
 #     Shared cocotb wrapper smoke test for unified top.sv reset/init state.
 #
 #   make test-top-unified-runtime
-#     Shared cocotb runtime checks for host-I2C, repeated prod loop, and forced wake/IRQ corners.
-#   make test-top-unified-host-i2c
-#     Shared cocotb host-I2C register/score visibility check.
+#     Shared cocotb runtime checks for repeated prod loop and forced wake/IRQ corners.
 #   make test-top-unified-prod-loop
 #     Shared cocotb repeated production-loop smoke check.
 #   make test-top-unified-forced-wake-irq
 #     Shared cocotb forced wake/IRQ reset-corner check.
 #
-#   make sim-top-feature-ml-prod-main-host-i2c
-#     Most production-like unified-top flow: SPI load + ML loop + host-I2C visibility.
-#
 #   make sim-top-sleep-wake-unified
 #     Repeated timer-wake + ML-IRQ-wake regression for unified top.sv.
 #
 #   make sim-top-spi-boot
-#   make sim-top-spi-weights
-#
 # NOTE:
 #   This Makefile expects a small helper script at:
 #     scripts/bin2hex.py
@@ -201,9 +188,6 @@ SOC_RTL_SRCS := \
 UNIFIED_TOP_RTL_SRCS := \
   $(RTL_DIR)/top.sv \
   $(RTL_DIR)/top_fsm.v \
-  $(RTL_DIR)/host_i2c_target.v \
-  $(RTL_DIR)/host_i2c_bridge_regs.v \
-  $(RTL_DIR)/spi_master_mmio.v \
   $(RTL_DIR)/i2c_master.sv \
   $(RTL_DIR)/accel_reader.sv \
   $(RTL_DIR)/motion_process.sv \
@@ -276,13 +260,10 @@ FW_C_test_ml_weights        := $(FW_TESTS)/test_ml_weights.c
 FW_C_test_ml_cpu_wake_i2c   := $(FW_TESTS)/test_ml_cpu_wake_i2c.c
 FW_C_test_top_feature_ml_cpu:= $(FW_TESTS)/test_top_feature_ml_cpu.c
 FW_C_test_top_feature_ml_cpu_spi_flash:= $(FW_TESTS)/test_top_feature_ml_cpu_spi_flash.c
-FW_C_test_top_spi_init_unified := $(FW_TESTS)/test_top_spi_init_unified.c
 FW_C_test_top_ml_control_unified := $(FW_TESTS)/test_top_ml_control_unified.c
 FW_C_test_top_sleep_wake_unified := $(FW_TESTS)/test_top_sleep_wake_unified.c
 FW_C_test_top_ml_golden_vector_unified := $(FW_TESTS)/test_top_ml_golden_vector_unified.c
 FW_C_irq_test              := $(FW_DIR)/irq_test.c
-FW_C_test_top_spi_boot_weights := $(FW_TESTS)/test_top_spi_boot_weights.c
-FW_ARCH_test_top_spi_boot_weights := rv32im
 
 # Select the C source based on FW_VARIANT
 FW_SRC = $(FW_C_$(FW_VARIANT))
@@ -297,7 +278,6 @@ FW_ARCH_test_ml_cpu_wake_i2c := rv32im
 FW_ARCH_prod_main := rv32im
 FW_ARCH_test_top_feature_ml_cpu := rv32im
 FW_ARCH_test_top_feature_ml_cpu_spi_flash := rv32im
-FW_ARCH_test_top_spi_init_unified := rv32im
 FW_ARCH_test_top_ml_control_unified := rv32im
 FW_ARCH_test_top_sleep_wake_unified := rv32im
 FW_ARCH_test_top_ml_golden_vector_unified := rv32im
@@ -459,8 +439,6 @@ TOP_FEATURE_ML_CPU_SOURCES := \
 	$(TB_DIR)/tb_top_feature_ml_cpu.sv \
 	$(RTL_DIR)/top.sv \
 	$(RTL_DIR)/top_fsm.v \
-	$(RTL_DIR)/host_i2c_target.v \
-	$(RTL_DIR)/host_i2c_bridge_regs.v \
 	$(RTL_DIR)/i2c_master.sv \
 	$(RTL_DIR)/accel_reader.sv \
 	$(RTL_DIR)/motion_process.sv \
@@ -472,7 +450,6 @@ TOP_FEATURE_ML_CPU_SOURCES := \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_boot_ctrl.v \
-	$(RTL_DIR)/spi_master_mmio.v \
 	$(MAKEFILE_DIR)/../ip/picorv32.v \
 	$(RTL_DIR)/test_mmio.v \
 	$(RTL_DIR)/timer_mmio.v \
@@ -505,8 +482,6 @@ TOP_FEATURE_ML_CPU_SPI_FLASH_SOURCES := \
 	$(TB_DIR)/spi_flash_model.v \
 	$(RTL_DIR)/top.sv \
 	$(RTL_DIR)/top_fsm.v \
-	$(RTL_DIR)/host_i2c_target.v \
-	$(RTL_DIR)/host_i2c_bridge_regs.v \
 	$(RTL_DIR)/i2c_master.sv \
 	$(RTL_DIR)/accel_reader.sv \
 	$(RTL_DIR)/motion_process.sv \
@@ -518,7 +493,6 @@ TOP_FEATURE_ML_CPU_SPI_FLASH_SOURCES := \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_boot_ctrl.v \
-	$(RTL_DIR)/spi_master_mmio.v \
 	$(MAKEFILE_DIR)/../ip/picorv32.v \
 	$(RTL_DIR)/test_mmio.v \
 	$(RTL_DIR)/timer_mmio.v \
@@ -544,56 +518,6 @@ sim-top-feature-ml-cpu-spi-flash: $(TOP_FEATURE_ML_CPU_SPI_FLASH_VVP) | $(SIM_BU
 	@echo "== Running $(TOP_FEATURE_ML_CPU_SPI_FLASH_TOP) (FW=$(FW_DIR)/build/test_top_feature_ml_cpu_spi_flash/firmware.hex FLASH=$(TAKETWO_PARAMS_HEX)) =="
 	$(VVP) $(TOP_FEATURE_ML_CPU_SPI_FLASH_VVP)
 
-
-# Unified top: short SPI-only regression. This isolates the boot-copy plumbing:
-#   CPU firmware -> spi_master_mmio -> spi_flash_model -> weight_ram_axi
-# without waiting on features, ML, or host policy behavior.
-TOP_SPI_INIT_UNIFIED_TOP     := tb_top_spi_init_unified
-TOP_SPI_INIT_UNIFIED_VVP     := $(BUILD_DIR)/$(TOP_SPI_INIT_UNIFIED_TOP).vvp
-TOP_SPI_INIT_UNIFIED_SOURCES := \
-	$(TB_DIR)/tb_top_spi_init_unified.sv \
-	$(TB_DIR)/spi_flash_model.v \
-	$(RTL_DIR)/top.sv \
-	$(RTL_DIR)/top_fsm.v \
-	$(RTL_DIR)/host_i2c_target.v \
-	$(RTL_DIR)/host_i2c_bridge_regs.v \
-	$(RTL_DIR)/i2c_master.sv \
-	$(RTL_DIR)/accel_reader.sv \
-	$(RTL_DIR)/motion_process.sv \
-	$(RTL_DIR)/ppg_fifo_reader.sv \
-	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/mssd_engine.sv \
-	$(RTL_DIR)/signal_quality.sv \
-	$(RTL_DIR)/feature_engine.sv \
-	$(RTL_DIR)/globaltimer.sv \
-	$(RTL_DIR)/simple_sram.v \
-	$(RTL_DIR)/spi_boot_ctrl.v \
-	$(RTL_DIR)/spi_master_mmio.v \
-	$(MAKEFILE_DIR)/../ip/picorv32.v \
-	$(RTL_DIR)/test_mmio.v \
-	$(RTL_DIR)/timer_mmio.v \
-	$(RTL_DIR)/ml_axil_bridge_mmio.v \
-	$(RTL_DIR)/weight_flash_axi.v \
-	$(RTL_DIR)/irq_ctrl_mmio.v \
-	$(RTL_DIR)/alarm_mmio.v \
-	$(RTL_DIR)/taketwo_wrap.v \
-	$(RTL_DIR)/taketwo.v \
-	$(RTL_DIR)/pwrctrl_mmio.v \
-	$(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v \
-	sensors/i2c_slave_lis2dw12.sv \
-	sensors/i2c_slave_adpd144ri.sv
-
-$(TOP_SPI_INIT_UNIFIED_VVP): $(TOP_SPI_INIT_UNIFIED_SOURCES)
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) -s $(TOP_SPI_INIT_UNIFIED_TOP) -o $@ \
-	  $(TOP_SPI_INIT_UNIFIED_SOURCES)
-
-.PHONY: sim-top-spi-init-unified
-sim-top-spi-init-unified: $(TOP_SPI_INIT_UNIFIED_VVP) | $(SIM_BUILD)
-	@$(SELF_MAKE) FW_VARIANT=test_top_spi_init_unified firmware
-	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
-	@echo "== Running $(TOP_SPI_INIT_UNIFIED_TOP) (FW=$(FW_DIR)/build/test_top_spi_init_unified/firmware.hex FLASH=$(TAKETWO_PARAMS_HEX)) =="
-	$(VVP) $(TOP_SPI_INIT_UNIFIED_VVP)
-
 # ============================================================
 # Unified top: hardware SPI boot controller isolation test
 # Verifies spi_boot_ctrl loads firmware into simple_sram and
@@ -617,32 +541,6 @@ $(TOP_SPI_BOOT_WEIGHTS_VVP): $(TOP_SPI_BOOT_WEIGHTS_SOURCES)
 sim-top-spi-boot: $(TOP_SPI_BOOT_WEIGHTS_VVP) | $(SIM_BUILD)
 	@echo "== Running $(TOP_SPI_BOOT_WEIGHTS_TOP) =="
 	$(VVP) $(TOP_SPI_BOOT_WEIGHTS_VVP)
-
-# ============================================================
-# Unified top: CPU-driven ML weight loading from SPI flash
-# Firmware boots (BOOT_WORDS=1), then loads weights from weight
-# flash via spi_master_mmio into weight_ram_axi and verifies.
-# ============================================================
-
-TOP_SPI_WEIGHTS_TOP     := tb_top_spi_weights
-TOP_SPI_WEIGHTS_VVP     := $(BUILD_DIR)/$(TOP_SPI_WEIGHTS_TOP).vvp
-TOP_SPI_WEIGHTS_SOURCES := \
-	$(TB_DIR)/tb_top_spi_weights.sv \
-	$(TB_DIR)/spi_flash_model.v \
-	$(UNIFIED_TOP_RTL_SRCS) \
-	sensors/i2c_slave_lis2dw12.sv \
-	sensors/i2c_slave_adpd144ri.sv
-
-$(TOP_SPI_WEIGHTS_VVP): $(TOP_SPI_WEIGHTS_SOURCES)
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) \
-	  -s $(TOP_SPI_WEIGHTS_TOP) -o $@ $(TOP_SPI_WEIGHTS_SOURCES)
-
-.PHONY: sim-top-spi-weights
-sim-top-spi-weights: $(TOP_SPI_WEIGHTS_VVP) | $(SIM_BUILD)
-	@$(SELF_MAKE) FW_VARIANT=test_top_spi_boot_weights firmware
-	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
-	@echo "== Running $(TOP_SPI_WEIGHTS_TOP) (FW=$(FW_DIR)/build/test_top_spi_boot_weights/firmware.hex FLASH=$(TAKETWO_PARAMS_HEX)) =="
-	$(VVP) $(TOP_SPI_WEIGHTS_VVP)
 
 # ============================================================
 # Hardware weight boot: SPI flash -> weight_ram_axi -> taketwo SRAMs
@@ -680,8 +578,6 @@ TOP_ML_CONTROL_UNIFIED_SOURCES := \
 	$(TB_DIR)/spi_flash_model.v \
 	$(RTL_DIR)/top.sv \
 	$(RTL_DIR)/top_fsm.v \
-	$(RTL_DIR)/host_i2c_target.v \
-	$(RTL_DIR)/host_i2c_bridge_regs.v \
 	$(RTL_DIR)/i2c_master.sv \
 	$(RTL_DIR)/accel_reader.sv \
 	$(RTL_DIR)/motion_process.sv \
@@ -693,7 +589,6 @@ TOP_ML_CONTROL_UNIFIED_SOURCES := \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_boot_ctrl.v \
-	$(RTL_DIR)/spi_master_mmio.v \
 	$(MAKEFILE_DIR)/../ip/picorv32.v \
 	$(RTL_DIR)/test_mmio.v \
 	$(RTL_DIR)/timer_mmio.v \
@@ -719,52 +614,6 @@ sim-top-ml-control-unified: $(TOP_ML_CONTROL_UNIFIED_VVP) | $(SIM_BUILD)
 	@echo "== Running $(TOP_ML_CONTROL_UNIFIED_TOP) (FW=$(FW_DIR)/build/test_top_ml_control_unified/firmware.hex WEIGHTS=$(TAKETWO_PARAMS_HEX)) =="
 	$(VVP) $(TOP_ML_CONTROL_UNIFIED_VVP)
 
-TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP     := tb_top_feature_ml_prod_main_host_i2c
-TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP     := $(BUILD_DIR)/$(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP).vvp
-TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES := \
-	$(TB_DIR)/tb_top_feature_ml_prod_main_host_i2c.sv \
-	$(TB_DIR)/spi_flash_model.v \
-	$(RTL_DIR)/top.sv \
-	$(RTL_DIR)/top_fsm.v \
-	$(RTL_DIR)/host_i2c_target.v \
-	$(RTL_DIR)/host_i2c_bridge_regs.v \
-	$(RTL_DIR)/i2c_master.sv \
-	$(RTL_DIR)/accel_reader.sv \
-	$(RTL_DIR)/motion_process.sv \
-	$(RTL_DIR)/ppg_fifo_reader.sv \
-	$(RTL_DIR)/ppg_process.sv \
-	$(RTL_DIR)/mssd_engine.sv \
-	$(RTL_DIR)/signal_quality.sv \
-	$(RTL_DIR)/feature_engine.sv \
-	$(RTL_DIR)/globaltimer.sv \
-	$(RTL_DIR)/simple_sram.v \
-	$(RTL_DIR)/spi_boot_ctrl.v \
-	$(RTL_DIR)/spi_master_mmio.v \
-	$(MAKEFILE_DIR)/../ip/picorv32.v \
-	$(RTL_DIR)/test_mmio.v \
-	$(RTL_DIR)/timer_mmio.v \
-	$(RTL_DIR)/ml_axil_bridge_mmio.v \
-	$(RTL_DIR)/weight_flash_axi.v \
-	$(RTL_DIR)/irq_ctrl_mmio.v \
-	$(RTL_DIR)/alarm_mmio.v \
-	$(RTL_DIR)/taketwo_wrap.v \
-	$(RTL_DIR)/taketwo.v \
-	$(RTL_DIR)/pwrctrl_mmio.v \
-	$(RTL_DIR)/gf180mcu_fd_ip_sram__sram512x8m8wm1.v \
-	sensors/i2c_slave_lis2dw12.sv \
-	sensors/i2c_slave_adpd144ri.sv
-
-$(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP): $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES)
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) -s $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP) -o $@ \
-	  $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_SOURCES)
-
-.PHONY: sim-top-feature-ml-prod-main-host-i2c
-sim-top-feature-ml-prod-main-host-i2c: $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP) | $(SIM_BUILD)
-	@$(SELF_MAKE) FW_VARIANT=prod_main firmware
-	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
-	@echo "== Running $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_TOP) (FW=$(FW_DIR)/build/prod_main/firmware.hex FLASH=$(TAKETWO_PARAMS_HEX)) =="
-	$(VVP) $(TOP_FEATURE_ML_PROD_MAIN_HOST_I2C_VVP)
-
 # Unified top: dedicated timer sleep/wake regression.
 # This bench isolates the always-on timer + pwrctrl + irq_ctrl sleep path:
 #   firmware requests sleep -> CPU clock gates -> timer wake arrives
@@ -776,8 +625,6 @@ TOP_SLEEP_WAKE_UNIFIED_SOURCES := \
 	$(TB_DIR)/spi_flash_model.v \
 	$(RTL_DIR)/top.sv \
 	$(RTL_DIR)/top_fsm.v \
-	$(RTL_DIR)/host_i2c_target.v \
-	$(RTL_DIR)/host_i2c_bridge_regs.v \
 	$(RTL_DIR)/i2c_master.sv \
 	$(RTL_DIR)/accel_reader.sv \
 	$(RTL_DIR)/motion_process.sv \
@@ -789,7 +636,6 @@ TOP_SLEEP_WAKE_UNIFIED_SOURCES := \
 	$(RTL_DIR)/globaltimer.sv \
 	$(RTL_DIR)/simple_sram.v \
 	$(RTL_DIR)/spi_boot_ctrl.v \
-	$(RTL_DIR)/spi_master_mmio.v \
 	$(MAKEFILE_DIR)/../ip/picorv32.v \
 	$(RTL_DIR)/test_mmio.v \
 	$(RTL_DIR)/timer_mmio.v \
@@ -1251,14 +1097,6 @@ test-top-unified-reset-init: $(TOP_UNIFIED_ENV_VVP)
 
 TOP_UNIFIED_RUNTIME_PYMOD := test_top_unified_runtime
 
-.PHONY: test-top-unified-host-i2c
-test-top-unified-host-i2c: $(TOP_UNIFIED_ENV_VVP)
-	@echo "[COCOTB] Running host-I2C runtime check on $(TOP_UNIFIED_ENV_TOP)"
-	@export COCOTB_TOPLEVEL=$(TOP_UNIFIED_ENV_TOP); \
-	export COCOTB_TEST_MODULES=$(TOP_UNIFIED_RUNTIME_PYMOD); \
-	export COCOTB_TEST_FILTER=test_host_i2c_registers_and_score_visibility; \
-	$(call RUN_COCOTB_ICARUS,$(TOP_UNIFIED_ENV_VVP))
-
 .PHONY: test-top-unified-prod-loop
 test-top-unified-prod-loop: $(TOP_UNIFIED_ENV_VVP)
 	@echo "[COCOTB] Running repeated production-loop smoke check on $(TOP_UNIFIED_ENV_TOP)"
@@ -1276,7 +1114,7 @@ test-top-unified-forced-wake-irq: $(TOP_UNIFIED_ENV_VVP)
 	$(call RUN_COCOTB_ICARUS,$(TOP_UNIFIED_ENV_VVP))
 
 .PHONY: test-top-unified-runtime
-test-top-unified-runtime: test-top-unified-host-i2c test-top-unified-prod-loop test-top-unified-forced-wake-irq
+test-top-unified-runtime: test-top-unified-prod-loop test-top-unified-forced-wake-irq
 	@true
 
 # ============================================================

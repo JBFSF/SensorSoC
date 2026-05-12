@@ -137,6 +137,7 @@ module chip_core #(
     logic spi_clk_w;
     logic spi_mosi_w;
     logic spi_cs_n_w;
+    logic i2c_scl_w;
     logic i2c_sda_drive_low_w;
 
     logic epoch_end_w;
@@ -157,7 +158,6 @@ module chip_core #(
     logic        pico_sleeping_w;
     logic        test_force_irq_w;
     logic        test_force_wake_w;
-    logic        host_i2c_irq_event_w;
     logic        ml_irq_w;
     logic        timer_event_w;
 
@@ -277,8 +277,8 @@ module chip_core #(
                     test_force_irq_w, pico_trap_w, pico_cpu_clk_en_w, pico_mem_instr_w, pico_mem_valid_w, pico_mem_ready_w, pico_mem_addr_w[9:0]};
             end
             5'b01011: begin 
-                // force pico wake and expose the wake/IRQ sources directly
-                debug_bus_w = {test_force_wake_w, host_i2c_irq_event_w, ml_irq_w, timer_event_w, 12'b0};
+                // force pico wake and expose the remaining wake/IRQ sources directly
+                debug_bus_w = {test_force_wake_w, 1'b0, ml_irq_w, timer_event_w, 12'b0};
             end
 
 
@@ -366,7 +366,7 @@ module chip_core #(
             end
             5'b11011: begin 
                 // force pico wake and expose the wake/IRQ sources directly
-                debug_bus_w = {test_force_wake_w, host_i2c_irq_event_w, ml_irq_w, timer_event_w, 12'b0};
+                debug_bus_w = {test_force_wake_w, 1'b0, ml_irq_w, timer_event_w, 12'b0};
             end
 
 
@@ -401,12 +401,14 @@ module chip_core #(
         bidir_out_w[1] = spi_clk_w;
         bidir_out_w[2] = spi_mosi_w;
         bidir_out_w[3] = spi_cs_n_w;
+        bidir_out_w[5] = i2c_scl_w;
         bidir_out_w[6] = 1'b0;
 
         bidir_oe_w[0] = 1'b1;
         bidir_oe_w[1] = 1'b1;
         bidir_oe_w[2] = 1'b1;
         bidir_oe_w[3] = 1'b1;
+        bidir_oe_w[5] = 1'b1;
         bidir_oe_w[6] = i2c_sda_drive_low_w;
 
         if (test_mode_w[3:0] != 4'b0000) begin
@@ -443,7 +445,7 @@ module chip_core #(
         .clk_i                 (core_clk_w),
         .reset_i               (~rst_n),
 
-        .i2c_scl_i             (bidir_in[5]),
+        .i2c_scl_o             (i2c_scl_w),
         .i2c_sda_io            (),
         .i2c_sda_i             (bidir_in[6]),
         .i2c_sda_drive_low_o   (i2c_sda_drive_low_w),
@@ -469,15 +471,14 @@ module chip_core #(
 
         .ml_update_gate_o      (ml_update_gate_w),
         .invalid_reason_o      (invalid_reason_w),
-
-        .spi_clk_o             (spi_clk_w),
-        .spi_mosi_o            (spi_mosi_w),
-        .spi_miso_i            (bidir_in[4]),
-        .spi_cs_n_o            (spi_cs_n_w),
         .boot_spi_clk_o        (),
         .boot_spi_mosi_o       (),
         .boot_spi_miso_i       (1'b1),
         .boot_spi_cs_n_o       (),
+        .weight_spi_clk_o      (spi_clk_w),
+        .weight_spi_mosi_o     (spi_mosi_w),
+        .weight_spi_miso_i     (bidir_in[4]),
+        .weight_spi_cs_n_o     (spi_cs_n_w),
 
         .epoch_end_o           (epoch_end_w),
         .alarm_o               (alarm_w),
@@ -501,7 +502,6 @@ module chip_core #(
         .pico_mem_wdata_o      (pico_mem_wdata_w),
         .pico_irq_o            (pico_irq_w),
         .pico_sleeping_o       (pico_sleeping_w),
-        .host_i2c_irq_event_o  (host_i2c_irq_event_w),
         .ml_irq_o              (ml_irq_w),
         .timer_event_o         (timer_event_w)
 

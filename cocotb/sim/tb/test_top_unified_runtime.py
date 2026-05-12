@@ -3,9 +3,8 @@
 These tests sit one layer above the reset/init smoke test. They reuse the
 shared wrapper and Python helpers to cover three high-value behaviors:
 
-    1) host-I2C register / configuration visibility
-    2) repeated production-loop smoke behavior
-    3) reset-adjacent forced wake / forced IRQ corner cases
+    1) repeated production-loop smoke behavior
+    2) reset-adjacent forced wake / forced IRQ corner cases
 
 The intent is not to replace the large production-style SystemVerilog bench.
 Instead, these provide focused Python-side checks that are easier to extend and
@@ -13,7 +12,7 @@ debug while keeping the long SV bench as the final integrated guardrail.
 """
 
 import cocotb
-from cocotb.triggers import ClockCycles, NextTimeStep, ReadOnly, RisingEdge
+from cocotb.triggers import ClockCycles, ReadOnly, RisingEdge
 
 from top_unified_env import (
     FEATURE_DHR,
@@ -21,25 +20,8 @@ from top_unified_env import (
     FEATURE_RMSSD,
     FEATURE_STATUS,
     FEATURE_TIME,
-    HOST_CONF_ABS_H,
-    HOST_CONF_ABS_L,
-    HOST_CONF_CTRL,
-    HOST_CONF_STAT,
-    HOST_CONF_THR_H,
-    HOST_CONF_THR_L,
-    HOST_IRQ_COUNT_H,
-    HOST_IRQ_COUNT_L,
-    HOST_LOGIT0_H,
-    HOST_LOGIT0_L,
-    HOST_VERSION,
-    HOST_WHOAMI,
-    ML_SCORE_ADDR,
-    TEST_STATUS_ADDR,
     X_BASE,
     apply_reset,
-    i2c_read_reg,
-    i2c_read_reg16_stable,
-    i2c_write_reg,
     mmio_read_active,
     mmio_write_active,
     start_clock,
@@ -64,47 +46,6 @@ def _s16(value: int) -> int:
 
 
 @cocotb.test()
-async def test_host_i2c_registers_and_score_visibility(dut):
-    """Verify host-I2C basic register/config behavior in the unified wrapper.
-
-    This intentionally avoids treating ML score correctness as a blocker for
-    the top-level behavioral suite. For now, the contract we care about is:
-
-    - the shared wrapper boots far enough for firmware bring-up
-    - the host-I2C target responds at the expected address
-    - ID/version registers read correctly
-    - configuration registers accept writes and read back coherently
-    """
-    cocotb.start_soon(start_clock(dut))
-    await apply_reset(dut)
-    await wait_for_boot_load(dut)
-
-    # Match the low threshold configuration used by the long production bench
-    # so the host bridge emits score-related events promptly.
-    await i2c_write_reg(dut, HOST_CONF_THR_L, 0x01)
-    await i2c_write_reg(dut, HOST_CONF_THR_H, 0x00)
-    await i2c_write_reg(dut, HOST_CONF_CTRL, 0x03)
-
-    whoami = await i2c_read_reg(dut, HOST_WHOAMI)
-    version = await i2c_read_reg(dut, HOST_VERSION)
-    conf_thr_l = await i2c_read_reg(dut, HOST_CONF_THR_L)
-    conf_thr_h = await i2c_read_reg(dut, HOST_CONF_THR_H)
-    conf_ctrl = await i2c_read_reg(dut, HOST_CONF_CTRL)
-    conf_stat = await i2c_read_reg(dut, HOST_CONF_STAT)
-    irq_count = await i2c_read_reg16_stable(dut, HOST_IRQ_COUNT_L, HOST_IRQ_COUNT_H)
-    _ = await i2c_read_reg16_stable(dut, HOST_CONF_ABS_L, HOST_CONF_ABS_H)
-    _ = await i2c_read_reg16_stable(dut, HOST_LOGIT0_L, HOST_LOGIT0_H)
-
-    assert whoami == 0xA5, f"unexpected host WHOAMI: 0x{whoami:02x}"
-    assert version == 0x01, f"unexpected host VERSION: 0x{version:02x}"
-    assert conf_thr_l == 0x01, f"unexpected HOST_CONF_THR_L readback: 0x{conf_thr_l:02x}"
-    assert conf_thr_h == 0x00, f"unexpected HOST_CONF_THR_H readback: 0x{conf_thr_h:02x}"
-    assert conf_ctrl & 0x03 == 0x03, f"unexpected HOST_CONF_CTRL readback: 0x{conf_ctrl:02x}"
-    assert 0 <= conf_stat <= 0xFF, f"unexpected HOST_CONF_STAT byte: 0x{conf_stat:02x}"
-    assert irq_count >= 0, "host IRQ count readback should be a valid 16-bit value"
-
-
-@cocotb.test()
 async def test_repeated_production_loop_smoke(dut):
     """Check that the prod_main loop completes at least one coherent iteration.
 
@@ -115,12 +56,6 @@ async def test_repeated_production_loop_smoke(dut):
     cocotb.start_soon(start_clock(dut))
     await apply_reset(dut)
     await wait_for_boot_load(dut)
-
-    # Configure the host bridge exactly as the production-style bench does so
-    # repeated score visibility is enabled while the firmware loop runs.
-    await i2c_write_reg(dut, HOST_CONF_THR_L, 0x01)
-    await i2c_write_reg(dut, HOST_CONF_THR_H, 0x00)
-    await i2c_write_reg(dut, HOST_CONF_CTRL, 0x03)
 
     feature_read_counts = {
         FEATURE_STATUS: 0,

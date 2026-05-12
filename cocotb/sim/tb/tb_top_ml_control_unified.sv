@@ -54,9 +54,6 @@ wire [7:0]  ppg_sim_rdata;
 wire        ppg_sim_rvalid;
 wire        ppg_sim_rlast;
 wire        ppg_sim_err;
-
-wire        host_i2c_scl;
-tri1        host_i2c_sda;
 wire        boot_spi_clk;
 wire        boot_spi_mosi;
 wire        boot_spi_miso;
@@ -125,8 +122,10 @@ top #(
 ) dut (
     .clk_i(clk),
     .reset_i(reset),
-    .i2c_scl_i(host_i2c_scl),
-    .i2c_sda_io(host_i2c_sda),
+    .i2c_scl_o(),
+    .i2c_sda_io(),
+    .i2c_sda_i(1'b1),
+    .i2c_sda_drive_low_o(),
     .sim_req_o(sim_req),
     .sim_addr_o(sim_addr),
     .sim_reg_o(sim_reg),
@@ -145,10 +144,6 @@ top #(
     .mssd_feat_o(),
     .ml_update_gate_o(),
     .invalid_reason_o(),
-    .spi_clk_o(),
-    .spi_mosi_o(),
-    .spi_miso_i(1'b1),
-    .spi_cs_n_o(),
     .boot_spi_clk_o(boot_spi_clk),
     .boot_spi_mosi_o(boot_spi_mosi),
     .boot_spi_miso_i(boot_spi_miso),
@@ -162,8 +157,6 @@ top #(
     .irq_eoi_o(),
     .boot_done_o()
 );
-
-assign host_i2c_scl = 1'b1;
 
 i2c_slave_lis2dw12 #(
     .I2C_ADDR(ACC_ADDR)

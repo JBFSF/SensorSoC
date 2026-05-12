@@ -24,28 +24,11 @@ the easiest ways for regressions to drift. Keeping the setup here makes the
 first few shared-wrapper tests consistent:
 
     - reset/init smoke
-    - future host-I2C checks
     - future repeated production-loop smoke checks
 """
 
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, NextTimeStep, ReadOnly, RisingEdge, Timer
-
-
-HOST_I2C_ADDR = 0x42
-
-HOST_WHOAMI = 0x00
-HOST_VERSION = 0x01
-HOST_IRQ_COUNT_L = 0x05
-HOST_IRQ_COUNT_H = 0x06
-HOST_CONF_THR_L = 0x30
-HOST_CONF_THR_H = 0x31
-HOST_CONF_CTRL = 0x32
-HOST_CONF_STAT = 0x33
-HOST_LOGIT0_L = 0x34
-HOST_LOGIT0_H = 0x35
-HOST_CONF_ABS_L = 0x38
-HOST_CONF_ABS_H = 0x39
+from cocotb.triggers import ClockCycles, NextTimeStep, ReadOnly, RisingEdge
 
 FEATURE_BASE = 0x03004000
 FEATURE_STATUS = FEATURE_BASE + 0x00
@@ -188,104 +171,6 @@ async def wait_for_coherent_score(dut, timeout_cycles: int = 600000) -> None:
         await ReadOnly()
         score = int(dut.ml_score_hw.value)
         code = int(dut.test_code.value)
-        logit0_proxy = int(dut.host_logit0_proxy.value)
-        if score != 0 and (code & 0xFFFF) == (score & 0xFFFF) and logit0_proxy != 0:
+        if score != 0 and (code & 0xFFFF) == (score & 0xFFFF):
             return
     raise AssertionError("timed out waiting for first coherent firmware score/logit update")
-
-
-async def i2c_tick(step_ns: int = 120) -> None:
-    """Mirror the timing used by the existing SV production-style bench."""
-    await Timer(step_ns, unit="ns")
-
-
-async def i2c_start(dut) -> None:
-    await NextTimeStep()
-    dut.host_sda_drv_low.value = 0
-    dut.host_scl_drv.value = 1
-    await i2c_tick()
-    dut.host_sda_drv_low.value = 1
-    await i2c_tick()
-    dut.host_scl_drv.value = 0
-    await i2c_tick()
-
-
-async def i2c_stop(dut) -> None:
-    await NextTimeStep()
-    dut.host_sda_drv_low.value = 1
-    dut.host_scl_drv.value = 0
-    await i2c_tick()
-    dut.host_scl_drv.value = 1
-    await i2c_tick()
-    dut.host_sda_drv_low.value = 0
-    await i2c_tick()
-
-
-async def i2c_write_bit(dut, bitval: int) -> None:
-    await NextTimeStep()
-    dut.host_scl_drv.value = 0
-    dut.host_sda_drv_low.value = 0 if bitval else 1
-    await i2c_tick()
-    dut.host_scl_drv.value = 1
-    await i2c_tick()
-    dut.host_scl_drv.value = 0
-    await i2c_tick()
-
-
-async def i2c_read_bit(dut) -> int:
-    await NextTimeStep()
-    dut.host_scl_drv.value = 0
-    dut.host_sda_drv_low.value = 0
-    await i2c_tick()
-    dut.host_scl_drv.value = 1
-    await i2c_tick()
-    bitval = int(dut.host_i2c_sda.value)
-    dut.host_scl_drv.value = 0
-    await i2c_tick()
-    return bitval
-
-
-async def i2c_write_byte(dut, value: int) -> bool:
-    for shift in range(7, -1, -1):
-        await i2c_write_bit(dut, (value >> shift) & 0x1)
-    ack_bit = await i2c_read_bit(dut)
-    return ack_bit == 0
-
-
-async def i2c_read_byte(dut, ack_from_master: bool) -> int:
-    value = 0
-    for shift in range(7, -1, -1):
-        bitval = await i2c_read_bit(dut)
-        value |= (bitval & 0x1) << shift
-    await i2c_write_bit(dut, 1 if ack_from_master else 0)
-    return value
-
-
-async def i2c_write_reg(dut, reg_addr: int, reg_data: int) -> None:
-    await i2c_start(dut)
-    assert await i2c_write_byte(dut, (HOST_I2C_ADDR << 1) | 0), "no ACK on host write address"
-    assert await i2c_write_byte(dut, reg_addr & 0xFF), "no ACK on host register pointer"
-    assert await i2c_write_byte(dut, reg_data & 0xFF), "no ACK on host register data"
-    await i2c_stop(dut)
-
-
-async def i2c_read_reg(dut, reg_addr: int) -> int:
-    await i2c_start(dut)
-    assert await i2c_write_byte(dut, (HOST_I2C_ADDR << 1) | 0), "no ACK on host write address before read"
-    assert await i2c_write_byte(dut, reg_addr & 0xFF), "no ACK on host register pointer before read"
-    await i2c_start(dut)
-    assert await i2c_write_byte(dut, (HOST_I2C_ADDR << 1) | 1), "no ACK on host read address"
-    value = await i2c_read_byte(dut, ack_from_master=True)
-    await i2c_stop(dut)
-    return value
-
-
-async def i2c_read_reg16_stable(dut, reg_addr_lo: int, reg_addr_hi: int) -> int:
-    """Mirror the stable two-read strategy used by the long SV production bench."""
-    lo0 = await i2c_read_reg(dut, reg_addr_lo)
-    hi0 = await i2c_read_reg(dut, reg_addr_hi)
-    lo1 = await i2c_read_reg(dut, reg_addr_lo)
-    hi1 = await i2c_read_reg(dut, reg_addr_hi)
-    if lo0 == lo1 and hi0 == hi1:
-        return (hi0 << 8) | lo0
-    return (hi1 << 8) | lo1
