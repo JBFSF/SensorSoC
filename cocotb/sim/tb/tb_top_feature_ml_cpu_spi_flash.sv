@@ -18,14 +18,14 @@ localparam [31:0] FEAT_MOTION  = FEATURE_BASE + 32'h08;
 localparam [31:0] FEAT_DHR     = FEATURE_BASE + 32'h0C;
 localparam [31:0] FEAT_MSSD   = FEATURE_BASE + 32'h10;
 
-localparam int unsigned FLASH_WORDS = 208;
+localparam int unsigned FLASH_WORDS = 1024;
 localparam int unsigned TB_TIMEOUT_CYCLES = 10_000_000;
 localparam int unsigned TB_PROGRESS_EVERY = 10_000;
-// weight_flash_axi serves weights directly from flash on each inference burst,
-// so SPI activity occurs during inference (not at boot). Each burst adds a
-// 32-bit READ command header; taketwo issues several bursts per inference.
-// Minimum: at least one command (32 bits) must have been sent.
-localparam int unsigned MIN_SPI_BITS = 32;
+// The top-level SPI pins are shared. spi_boot_ctrl owns them until firmware
+// boot completes; after boot_done, weight_flash_axi owns the same pins and
+// fetches weights on inference AXI reads.
+localparam int unsigned MIN_BOOT_SPI_BITS = 32;
+localparam int unsigned MIN_WEIGHT_SPI_BITS = 32;
 
 reg clk;
 reg reset;
@@ -54,16 +54,14 @@ wire        ppg_sim_rvalid;
 wire        ppg_sim_rlast;
 wire        ppg_sim_err;
 
-wire        weight_spi_clk;
-wire        weight_spi_mosi;
-wire        weight_spi_miso;
-wire        weight_spi_cs_n;
-wire        boot_spi_clk;
-wire        boot_spi_mosi;
-wire        boot_spi_miso;
-wire        boot_spi_cs_n;
+wire        spi_clk;
+wire        spi_mosi;
+wire        spi_miso;
+wire        spi_cs_n;
+wire        boot_done;
 wire signed [15:0] logit0;
 wire signed [15:0] logit1;
+reg  [3:0]  test_mode;
 
 localparam [6:0] ACC_ADDR = 7'h19;
 localparam [6:0] PPG_ADDR = 7'h64;
@@ -83,8 +81,10 @@ integer axi_r_hs;
 integer axi_aw_hs;
 integer axi_w_hs;
 integer axi_b_hs;
-integer spi_cs_asserts;
-integer spi_bit_count;
+integer boot_spi_cs_asserts;
+integer boot_spi_bit_count;
+integer weight_spi_cs_asserts;
+integer weight_spi_bit_count;
 integer boot_writes_seen;
 reg saw_feature_latch;
 reg signed [15:0] first_time_feat;
@@ -96,6 +96,8 @@ reg saw_start_write;
 reg saw_busy_read;
 reg prev_spi_cs_n;
 reg prev_spi_clk;
+reg weights_flash_loaded;
+reg early_spi_handoff;
 reg [31:0] boot_word0;
 reg [31:0] boot_word1;
 reg [31:0] boot_word2;
@@ -154,6 +156,9 @@ top #(
     .i2c_sda_io(),
     .i2c_sda_i(1'b1),
     .i2c_sda_drive_low_o(),
+    .sensor_scl_o(),
+    .sensor_sda_i(1'b1),
+    .sensor_sda_oe(),
     .sim_req_o(sim_req),
     .sim_addr_o(sim_addr),
     .sim_reg_o(sim_reg),
@@ -170,29 +175,35 @@ top #(
     .motion_feat_o(),
     .delta_hr_feat_o(),
     .mssd_feat_o(),
+    .epoch_end_o(),
     .ml_update_gate_o(),
     .invalid_reason_o(),
-    .weight_spi_clk_o(weight_spi_clk),
-    .weight_spi_mosi_o(weight_spi_mosi),
-    .weight_spi_miso_i(weight_spi_miso),
-    .weight_spi_cs_n_o(weight_spi_cs_n),
-    // boot SPI flash: spi_boot_ctrl copies firmware into SRAM before releasing CPU from reset
-    .boot_spi_clk_o(boot_spi_clk),
-    .boot_spi_mosi_o(boot_spi_mosi),
-    .boot_spi_miso_i(boot_spi_miso),
-    .boot_spi_cs_n_o(boot_spi_cs_n),
-    .epoch_end_o(),
+    .spi_clk_o(spi_clk),
+    .spi_mosi_o(spi_mosi),
+    .spi_miso_i(spi_miso),
+    .spi_cs_n_o(spi_cs_n),
+    .start_i(1'b1),
     .alarm_o(),
     .logit0(logit0),
     .logit1(logit1),
-    .test_mode_i(4'b0101),    // force FSM to ALL: feat+ML+CPU all active; bypasses SLEEP deadlock in sim
+    .test_mode_i(test_mode),
     .test_force_irq_i(1'b0),
     .test_force_wake_i(1'b0),
     .test_irq_src_i(3'b000),
     .irq_eoi_o(),
-    .start_i(1'b1),
-    .boot_done_o(),
-    .weight_boot_done_o()
+    .boot_done_o(boot_done),
+    .pico_trap_o(),
+    .pico_cpu_clk_en_o(),
+    .pico_mem_valid_o(),
+    .pico_mem_instr_o(),
+    .pico_mem_ready_o(),
+    .pico_mem_wstrb_o(),
+    .pico_mem_addr_o(),
+    .pico_mem_wdata_o(),
+    .pico_irq_o(),
+    .pico_sleeping_o(),
+    .ml_irq_o(),
+    .timer_event_o()
 );
 
 i2c_slave_lis2dw12 #(
@@ -229,28 +240,17 @@ i2c_slave_adpd144ri #(
     .sim_err(ppg_sim_err)
 );
 
-// Weight flash: weight_flash_axi reads 208 weight words at reset via weight_spi_*
-// and caches them on-chip before the CPU triggers inference.
+// Shared external SPI flash. It starts with firmware for spi_boot_ctrl. Once
+// boot_done is observed, the bench models the board/programmer loading the
+// weight image into the same flash address range that weight_flash_axi reads.
 spi_flash_model #(
     .FLASH_WORDS(FLASH_WORDS),
-    .FLASH_INIT_HEX("firmware/build/generated/taketwo_params.hex")
-) u_weight_flash (
-    .spi_clk(weight_spi_clk),
-    .spi_cs_n(weight_spi_cs_n),
-    .spi_mosi(weight_spi_mosi),
-    .spi_miso(weight_spi_miso)
-);
-
-// Boot SPI flash: spi_boot_ctrl copies firmware into SRAM before boot_done, releasing CPU from reset.
-// Without this, the boot controller fills SRAM with 0xFF (illegal instructions).
-spi_flash_model #(
-    .FLASH_WORDS(1024),   // must match top.sv BOOT_WORDS
     .FLASH_INIT_HEX("firmware/build/test_top_feature_ml_cpu_spi_flash/firmware.hex")
-) u_boot_flash (
-    .spi_clk(boot_spi_clk),
-    .spi_cs_n(boot_spi_cs_n),
-    .spi_mosi(boot_spi_mosi),
-    .spi_miso(boot_spi_miso)
+) u_spi_flash (
+    .spi_clk(spi_clk),
+    .spi_cs_n(spi_cs_n),
+    .spi_mosi(spi_mosi),
+    .spi_miso(spi_miso)
 );
 
 // The gf180mcu_fd_ip_sram behavioral model defaults all memory cells to X (uninitialized).
@@ -302,8 +302,10 @@ always @(posedge clk) begin
         axi_aw_hs <= 0;
         axi_w_hs <= 0;
         axi_b_hs <= 0;
-        spi_cs_asserts <= 0;
-        spi_bit_count <= 0;
+        boot_spi_cs_asserts <= 0;
+        boot_spi_bit_count <= 0;
+        weight_spi_cs_asserts <= 0;
+        weight_spi_bit_count <= 0;
         boot_writes_seen <= 0;
         saw_feature_latch <= 1'b0;
         first_time_feat <= '0;
@@ -315,6 +317,8 @@ always @(posedge clk) begin
         saw_busy_read <= 1'b0;
         prev_spi_cs_n <= 1'b1;
         prev_spi_clk <= 1'b0;
+        weights_flash_loaded <= 1'b0;
+        early_spi_handoff <= 1'b0;
         boot_word0 <= 32'h0;
         boot_word1 <= 32'h0;
         boot_word2 <= 32'h0;
@@ -325,13 +329,31 @@ always @(posedge clk) begin
         saw_feature_word0_snap <= 1'b0;
         saw_feature_word1_snap <= 1'b0;
     end else begin
-        // weight SPI (weight_flash_axi): driven at reset to boot-load cache from flash
-        if (prev_spi_cs_n && !weight_spi_cs_n)
-            spi_cs_asserts <= spi_cs_asserts + 1;
-        prev_spi_cs_n <= weight_spi_cs_n;
-        if (!prev_spi_clk && weight_spi_clk && !weight_spi_cs_n)
-            spi_bit_count <= spi_bit_count + 1;
-        prev_spi_clk <= weight_spi_clk;
+        if (!boot_done && dut.init_done)
+            early_spi_handoff <= 1'b1;
+
+        if (boot_done && !weights_flash_loaded) begin
+            $display("[%0t] boot_done observed; loading weight image into shared SPI flash and enabling ML test mode", $time);
+            $readmemh("firmware/build/generated/taketwo_params.hex", u_spi_flash.mem);
+            weights_flash_loaded <= 1'b1;
+            test_mode <= 4'b0101; // feat+ML+CPU active after firmware boot owns instruction SRAM
+        end
+
+        if (prev_spi_cs_n && !spi_cs_n) begin
+            if (boot_done)
+                weight_spi_cs_asserts <= weight_spi_cs_asserts + 1;
+            else
+                boot_spi_cs_asserts <= boot_spi_cs_asserts + 1;
+        end
+        prev_spi_cs_n <= spi_cs_n;
+
+        if (!prev_spi_clk && spi_clk && !spi_cs_n) begin
+            if (boot_done)
+                weight_spi_bit_count <= weight_spi_bit_count + 1;
+            else
+                boot_spi_bit_count <= boot_spi_bit_count + 1;
+        end
+        prev_spi_clk <= spi_clk;
         if (!saw_feature_latch && dut.feat_latched_valid_r)
             saw_feature_latch <= 1'b1;
 
@@ -406,6 +428,7 @@ end
 initial begin
     clk = 1'b0;
     reset = 1'b1;
+    test_mode = 4'b0000;
     failures = 0;
     cycles = 0;
     expected_conf = 32'h0;
@@ -422,11 +445,12 @@ initial begin
         cycles = cycles + 1;
 
         if ((cycles % TB_PROGRESS_EVERY) == 0) begin
-            $display("[cyc %0d] status=0x%08x code=0x%08x score=0x%08x feature_reads=%0d/%0d/%0d/%0d/%0d spi_cs=%0d spi_bits=%0d axi=%0d/%0d/%0d/%0d/%0d",
-                     cycles, dut.test_status, dut.test_code, dut.ml_score_hw,
+            $display("[cyc %0d] boot_done=%0b weights_loaded=%0b status=0x%08x code=0x%08x score=0x%08x feature_reads=%0d/%0d/%0d/%0d/%0d boot_spi=%0d/%0d weight_spi=%0d/%0d axi=%0d/%0d/%0d/%0d/%0d",
+                     cycles, boot_done, weights_flash_loaded, dut.test_status, dut.test_code, dut.ml_score_hw,
                      feature_status_reads, feature_time_reads, feature_motion_reads,
                      feature_dhr_reads, feature_mssd_reads,
-                     spi_cs_asserts, spi_bit_count,
+                     boot_spi_cs_asserts, boot_spi_bit_count,
+                     weight_spi_cs_asserts, weight_spi_bit_count,
                      axi_ar_hs, axi_r_hs, axi_aw_hs, axi_w_hs, axi_b_hs);
         end
 
@@ -437,10 +461,11 @@ initial begin
 
         if (dut.test_status == 32'hDEAD_BEEF) begin
             $display("FAIL: firmware reported FAIL code=0x%08x", dut.test_code);
-            $display("  spi_cs=%0d spi_bits=%0d boot_writes=%0d captured=%08x %08x %08x %08x wram[0..3]=%08x %08x %08x %08x flash[0..3]=%08x %08x %08x %08x out=%08x %08x",
-                     spi_cs_asserts, spi_bit_count, boot_writes_seen,
+            $display("  boot_spi=%0d/%0d weight_spi=%0d/%0d boot_writes=%0d captured=%08x %08x %08x %08x flash[0..3]=%08x %08x %08x %08x out=%08x %08x",
+                     boot_spi_cs_asserts, boot_spi_bit_count,
+                     weight_spi_cs_asserts, weight_spi_bit_count, boot_writes_seen,
                      boot_word0, boot_word1, boot_word2, boot_word3,
-                     u_weight_flash.mem[0], u_weight_flash.mem[1], u_weight_flash.mem[2], u_weight_flash.mem[3],
+                     u_spi_flash.mem[0], u_spi_flash.mem[1], u_spi_flash.mem[2], u_spi_flash.mem[3],
                      {logit1[15:0], logit0[15:0]}, 32'h0000_0000);
             $fatal(1);
         end
@@ -481,15 +506,32 @@ initial begin
                          first_mssd_feat[15:0], first_delta_hr_feat[15:0], feature_word1_snap);
                 failures = failures + 1;
             end
-            // Weight SPI check: weight_flash_axi must have issued at least one SPI READ
-            // to the weight flash during inference (direct-from-flash, no boot preload).
-            if (spi_cs_asserts == 0) begin
+            // Shared SPI checks: boot owns the bus first, then weight_flash_axi
+            // owns it after boot_done and after the weight image is loaded.
+            if (boot_spi_cs_asserts == 0) begin
+                $display("FAIL: spi_boot_ctrl never asserted shared SPI CS before boot_done");
+                failures = failures + 1;
+            end
+            if (boot_spi_bit_count < MIN_BOOT_SPI_BITS) begin
+                $display("FAIL: too few boot SPI bit clocks: %0d (expected >= %0d)",
+                         boot_spi_bit_count, MIN_BOOT_SPI_BITS);
+                failures = failures + 1;
+            end
+            if (!weights_flash_loaded) begin
+                $display("FAIL: weight image was not loaded into shared SPI flash after boot_done");
+                failures = failures + 1;
+            end
+            if (early_spi_handoff) begin
+                $display("FAIL: shared SPI handoff went active before boot_done");
+                failures = failures + 1;
+            end
+            if (weight_spi_cs_asserts == 0) begin
                 $display("FAIL: weight_flash_axi never asserted weight SPI CS");
                 failures = failures + 1;
             end
-            if (spi_bit_count < MIN_SPI_BITS) begin
+            if (weight_spi_bit_count < MIN_WEIGHT_SPI_BITS) begin
                 $display("FAIL: too few weight SPI bit clocks: %0d (expected >= %0d)",
-                         spi_bit_count, MIN_SPI_BITS);
+                         weight_spi_bit_count, MIN_WEIGHT_SPI_BITS);
                 failures = failures + 1;
             end
             if (!saw_global_base_write) begin
@@ -540,8 +582,10 @@ initial begin
 
             if (failures == 0) begin
                 $display("PASS: tb_top_feature_ml_cpu_spi_flash");
-                $display("  score=0x%08x class=%0d spi_cs=%0d spi_bits=%0d axi=%0d/%0d/%0d/%0d/%0d code=0x%08x",
-                         dut.ml_score_hw, dut.test_code[31], spi_cs_asserts, spi_bit_count,
+                $display("  score=0x%08x class=%0d boot_spi=%0d/%0d weight_spi=%0d/%0d axi=%0d/%0d/%0d/%0d/%0d code=0x%08x",
+                         dut.ml_score_hw, dut.test_code[31],
+                         boot_spi_cs_asserts, boot_spi_bit_count,
+                         weight_spi_cs_asserts, weight_spi_bit_count,
                          axi_ar_hs, axi_r_hs, axi_aw_hs, axi_w_hs, axi_b_hs, dut.test_code);
                 $finish;
             end else begin
@@ -552,8 +596,10 @@ initial begin
     end
 
     $display("FAIL: timeout after %0d cycles", TB_TIMEOUT_CYCLES);
-    $display("  status=0x%08x code=0x%08x score=0x%08x spi_bits=%0d axi=%0d/%0d/%0d/%0d/%0d",
-             dut.test_status, dut.test_code, dut.ml_score_hw, spi_bit_count,
+    $display("  status=0x%08x code=0x%08x score=0x%08x boot_done=%0b weights_loaded=%0b boot_spi=%0d/%0d weight_spi=%0d/%0d axi=%0d/%0d/%0d/%0d/%0d",
+             dut.test_status, dut.test_code, dut.ml_score_hw, boot_done, weights_flash_loaded,
+             boot_spi_cs_asserts, boot_spi_bit_count,
+             weight_spi_cs_asserts, weight_spi_bit_count,
              axi_ar_hs, axi_r_hs, axi_aw_hs, axi_w_hs, axi_b_hs);
     $fatal(1);
 end

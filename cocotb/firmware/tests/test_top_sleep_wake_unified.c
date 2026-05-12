@@ -137,8 +137,8 @@ static void run_timer_phase(uint32_t iter,
     T_CTRL = 0u;
     T_EVENT = 1u;
 
-    T_RELOAD = 64u + (iter * 8u);
-    T_COUNT = 24u + (iter * 4u);
+    T_RELOAD = 512u + (iter * 64u);
+    T_COUNT = 256u + (iter * 32u);
     T_CTRL = 0x1u;
 
     P_CTRL = 1u;
