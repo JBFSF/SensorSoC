@@ -83,17 +83,19 @@ module chip_core #(
     output wire [NUM_BIDIR_PADS-1:0] bidir_pu,   // Pull-up
     output wire [NUM_BIDIR_PADS-1:0] bidir_pd,   // Pull-down
 
-    output wire       sim_req_o,
-    output wire [6:0] sim_addr_o,
-    output wire [7:0] sim_reg_o,
-    output wire [7:0] sim_len_o,
-    output wire       sim_write_o,
-    output wire [7:0] sim_wdata_o,
-    input  wire       sim_ack_i,
-    input  wire [7:0] sim_rdata_i,
-    input  wire       sim_rvalid_i,
-    input  wire       sim_rlast_i,
-    input  wire       sim_err_i,
+    `ifdef SIM
+        output wire       sim_req_o,
+        output wire [6:0] sim_addr_o,
+        output wire [7:0] sim_reg_o,
+        output wire [7:0] sim_len_o,
+        output wire       sim_write_o,
+        output wire [7:0] sim_wdata_o,
+        input  wire       sim_ack_i,
+        input  wire [7:0] sim_rdata_i,
+        input  wire       sim_rvalid_i,
+        input  wire       sim_rlast_i,
+        input  wire       sim_err_i,
+    `endif
 
     input  wire        debug_stim_override_en_i,
     input  wire [15:0] debug_stim_mssd_i,
@@ -159,21 +161,21 @@ module chip_core #(
     logic        ml_irq_w;
     logic        timer_event_w;
 
-    logic       sim_req_w;
-    logic [6:0] sim_addr_w;
-    logic [7:0] sim_reg_w;
-    logic [7:0] sim_len_w;
-    logic       sim_write_w;
-    logic [7:0] sim_wdata_w;
+    `ifdef SIM
+        logic       sim_req_w;
+        logic [6:0] sim_addr_w;
+        logic [7:0] sim_reg_w;
+        logic [7:0] sim_len_w;
+        logic       sim_write_w;
+        logic [7:0] sim_wdata_w;
 
-    assign sim_req_o   = sim_req_w;
-    assign sim_addr_o  = sim_addr_w;
-    assign sim_reg_o   = sim_reg_w;
-    assign sim_len_o   = sim_len_w;
-    assign sim_write_o = sim_write_w;
-    assign sim_wdata_o = sim_wdata_w;
+        assign sim_req_o   = sim_req_w;
+        assign sim_addr_o  = sim_addr_w;
+        assign sim_reg_o   = sim_reg_w;
+        assign sim_len_o   = sim_len_w;
+        assign sim_write_o = sim_write_w;
+        assign sim_wdata_o = sim_wdata_w;
 
-    `ifndef SIM
         assign sim_req_w   = 1'b0;
         assign sim_addr_w  = 7'b0;
         assign sim_reg_w   = 8'b0;
