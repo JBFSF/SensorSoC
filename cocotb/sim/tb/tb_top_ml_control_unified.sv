@@ -54,10 +54,14 @@ wire [7:0]  ppg_sim_rdata;
 wire        ppg_sim_rvalid;
 wire        ppg_sim_rlast;
 wire        ppg_sim_err;
-wire        boot_spi_clk;
-wire        boot_spi_mosi;
-wire        boot_spi_miso;
-wire        boot_spi_cs_n;
+wire        flash_spi_clk;
+wire        flash_spi_mosi;
+wire        flash_spi_miso;
+wire        flash_spi_cs_n;
+wire        spi_clk;
+wire        spi_mosi;
+wire        spi_miso;
+wire        spi_cs_n;
 
 localparam [6:0] ACC_ADDR = 7'h19;
 localparam [6:0] PPG_ADDR = 7'h64;
@@ -144,10 +148,22 @@ top #(
     .mssd_feat_o(),
     .ml_update_gate_o(),
     .invalid_reason_o(),
-    .boot_spi_clk_o(boot_spi_clk),
-    .boot_spi_mosi_o(boot_spi_mosi),
-    .boot_spi_miso_i(boot_spi_miso),
-    .boot_spi_cs_n_o(boot_spi_cs_n),
+    .flash_spi_clk_o(flash_spi_clk),
+    .flash_spi_mosi_o(flash_spi_mosi),
+    .flash_spi_miso_i(flash_spi_miso),
+    .flash_spi_cs_n_o(flash_spi_cs_n),
+    .boot_spi_clk_o(),
+    .boot_spi_mosi_o(),
+    .boot_spi_miso_i(1'b1),
+    .boot_spi_cs_n_o(),
+    .weight_spi_clk_o(),
+    .weight_spi_mosi_o(),
+    .weight_spi_miso_i(1'b1),
+    .weight_spi_cs_n_o(),
+    .spi_clk_o(spi_clk),
+    .spi_mosi_o(spi_mosi),
+    .spi_miso_i(spi_miso),
+    .spi_cs_n_o(spi_cs_n),
     .epoch_end_o(),
     .alarm_o(),
     .test_mode_i(4'b0101),
@@ -196,11 +212,13 @@ spi_flash_model #(
     .FLASH_WORDS(512),
     .FLASH_INIT_HEX("firmware/build/test_top_ml_control_unified/firmware.hex")
 ) u_boot_flash (
-    .spi_clk(boot_spi_clk),
-    .spi_cs_n(boot_spi_cs_n),
-    .spi_mosi(boot_spi_mosi),
-    .spi_miso(boot_spi_miso)
+    .spi_clk(flash_spi_clk),
+    .spi_cs_n(flash_spi_cs_n),
+    .spi_mosi(flash_spi_mosi),
+    .spi_miso(flash_spi_miso)
 );
+
+assign spi_miso = 1'b1;
 
 always #10 clk = ~clk;
 

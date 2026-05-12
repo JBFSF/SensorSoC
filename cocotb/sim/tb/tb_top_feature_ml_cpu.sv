@@ -50,8 +50,13 @@ wire        ppg_sim_rvalid;
 wire        ppg_sim_rlast;
 wire        ppg_sim_err;
 
+wire        flash_spi_clk;
+wire        flash_spi_mosi;
+wire        flash_spi_miso;
+wire        flash_spi_cs_n;
 wire        spi_clk;
 wire        spi_mosi;
+wire        spi_miso;
 wire        spi_cs_n;
 
 localparam [6:0] ACC_ADDR = 7'h19;
@@ -145,10 +150,22 @@ top #(
     .sim_rvalid_i(sim_rvalid),
     .sim_rlast_i(sim_rlast),
     .sim_err_i(sim_err),
+    .flash_spi_clk_o(flash_spi_clk),
+    .flash_spi_mosi_o(flash_spi_mosi),
+    .flash_spi_miso_i(flash_spi_miso),
+    .flash_spi_cs_n_o(flash_spi_cs_n),
     .boot_spi_clk_o(),
     .boot_spi_mosi_o(),
     .boot_spi_miso_i(1'b1),
     .boot_spi_cs_n_o(),
+    .weight_spi_clk_o(),
+    .weight_spi_mosi_o(),
+    .weight_spi_miso_i(1'b1),
+    .weight_spi_cs_n_o(),
+    .spi_clk_o(spi_clk),
+    .spi_mosi_o(spi_mosi),
+    .spi_miso_i(spi_miso),
+    .spi_cs_n_o(spi_cs_n),
     .feat_valid_o(feat_valid),
     .time_feat_o(time_feat),
     .motion_feat_o(motion_feat),
@@ -163,6 +180,16 @@ top #(
     .test_irq_src_i(3'b000),
     .irq_eoi_o(),
     .boot_done_o()
+);
+
+spi_flash_model #(
+    .FLASH_WORDS(1232),
+    .FLASH_INIT_HEX("firmware/build/generated/combined_flash_test_top_feature_ml_cpu.hex")
+) u_shared_flash (
+    .spi_clk(flash_spi_clk),
+    .spi_cs_n(flash_spi_cs_n),
+    .spi_mosi(flash_spi_mosi),
+    .spi_miso(flash_spi_miso)
 );
 
 // Simulation-only accelerometer model.
@@ -329,14 +356,14 @@ initial begin
             end
             // The shared input buffer should match the feature vector that was
             // published through the MMIO-visible latch bank.
-            if (dut.u_weight_ram.mem[16] !== {first_time_feat[15:0], first_motion_feat[15:0]}) begin
+            if (dut.u_weight_ram.feat_reg_0 !== {first_time_feat[15:0], first_motion_feat[15:0]}) begin
                 $display("FAIL: weight RAM word0 mismatch expected={time,motion}=0x%04x_%04x got=0x%08x",
-                         first_time_feat[15:0], first_motion_feat[15:0], dut.u_weight_ram.mem[16]);
+                         first_time_feat[15:0], first_motion_feat[15:0], dut.u_weight_ram.feat_reg_0);
                 failures = failures + 1;
             end
-            if (dut.u_weight_ram.mem[17] !== {first_mssd_feat[15:0], first_delta_hr_feat[15:0]}) begin
+            if (dut.u_weight_ram.feat_reg_1 !== {first_mssd_feat[15:0], first_delta_hr_feat[15:0]}) begin
                 $display("FAIL: weight RAM word1 mismatch expected={mssd,dhr}=0x%04x_%04x got=0x%08x",
-                         first_mssd_feat[15:0], first_delta_hr_feat[15:0], dut.u_weight_ram.mem[17]);
+                         first_mssd_feat[15:0], first_delta_hr_feat[15:0], dut.u_weight_ram.feat_reg_1);
                 failures = failures + 1;
             end
             if (!saw_global_base_write) begin

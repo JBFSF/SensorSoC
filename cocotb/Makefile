@@ -563,10 +563,9 @@ sim-top-spi-boot: $(TOP_SPI_BOOT_WEIGHTS_VVP) | $(SIM_BUILD)
 	@echo "== Running $(TOP_SPI_BOOT_WEIGHTS_TOP) =="
 	$(VVP) $(TOP_SPI_BOOT_WEIGHTS_VVP)
 
-# ============================================================
-# Shared flash proof: single S25 flash chip serves both
+# ===========================================================
 # spi_boot_ctrl (Phase 1) and weight_flash_axi (Phase 2).
-# boot_done gates the mux; CPU spi_master_mmio stays idle.
+# boot_done gates the mux; CPU spi_master_mmio stays idle
 # ============================================================
 
 TOP_SHARED_FLASH_TOP     := tb_top_shared_flash

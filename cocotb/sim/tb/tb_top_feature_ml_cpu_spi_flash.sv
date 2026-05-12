@@ -18,7 +18,7 @@ localparam [31:0] FEAT_MOTION  = FEATURE_BASE + 32'h08;
 localparam [31:0] FEAT_DHR     = FEATURE_BASE + 32'h0C;
 localparam [31:0] FEAT_MSSD   = FEATURE_BASE + 32'h10;
 
-localparam int unsigned FLASH_WORDS = 1024;
+localparam int unsigned FLASH_WORDS = 1232;
 localparam int unsigned TB_TIMEOUT_CYCLES = 10_000_000;
 localparam int unsigned TB_PROGRESS_EVERY = 10_000;
 // The top-level SPI pins are shared. spi_boot_ctrl owns them until firmware
@@ -54,6 +54,10 @@ wire        ppg_sim_rvalid;
 wire        ppg_sim_rlast;
 wire        ppg_sim_err;
 
+wire        flash_spi_clk;
+wire        flash_spi_mosi;
+wire        flash_spi_miso;
+wire        flash_spi_cs_n;
 wire        spi_clk;
 wire        spi_mosi;
 wire        spi_miso;
@@ -178,6 +182,10 @@ top #(
     .epoch_end_o(),
     .ml_update_gate_o(),
     .invalid_reason_o(),
+    .flash_spi_clk_o(flash_spi_clk),
+    .flash_spi_mosi_o(flash_spi_mosi),
+    .flash_spi_miso_i(flash_spi_miso),
+    .flash_spi_cs_n_o(flash_spi_cs_n),
     .spi_clk_o(spi_clk),
     .spi_mosi_o(spi_mosi),
     .spi_miso_i(spi_miso),
@@ -247,11 +255,13 @@ spi_flash_model #(
     .FLASH_WORDS(FLASH_WORDS),
     .FLASH_INIT_HEX("firmware/build/test_top_feature_ml_cpu_spi_flash/firmware.hex")
 ) u_spi_flash (
-    .spi_clk(spi_clk),
-    .spi_cs_n(spi_cs_n),
-    .spi_mosi(spi_mosi),
-    .spi_miso(spi_miso)
+    .spi_clk(flash_spi_clk),
+    .spi_cs_n(flash_spi_cs_n),
+    .spi_mosi(flash_spi_mosi),
+    .spi_miso(flash_spi_miso)
 );
+
+assign spi_miso = 1'b1;
 
 // The gf180mcu_fd_ip_sram behavioral model defaults all memory cells to X (uninitialized).
 // taketwo's accumulator SRAMs are read-before-written on each inference, so X propagates
@@ -334,26 +344,26 @@ always @(posedge clk) begin
 
         if (boot_done && !weights_flash_loaded) begin
             $display("[%0t] boot_done observed; loading weight image into shared SPI flash and enabling ML test mode", $time);
-            $readmemh("firmware/build/generated/taketwo_params.hex", u_spi_flash.mem);
+            $readmemh("firmware/build/generated/taketwo_params.hex", u_spi_flash.mem, 1024);
             weights_flash_loaded <= 1'b1;
             test_mode <= 4'b0101; // feat+ML+CPU active after firmware boot owns instruction SRAM
         end
 
-        if (prev_spi_cs_n && !spi_cs_n) begin
+        if (prev_spi_cs_n && !flash_spi_cs_n) begin
             if (boot_done)
                 weight_spi_cs_asserts <= weight_spi_cs_asserts + 1;
             else
                 boot_spi_cs_asserts <= boot_spi_cs_asserts + 1;
         end
-        prev_spi_cs_n <= spi_cs_n;
+        prev_spi_cs_n <= flash_spi_cs_n;
 
-        if (!prev_spi_clk && spi_clk && !spi_cs_n) begin
+        if (!prev_spi_clk && flash_spi_clk && !flash_spi_cs_n) begin
             if (boot_done)
                 weight_spi_bit_count <= weight_spi_bit_count + 1;
             else
                 boot_spi_bit_count <= boot_spi_bit_count + 1;
         end
-        prev_spi_clk <= spi_clk;
+        prev_spi_clk <= flash_spi_clk;
         if (!saw_feature_latch && dut.feat_latched_valid_r)
             saw_feature_latch <= 1'b1;
 

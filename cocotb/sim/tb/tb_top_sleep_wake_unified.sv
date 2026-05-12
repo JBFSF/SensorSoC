@@ -71,15 +71,13 @@ wire        ppg_sim_err;
 
 wire        spi_clk;
 wire        spi_mosi;
+wire        spi_miso;
 wire        spi_cs_n;
-wire        boot_spi_clk;
-wire        boot_spi_mosi;
-wire        boot_spi_miso;
-wire        boot_spi_cs_n;
-wire        weight_spi_clk;
-wire        weight_spi_mosi;
-wire        weight_spi_miso;
-wire        weight_spi_cs_n;
+wire        flash_spi_clk;
+wire        flash_spi_mosi;
+wire        flash_spi_miso;
+wire        flash_spi_cs_n;
+wire        boot_done;
 
 localparam [6:0] ACC_ADDR = 7'h19;
 localparam [6:0] PPG_ADDR = 7'h64;
@@ -176,14 +174,22 @@ top #(
     .sim_rvalid_i(sim_rvalid),
     .sim_rlast_i(sim_rlast),
     .sim_err_i(sim_err),
-    .boot_spi_clk_o(boot_spi_clk),
-    .boot_spi_mosi_o(boot_spi_mosi),
-    .boot_spi_miso_i(boot_spi_miso),
-    .boot_spi_cs_n_o(boot_spi_cs_n),
-    .weight_spi_clk_o(weight_spi_clk),
-    .weight_spi_mosi_o(weight_spi_mosi),
-    .weight_spi_miso_i(weight_spi_miso),
-    .weight_spi_cs_n_o(weight_spi_cs_n),
+    .flash_spi_clk_o(flash_spi_clk),
+    .flash_spi_mosi_o(flash_spi_mosi),
+    .flash_spi_miso_i(flash_spi_miso),
+    .flash_spi_cs_n_o(flash_spi_cs_n),
+    .boot_spi_clk_o(),
+    .boot_spi_mosi_o(),
+    .boot_spi_miso_i(1'b1),
+    .boot_spi_cs_n_o(),
+    .weight_spi_clk_o(),
+    .weight_spi_mosi_o(),
+    .weight_spi_miso_i(1'b1),
+    .weight_spi_cs_n_o(),
+    .spi_clk_o(spi_clk),
+    .spi_mosi_o(spi_mosi),
+    .spi_miso_i(spi_miso),
+    .spi_cs_n_o(spi_cs_n),
     .feat_valid_o(feat_valid),
     .time_feat_o(time_feat),
     .motion_feat_o(motion_feat),
@@ -199,7 +205,7 @@ top #(
     .test_force_wake_i(test_force_wake),
     .test_irq_src_i(3'b000),
     .irq_eoi_o(),
-    .boot_done_o()
+    .boot_done_o(boot_done)
 );
 
 i2c_slave_lis2dw12 #(
@@ -237,24 +243,21 @@ i2c_slave_adpd144ri #(
 );
 
 spi_flash_model #(
-    .FLASH_WORDS(208),
-    .FLASH_INIT_HEX("firmware/build/generated/taketwo_params.hex")
-) u_weight_flash (
-    .spi_clk(weight_spi_clk),
-    .spi_cs_n(weight_spi_cs_n),
-    .spi_mosi(weight_spi_mosi),
-    .spi_miso(weight_spi_miso)
+    .FLASH_WORDS(1232),
+    .FLASH_INIT_HEX("firmware/build/test_top_sleep_wake_unified/firmware.hex")
+) u_shared_flash (
+    .spi_clk(flash_spi_clk),
+    .spi_cs_n(flash_spi_cs_n),
+    .spi_mosi(flash_spi_mosi),
+    .spi_miso(flash_spi_miso)
 );
 
-spi_flash_model #(
-    .FLASH_WORDS(1024),
-    .FLASH_INIT_HEX("firmware/build/test_top_sleep_wake_unified/firmware.hex")
-) u_boot_flash (
-    .spi_clk(boot_spi_clk),
-    .spi_cs_n(boot_spi_cs_n),
-    .spi_mosi(boot_spi_mosi),
-    .spi_miso(boot_spi_miso)
-);
+assign spi_miso = 1'b1;
+
+initial begin
+    wait (boot_done === 1'b1);
+    $readmemh("firmware/build/generated/taketwo_params.hex", u_shared_flash.mem, 1024);
+end
 
 always #10 clk = ~clk;
 

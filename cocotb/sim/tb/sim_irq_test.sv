@@ -13,10 +13,10 @@ module sim_irq_test #(
     output logic        boot_done
 );
 
-    wire boot_spi_clk;
-    wire boot_spi_mosi;
-    wire boot_spi_miso;
-    wire boot_spi_cs_n;
+    wire flash_spi_clk;
+    wire flash_spi_mosi;
+    wire flash_spi_miso;
+    wire flash_spi_cs_n;
 
     tri1 sda_bus;
 
@@ -52,10 +52,18 @@ module sim_irq_test #(
         .mssd_feat_o         (),
         .ml_update_gate_o    (),
         .invalid_reason_o    (),
-        .boot_spi_clk_o      (boot_spi_clk),
-        .boot_spi_mosi_o     (boot_spi_mosi),
-        .boot_spi_miso_i     (boot_spi_miso),
-        .boot_spi_cs_n_o     (boot_spi_cs_n),
+        .flash_spi_clk_o     (flash_spi_clk),
+        .flash_spi_mosi_o    (flash_spi_mosi),
+        .flash_spi_miso_i    (flash_spi_miso),
+        .flash_spi_cs_n_o    (flash_spi_cs_n),
+        .boot_spi_clk_o      (),
+        .boot_spi_mosi_o     (),
+        .boot_spi_miso_i     (1'b1),
+        .boot_spi_cs_n_o     (),
+        .weight_spi_clk_o    (),
+        .weight_spi_mosi_o   (),
+        .weight_spi_miso_i   (1'b1),
+        .weight_spi_cs_n_o   (),
         .epoch_end_o         (),
         .alarm_o             (),
         .test_mode_i         (4'b1011),
@@ -82,10 +90,10 @@ module sim_irq_test #(
         .FLASH_WORDS   (256),
         .FLASH_INIT_HEX(BOOT_FLASH_HEX)
     ) u_boot_flash (
-        .spi_clk (boot_spi_clk),
-        .spi_cs_n(boot_spi_cs_n),
-        .spi_mosi(boot_spi_mosi),
-        .spi_miso(boot_spi_miso)
+        .spi_clk (flash_spi_clk),
+        .spi_cs_n(flash_spi_cs_n),
+        .spi_mosi(flash_spi_mosi),
+        .spi_miso(flash_spi_miso)
     );
 
 endmodule
