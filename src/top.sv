@@ -1,7 +1,5 @@
 `timescale 1ns/1ps
 
-`include "taketwo_feature_bridge.sv"
-
 module top #(
     parameter integer MEM_WORDS    = 1024,
     parameter integer BOOT_WORDS   = 1024,
@@ -49,7 +47,7 @@ module top #(
     `endif
     input  logic clk_i,
     input  logic reset_i,
-    input  logic i2c_scl_i,
+    output logic i2c_scl_o,
     inout  wire  i2c_sda_io,
     input  logic i2c_sda_i,
     output logic i2c_sda_drive_low_o,
@@ -432,26 +430,11 @@ module top #(
 
     wire [31:0] irq_sources;
     wire [31:0] wake_sources;
-    wire        host_i2c_wr_en;
-    wire [7:0]  host_i2c_wr_addr;
-    wire [7:0]  host_i2c_wr_data;
-    wire [7:0]  host_i2c_rd_addr;
-    wire [7:0]  host_i2c_rd_data;
-    wire        host_i2c_proto_err;
-    wire        host_i2c_irq_event;
-    wire        host_i2c_irqc_req;
-    wire        host_i2c_irqc_we;
-    wire [7:0]  host_i2c_irqc_off;
-    wire [31:0] host_i2c_irqc_wdata;
-    wire        host_i2c_irqc_ready;
-    wire [31:0] host_i2c_irqc_rdata;
-    wire [31:0] host_cfg_target_wake_sec;
-    wire [31:0] host_cfg_window_sec;
-    wire [15:0] host_cfg_step_sec;
-    wire [15:0] host_cfg_motion_hi_th;
-    wire [7:0]  host_cfg_motion_hi_count;
-    wire [7:0]  host_cfg_policy;
-    wire [15:0] host_cfg_conf_thr;
+
+    // host_i2c_target is disconnected from the physical I2C pads; the pads are
+    // now reserved for i2c_master. These internal stubs keep host_i2c_target
+    // instantiated (and its register file accessible) while isolating it from
+    // the chip-level pins
 
     always_ff @(posedge clk_i) begin
         if (reset_i) begin
@@ -1079,56 +1062,7 @@ module top #(
     );
 
 
-    // Off-chip host I2C target bridge in the always-on domain. This mirrors
-    // soc_top so the unified top can participate in end-to-end host config and
-    // score visibility tests without changing production firmware.
-    //JF: we can probably remove this
-    host_i2c_target #(
-        .SLAVE_ADDR(7'h42)
-    ) u_host_i2c_target (
-        .clk                (clk_i),
-        .resetn             (~reset_i),
-        .i2c_scl_i          (i2c_scl_i),
-        .i2c_sda_io         (i2c_sda_io),
-        .i2c_sda_i          (i2c_sda_i),
-        .i2c_sda_drive_low_o(i2c_sda_drive_low_o),
-        .wr_en_o            (host_i2c_wr_en),
-        .wr_addr_o          (host_i2c_wr_addr),
-        .wr_data_o          (host_i2c_wr_data),
-        .rd_addr_o          (host_i2c_rd_addr),
-        .rd_data_i          (host_i2c_rd_data),
-        .proto_err_o        (host_i2c_proto_err)
-    );
-
-    //JF: do we need this?
-    host_i2c_bridge_regs u_host_i2c_bridge_regs (
-        .clk                  (clk_i),
-        .resetn               (~reset_i),
-        .wr_en_i              (host_i2c_wr_en),
-        .wr_addr_i            (host_i2c_wr_addr),
-        .wr_data_i            (host_i2c_wr_data),
-        .rd_addr_i            (host_i2c_rd_addr),
-        .rd_data_o            (host_i2c_rd_data),
-        .proto_err_i          (host_i2c_proto_err),
-        .ml_score_i           (ml_score_hw),
-        .event_o              (host_i2c_irq_event),
-        .cfg_target_wake_sec_o(host_cfg_target_wake_sec),
-        .cfg_window_sec_o     (host_cfg_window_sec),
-        .cfg_step_sec_o       (host_cfg_step_sec),
-        .cfg_motion_hi_th_o   (host_cfg_motion_hi_th),
-        .cfg_motion_hi_count_o(host_cfg_motion_hi_count),
-        .cfg_policy_o         (host_cfg_policy),
-        .cfg_conf_thr_o       (host_cfg_conf_thr),
-        .irqc_req_o           (host_i2c_irqc_req),
-        .irqc_we_o            (host_i2c_irqc_we),
-        .irqc_off_o           (host_i2c_irqc_off),
-        .irqc_wdata_o         (host_i2c_irqc_wdata),
-        .irqc_ready_i         (host_i2c_irqc_ready),
-        .irqc_rdata_i         (host_i2c_irqc_rdata)
-    );
-
-    assign irq_sources = {28'b0, test_force_wake_i,
-        host_i2c_irq_event | test_irq_src_i[2],
+    assign irq_sources = {28'b0, test_force_wake_i, test_irq_src_i[2],
         ml_irq             | test_irq_src_i[1],
         timer_event        | test_irq_src_i[0]};
     assign wake_sources = irq_sources;
@@ -1282,5 +1216,11 @@ module top #(
     assign epoch_end_o = epoch_end_w;
     //assign alarm_o = 1'b0;
     // assign weight_boot_done_o = 1'b1;
+
+    // Placeholder drives for the i2c_master physical interface.
+    // Replace these assigns with connections to i2c_master ports once the
+    // master is updated to drive real I2C pins.
+    assign i2c_scl_o           = 1'b1; // SCL idle high
+    assign i2c_sda_drive_low_o = 1'b0; // not driving SDA low
 
 endmodule
