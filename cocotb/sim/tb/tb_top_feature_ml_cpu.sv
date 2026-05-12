@@ -53,8 +53,6 @@ wire        ppg_sim_err;
 wire        spi_clk;
 wire        spi_mosi;
 wire        spi_cs_n;
-wire        host_i2c_scl;
-tri1        host_i2c_sda;
 
 localparam [6:0] ACC_ADDR = 7'h19;
 localparam [6:0] PPG_ADDR = 7'h64;
@@ -132,9 +130,9 @@ top #(
 ) dut (
     .clk_i(clk),
     .reset_i(reset),
-    .i2c_scl_i(host_i2c_scl),
-    .i2c_sda_io(host_i2c_sda),
-    .i2c_sda_i(host_i2c_sda),
+    .i2c_scl_o(),
+    .i2c_sda_io(),
+    .i2c_sda_i(1'b1),
     .i2c_sda_drive_low_o(),
     .sim_req_o(sim_req),
     .sim_addr_o(sim_addr),
@@ -147,10 +145,6 @@ top #(
     .sim_rvalid_i(sim_rvalid),
     .sim_rlast_i(sim_rlast),
     .sim_err_i(sim_err),
-    .spi_clk_o(spi_clk),
-    .spi_mosi_o(spi_mosi),
-    .spi_miso_i(1'b1),
-    .spi_cs_n_o(spi_cs_n),
     .boot_spi_clk_o(),
     .boot_spi_mosi_o(),
     .boot_spi_miso_i(1'b1),
@@ -170,8 +164,6 @@ top #(
     .irq_eoi_o(),
     .boot_done_o()
 );
-
-assign host_i2c_scl = 1'b1;
 
 // Simulation-only accelerometer model.
 i2c_slave_lis2dw12 #(

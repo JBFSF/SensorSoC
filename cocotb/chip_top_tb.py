@@ -309,7 +309,10 @@ def chip_top_runner():
         defines = {"FUNCTIONAL": True, "USE_POWER_PINS": True}
     else:
         src_dir = proj_path / "../src"
-        skip = {"gf180mcu_fd_ip_sram__sram512x8m8wm1.v", "dummy_top.sv", "soc_top.v"}
+        pad_level = hdl_toplevel in {"chip_top", "chip_top_sim_wrap"}
+        skip = {"dummy_top.sv", "soc_top.v"}
+        if pad_level:
+            skip.add("gf180mcu_fd_ip_sram__sram512x8m8wm1.v")
         sources += sorted(p for p in src_dir.glob("*.sv") if p.name not in skip)
         sources += sorted(p for p in src_dir.glob("*.v")  if p.name not in skip)
         sources.append(proj_path / "../ip/picorv32.v")
@@ -319,27 +322,34 @@ def chip_top_runner():
         sources.append(proj_path / "sensors/i2c_slave_lis2dw12.sv")
         sources.append(proj_path / "sensors/i2c_slave_adpd144ri.sv")
 
-        # Sim wrapper (HDL toplevel for full tests; ignored when hdl_toplevel=chip_top)
-        sources.append(proj_path / "sim/tb/chip_top_sim_wrap.sv")
+        # Sim wrapper is only needed when it is the selected HDL toplevel.
+        if hdl_toplevel == "chip_top_sim_wrap":
+            sources.append(proj_path / "sim/tb/chip_top_sim_wrap.sv")
 
-        # Always include pad and SRAM models (needed by chip_top inside the wrapper)
-        sources += [
-            Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_fd_io.v",
-            Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_ws_io.v",
-            Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_ip_sram/verilog/gf180mcu_fd_ip_sram__sram512x8m8wm1.v",
-            proj_path / "../ip/gf180mcu_ws_ip__id/vh/gf180mcu_ws_ip__id.v",
-            proj_path / "../ip/gf180mcu_ws_ip__logo/vh/gf180mcu_ws_ip__logo.v",
-        ]
+        # Pad-level builds need GF180 IO models. Direct chip_core RTL DFT does not.
+        if pad_level:
+            sources += [
+                Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_fd_io.v",
+                Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_ws_io.v",
+                Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_ip_sram/verilog/gf180mcu_fd_ip_sram__sram512x8m8wm1.v",
+                proj_path / "../ip/gf180mcu_ws_ip__id/vh/gf180mcu_ws_ip__id.v",
+                proj_path / "../ip/gf180mcu_ws_ip__logo/vh/gf180mcu_ws_ip__logo.v",
+            ]
 
     build_args = []
     if sim == "verilator":
         build_args = ["--timing", "--trace", "--trace-fst", "--trace-structs"]
+
+    parameters = {}
+    if hdl_toplevel == "chip_core" and test_module == "chip_core_dft_tb":
+        parameters["DEBUG_STIM_EN"] = 1
 
     runner = get_runner(sim)
     runner.build(
         sources=sources,
         hdl_toplevel=hdl_toplevel,
         defines=defines,
+        parameters=parameters,
         always=True,
         includes=includes,
         build_args=build_args,

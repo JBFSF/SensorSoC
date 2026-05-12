@@ -54,9 +54,6 @@ wire        ppg_sim_rvalid;
 wire        ppg_sim_rlast;
 wire        ppg_sim_err;
 
-wire        spi_clk;
-wire        spi_mosi;
-wire        spi_cs_n;
 wire        weight_spi_clk;
 wire        weight_spi_mosi;
 wire        weight_spi_miso;
@@ -67,8 +64,6 @@ wire        boot_spi_miso;
 wire        boot_spi_cs_n;
 wire signed [15:0] logit0;
 wire signed [15:0] logit1;
-wire        host_i2c_scl;
-tri1        host_i2c_sda;
 
 localparam [6:0] ACC_ADDR = 7'h19;
 localparam [6:0] PPG_ADDR = 7'h64;
@@ -90,9 +85,6 @@ integer axi_w_hs;
 integer axi_b_hs;
 integer spi_cs_asserts;
 integer spi_bit_count;
-// main SPI (spi_master_mmio) counters — used by firmware's spi_boot_load(), separate from weight SPI
-integer main_spi_cs_asserts;
-integer main_spi_bit_count;
 integer boot_writes_seen;
 reg saw_feature_latch;
 reg signed [15:0] first_time_feat;
@@ -104,8 +96,6 @@ reg saw_start_write;
 reg saw_busy_read;
 reg prev_spi_cs_n;
 reg prev_spi_clk;
-reg prev_main_spi_cs_n;
-reg prev_main_spi_clk;
 reg [31:0] boot_word0;
 reg [31:0] boot_word1;
 reg [31:0] boot_word2;
@@ -160,9 +150,9 @@ top #(
 ) dut (
     .clk_i(clk),
     .reset_i(reset),
-    .i2c_scl_i(host_i2c_scl),
-    .i2c_sda_io(host_i2c_sda),
-    .i2c_sda_i(host_i2c_sda),
+    .i2c_scl_o(),
+    .i2c_sda_io(),
+    .i2c_sda_i(1'b1),
     .i2c_sda_drive_low_o(),
     .sim_req_o(sim_req),
     .sim_addr_o(sim_addr),
@@ -182,10 +172,6 @@ top #(
     .mssd_feat_o(),
     .ml_update_gate_o(),
     .invalid_reason_o(),
-    .spi_clk_o(spi_clk),
-    .spi_mosi_o(spi_mosi),
-    .spi_miso_i(1'b1),     // CPU SPI unused; weight_flash_axi boots from weight_spi_*
-    .spi_cs_n_o(spi_cs_n),
     .weight_spi_clk_o(weight_spi_clk),
     .weight_spi_mosi_o(weight_spi_mosi),
     .weight_spi_miso_i(weight_spi_miso),
@@ -208,8 +194,6 @@ top #(
     .boot_done_o(),
     .weight_boot_done_o()
 );
-
-assign host_i2c_scl = 1'b1;
 
 i2c_slave_lis2dw12 #(
     .I2C_ADDR(ACC_ADDR)
@@ -320,12 +304,6 @@ always @(posedge clk) begin
         axi_b_hs <= 0;
         spi_cs_asserts <= 0;
         spi_bit_count <= 0;
-        // main SPI tracks spi_master_mmio (spi_clk_o/spi_cs_n_o), used by spi_boot_load()
-        // separate from weight_spi_* which taketwo drives via AXI
-        main_spi_cs_asserts <= 0;
-        main_spi_bit_count <= 0;
-        prev_main_spi_cs_n <= 1'b1;
-        prev_main_spi_clk <= 1'b0;
         boot_writes_seen <= 0;
         saw_feature_latch <= 1'b0;
         first_time_feat <= '0;
@@ -354,14 +332,6 @@ always @(posedge clk) begin
         if (!prev_spi_clk && weight_spi_clk && !weight_spi_cs_n)
             spi_bit_count <= spi_bit_count + 1;
         prev_spi_clk <= weight_spi_clk;
-        // main SPI (spi_master_mmio): CPU SPI — unused in this test (no spi_boot_load)
-        if (prev_main_spi_cs_n && !spi_cs_n)
-            main_spi_cs_asserts <= main_spi_cs_asserts + 1;
-        prev_main_spi_cs_n <= spi_cs_n;
-        if (!prev_main_spi_clk && spi_clk && !spi_cs_n)
-            main_spi_bit_count <= main_spi_bit_count + 1;
-        prev_main_spi_clk <= spi_clk;
-
         if (!saw_feature_latch && dut.feat_latched_valid_r)
             saw_feature_latch <= 1'b1;
 

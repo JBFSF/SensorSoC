@@ -72,7 +72,6 @@ module top #(
         input  logic        sim_rvalid_i,  // read data valid strobe from simulated sensor
         input  logic        sim_rlast_i,   // marks last read byte of the transaction from simulated sensor
         input  logic        sim_err_i,     // error indicator from simulated sensor (e.g., NACK/invalid access)
-
     `endif
     
     // Signals used for test modes.
@@ -233,18 +232,19 @@ module top #(
     logic       feat_en;                 // Feature pipeline enable wire
     logic       ml_en;                   // ML enable wire
     logic       cpu_clk_en;                  // CPU clock enable wire
-    logic       sleeping_r;
-    logic       sim_req_w;
-    logic [6:0] sim_addr_w;
-    logic [7:0] sim_reg_w;
-    logic [7:0] sim_len_w;
-    logic       sim_write_w;
-    logic [7:0] sim_wdata_w;
-    logic       sim_ack_w;
-    logic [7:0] sim_rdata_w;
-    logic       sim_rvalid_w;
-    logic       sim_rlast_w;
-    logic       sim_err_w;
+    `ifdef SIM
+        logic       sleeping_r;
+        logic       sim_req_w;
+        logic [6:0] sim_addr_w;
+        logic [7:0] sim_reg_w;
+        logic [7:0] sim_len_w;
+        logic       sim_write_w;
+        logic [7:0] sim_wdata_w;
+        logic       sim_ack_w;
+        logic [7:0] sim_rdata_w;
+        logic       sim_rvalid_w;
+        logic       sim_rlast_w;
+        logic       sim_err_w;
 
     // Internal wires for the sensor I2C bus (i2c_master <-> top-level ports)
     logic sensor_scl_w;
@@ -439,11 +439,6 @@ module top #(
     wire [31:0] irq_sources;
     wire [31:0] wake_sources;
 
-    // host_i2c_target is disconnected from the physical I2C pads; the pads are
-    // now reserved for i2c_master. These internal stubs keep host_i2c_target
-    // instantiated (and its register file accessible) while isolating it from
-    // the chip-level pins
-
     always_ff @(posedge clk_i) begin
         if (reset_i) begin
             ms_div_q  <= '0;
@@ -597,21 +592,24 @@ module top #(
         .ppg_rsp_last_o(ppg_i2c_rsp_last_w),       // PPG response last-byte marker
         .ppg_rsp_done_o(ppg_i2c_rsp_done_w),       // PPG transaction done
         .ppg_rsp_err_o(ppg_i2c_rsp_err_w),         // PPG transaction error
-        .ppg_rsp_ready_i(ppg_i2c_rsp_ready_w),     // backpressure from ppg_fifo_reader during bursts
-        .scl_o  (sensor_scl_w),                    // sensor I2C SCL output (push-pull)
-        .sda_i  (sensor_sda_i_w),                  // sensor I2C SDA input (sampled from pad)
-        .sda_oe (sensor_sda_oe_w),                 // sensor I2C SDA drive-low enable (open-drain)
-        .sim_req(sim_req_w),                       // drive sim sensor-bus request (to TB sensor models)
-        .sim_addr(sim_addr_w),                     // drive sim sensor-bus device address
-        .sim_reg(sim_reg_w),                       // drive sim sensor-bus register address
-        .sim_len(sim_len_w),                       // drive sim sensor-bus transfer length
-        .sim_write(sim_write_w),                   // drive sim sensor-bus direction
-        .sim_wdata(sim_wdata_w),                   // drive sim sensor-bus write data
-        .sim_ack(sim_ack_w),                       // receive sim sensor-bus ack from model
-        .sim_rdata(sim_rdata_w),                   // receive sim sensor-bus read data from model
-        .sim_rvalid(sim_rvalid_w),                 // receive sim sensor-bus read valid strobe
-        .sim_rlast(sim_rlast_w),                   // receive sim sensor-bus last-byte marker
-        .sim_err(sim_err_w)                        // receive sim sensor-bus error indication
+        .ppg_rsp_ready_i(ppg_i2c_rsp_ready_w),
+        .scl_o  (sensor_scl_w),
+        .sda_i  (sensor_sda_i_w),
+        .sda_oe (sensor_sda_oe_w)
+        `ifdef SIM
+            ,
+            .sim_req(sim_req_w),
+            .sim_addr(sim_addr_w),
+            .sim_reg(sim_reg_w),
+            .sim_len(sim_len_w),
+            .sim_write(sim_write_w),
+            .sim_wdata(sim_wdata_w),
+            .sim_ack(sim_ack_w),
+            .sim_rdata(sim_rdata_w),
+            .sim_rvalid(sim_rvalid_w),
+            .sim_rlast(sim_rlast_w),
+            .sim_err(sim_err_w)
+        `endif
     );
 
     //JF: Feat Pipline, sleep until watchdog
