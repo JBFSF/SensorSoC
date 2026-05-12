@@ -175,13 +175,6 @@ module chip_core #(
         assign sim_len_o   = sim_len_w;
         assign sim_write_o = sim_write_w;
         assign sim_wdata_o = sim_wdata_w;
-
-        assign sim_req_w   = 1'b0;
-        assign sim_addr_w  = 7'b0;
-        assign sim_reg_w   = 8'b0;
-        assign sim_len_w   = 8'b0;
-        assign sim_write_w = 1'b0;
-        assign sim_wdata_w = 8'b0;
     `endif
 
 

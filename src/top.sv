@@ -568,6 +568,7 @@ module top #(
         .ppg_rsp_err_o(ppg_i2c_rsp_err_w),         // PPG transaction error
         .ppg_rsp_ready_i(ppg_i2c_rsp_ready_w)     // backpressure from ppg_fifo_reader during bursts
         `ifdef SIM
+            ,
             .sim_req(sim_req_w),                       // drive sim sensor-bus request (to TB sensor models)
             .sim_addr(sim_addr_w),                     // drive sim sensor-bus device address
             .sim_reg(sim_reg_w),                       // drive sim sensor-bus register address
