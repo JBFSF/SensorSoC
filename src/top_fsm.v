@@ -79,11 +79,11 @@ module top_fsm
 
         case (test_mode_i)
             4'b0001, 4'b0010, 4'b0011, 4'b0100: state_d = FEAT_ONLY; //just feat_pl
-            4'b0110, 4'b1100, 4'b1101: state_d = FEAT_ML; //feat and ML
+            4'b0110: state_d = FEAT_ML; //feat and ML
             // 01001 is an observer mode for live sleep/IRQ state; do not
             // override the FSM or it cannot expose sleeping_o=1.
             4'b0111, 4'b1000, 4'b1010, 4'b1011: state_d = CPU_ONLY; //just cpu?
-            4'b0101: state_d = ALL; //all 
+            4'b0101, 4'b1100, 4'b1101: state_d = ALL; //all 
         endcase
     end
 

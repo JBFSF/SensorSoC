@@ -245,7 +245,7 @@ module top #(
         logic       sim_rvalid_w;
         logic       sim_rlast_w;
         logic       sim_err_w;
-
+    `endif
     // Internal wires for the sensor I2C bus (i2c_master <-> top-level ports)
     logic sensor_scl_w;
     logic sensor_sda_i_w;
