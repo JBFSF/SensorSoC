@@ -231,9 +231,9 @@ module top #(
 
     logic       feat_en;                 // Feature pipeline enable wire
     logic       ml_en;                   // ML enable wire
-    logic       cpu_clk_en;                  // CPU clock enable wire
+    logic       cpu_clk_en;             // CPU clock enable wire
+    logic       sleeping_r;             // top_fsm sleeping status (used in both paths)
     `ifdef SIM
-        logic       sleeping_r;
         logic       sim_req_w;
         logic [6:0] sim_addr_w;
         logic [7:0] sim_reg_w;
@@ -245,6 +245,7 @@ module top #(
         logic       sim_rvalid_w;
         logic       sim_rlast_w;
         logic       sim_err_w;
+    `endif
 
     // Internal wires for the sensor I2C bus (i2c_master <-> top-level ports)
     logic sensor_scl_w;
@@ -256,23 +257,17 @@ module top #(
     assign sensor_sda_i_w = sensor_sda_i;
 
 `ifdef SIM
-    assign sim_req_o = sim_req_w;
-    assign sim_addr_o = sim_addr_w;
-    assign sim_reg_o = sim_reg_w;
-    assign sim_len_o = sim_len_w;
+    assign sim_req_o   = sim_req_w;
+    assign sim_addr_o  = sim_addr_w;
+    assign sim_reg_o   = sim_reg_w;
+    assign sim_len_o   = sim_len_w;
     assign sim_write_o = sim_write_w;
     assign sim_wdata_o = sim_wdata_w;
-    assign sim_ack_w = sim_ack_i;
+    assign sim_ack_w   = sim_ack_i;
     assign sim_rdata_w = sim_rdata_i;
     assign sim_rvalid_w = sim_rvalid_i;
     assign sim_rlast_w = sim_rlast_i;
-    assign sim_err_w = sim_err_i;
-`else
-    assign sim_ack_w = 1'b0;
-    assign sim_rdata_w = 8'h00;
-    assign sim_rvalid_w = 1'b0;
-    assign sim_rlast_w = 1'b0;
-    assign sim_err_w = 1'b0;
+    assign sim_err_w   = sim_err_i;
 `endif
 
     // ---------------------------------------------------------------------

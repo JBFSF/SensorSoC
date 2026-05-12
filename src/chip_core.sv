@@ -187,8 +187,15 @@ module chip_core #(
     assign input_pu = '0;
     assign input_pd = '0;
 
-    assign bidir_out = bidir_out_w;
-    assign bidir_oe = bidir_oe_w;
+    // Debug-bus contribution shifted into bits [DEBUG_BUS_HI:DEBUG_BUS_LO] = [22:7].
+    // Computed with continuous assigns (no always_comb bit-select) to avoid iverilog limitation.
+    logic [39:0] dbg_bidir_out_w;
+    logic [39:0] dbg_bidir_oe_w;
+    assign dbg_bidir_out_w = (test_mode_w[3:0] != 4'b0000) ? {{17{1'b0}}, debug_bus_w, 7'b0} : '0;
+    assign dbg_bidir_oe_w  = (test_mode_w[3:0] != 4'b0000) ? {{17{1'b0}}, {16{1'b1}}, 7'b0} : '0;
+
+    assign bidir_out = bidir_out_w | dbg_bidir_out_w;
+    assign bidir_oe  = bidir_oe_w  | dbg_bidir_oe_w;
     assign bidir_cs = '0;
     assign bidir_sl = '0;
     assign bidir_ie = ~bidir_oe_w;
@@ -410,15 +417,11 @@ module chip_core #(
         bidir_oe_w[5] = 1'b1;
         bidir_oe_w[6] = i2c_sda_drive_low_w;
 
-        bidir_out_w[SENSOR_SCL_PAD] = sensor_scl_w;
-        bidir_oe_w[SENSOR_SCL_PAD]  = 1'b1;
-        bidir_out_w[SENSOR_SDA_PAD] = 1'b0;
-        bidir_oe_w[SENSOR_SDA_PAD]  = sensor_sda_oe_w;
+        bidir_out_w[23] = sensor_scl_w;   // SENSOR_SCL_PAD = 23
+        bidir_oe_w[23]  = 1'b1;
+        bidir_out_w[24] = 1'b0;           // SENSOR_SDA_PAD = 24
+        bidir_oe_w[24]  = sensor_sda_oe_w;
 
-        if (test_mode_w[3:0] != 4'b0000) begin
-            bidir_out_w[DEBUG_BUS_HI:DEBUG_BUS_LO] = debug_bus_w;
-            bidir_oe_w[DEBUG_BUS_HI:DEBUG_BUS_LO] = '1;
-        end
     end
 
     top #(
