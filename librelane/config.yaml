@@ -25,11 +25,13 @@ meta:
     #Checker.LVS: null
 
 DESIGN_NAME: chip_top
+VERILOG_DEFINES: ["SLOT_1X1", "USE_POWER_PINS"]
 VERILOG_FILES:
 - dir::../src/chip_top.sv
 - dir::../src/chip_core.sv
 - dir::../src/top.sv
 - dir::../src/accel_reader.sv
+- dir::../src/alarm_mmio.v
 - dir::../src/axi_interface.sv
 - dir::../src/clock_mux.sv
 - dir::../src/cpu_to_ml.v
