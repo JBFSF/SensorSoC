@@ -1504,6 +1504,27 @@ sim-i2c-master-rtl: $(I2C_MASTER_RTL_VVP)
 	$(VVP) $(I2C_MASTER_RTL_VVP)
 
 # ============================================================
+# CHIP CORE I2C PAD ROUTING (chip_core synthesis path — no -DSIM)
+# Verifies that bidir[23]=SCL and bidir[24]=SDA are correctly
+# routed through chip_core with a real open-drain I2C slave BFM.
+# ============================================================
+
+CHIP_CORE_I2C_RTL_TOP  := tb_chip_core_i2c_rtl
+CHIP_CORE_I2C_RTL_VVP  := $(BUILD_DIR)/$(CHIP_CORE_I2C_RTL_TOP).vvp
+CHIP_CORE_I2C_RTL_SRCS := \
+  sim/tb/$(CHIP_CORE_I2C_RTL_TOP).sv \
+  $(RTL_DIR)/chip_core.sv \
+  $(UNIFIED_TOP_RTL_SRCS)
+
+$(CHIP_CORE_I2C_RTL_VVP): $(CHIP_CORE_I2C_RTL_SRCS) | $(BUILD_DIR)
+	$(IVERILOG) -g2012 -I $(RTL_DIR) -s $(CHIP_CORE_I2C_RTL_TOP) -o $@ $(CHIP_CORE_I2C_RTL_SRCS)
+
+.PHONY: sim-chip-core-i2c-rtl
+sim-chip-core-i2c-rtl: $(CHIP_CORE_I2C_RTL_VVP)
+	@echo "== Running $(CHIP_CORE_I2C_RTL_TOP) (chip_core I2C pad routing, no -DSIM) =="
+	$(VVP) $(CHIP_CORE_I2C_RTL_VVP)
+
+# ============================================================
 # SENSOR PIPELINE (i2c_master + slave models + tb_sensor_pipeline)
 # ============================================================
 
