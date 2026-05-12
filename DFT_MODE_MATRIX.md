@@ -39,7 +39,7 @@ Important nuance for `00000`:
 | `00110` | ML Update / Invalid Reason | Internal | Run valid and invalid pipeline cases | Yes | Yes | `ML_ONLY`: feature off, ML on, CPU off, not sleeping | `{ml_update_gate, epoch_end, invalid_reason[7:0], 6'b0}` | Matches internal control/status signals | Medium |
 | `00111` | Pico State Summary | Internal | Boot firmware | Yes | No | `CPU_ONLY`: feature off, ML off, CPU on, not sleeping | CPU trap/clock/mem summary | Reflects active CPU execution and no unexpected trap | High |
 | `01000` | Pico MMIO Write Summary | Internal | Run firmware with MMIO writes | Yes | No | `CPU_ONLY`: feature off, ML off, CPU on, not sleeping | MMIO write summary | Shows expected address/data/write activity | High |
-| `01001` | Pico Sleep / IRQ Summary | Internal | Run sleep/wake firmware | Yes | No | `CPU_ONLY`: feature off, ML off, CPU on, not sleeping | Sleep/IRQ summary | Matches expected sleep/awake/IRQ phase | High |
+| `01001` | Pico Sleep / IRQ Summary | Internal | Drive controlled sleep, IRQ, wake, CPU-on, and trap phases | Minimal | No | Observer mode: does not override the live FSM | `{pico_trap, pico_sleeping, pico_cpu_clk_en, \|pico_irq, 12'b0}` | Matches expected sleep/awake/IRQ/CPU/trap phase | High |
 | `01010` | Force IRQ View | Internal | Drive `bidir[37]` | Minimal | No | `CPU_ONLY`: feature off, ML off, CPU on, not sleeping | Forced IRQ summary | Forced IRQ bit and related fields respond correctly | Very High |
 | `01011` | Force Wake View | Internal | Drive `bidir[38]` | Minimal | No | `CPU_ONLY`: feature off, ML off, CPU on, not sleeping | Forced wake / wake-source summary | Forced wake bit visible and wake summary coherent | Very High |
 | `01100` | Logit0 View | Internal | Run ML once | Yes | Likely Yes | No current `top_fsm` override; needs clarification before locking expected enable posture | `logit0[15:0]` | Matches agreed internal/exported `logit0` value | Medium |
@@ -148,9 +148,41 @@ Currently covered modes:
     - `ml_en = 0`
     - `cpu_en = 1`
     - `sleeping = 0`
+- `01001`
+  - checks that the debug bus is enabled
+  - checks that the 16-bit Pico sleep / IRQ summary matches the live internal packed view
+    of:
+    - `pico_trap`
+    - `pico_sleeping`
+    - `pico_cpu_clk_en`
+    - `|pico_irq`
+    - hard-zero low 12 bits
+  - proves `01001` is an observer mode rather than a CPU-only override by driving
+    the real FSM into sleep and observing `sleeping = 1`, `cpu_en = 0`
+  - toggles the DFT forced-IRQ pad and checks the IRQ summary bit
+  - toggles the DFT forced-wake pad and checks the sleeping bit clears
+  - enters a neighboring CPU-only DFT mode, returns to `01001`, and checks
+    `cpu_clk_en = 1`
+  - briefly forces the trap source in the chip-core harness to verify bit 15
 - `01010`
   - checks that the debug bus is enabled
-  - checks that bit 15 reflects the forced IRQ input on `bidir[37]`
+  - checks that the full 16-bit packed summary matches the live internal view
+    of:
+    - `test_force_irq`
+    - `pico_trap`
+    - `pico_cpu_clk_en`
+    - `pico_mem_instr`
+    - `pico_mem_valid`
+    - `pico_mem_ready`
+    - `pico_mem_addr[9:0]`
+  - toggles `bidir[37]` and checks both the debug summary bit and the routed
+    Pico IRQ bit
+  - preloads a tiny SRAM Pico program and checks that the summary exposes real:
+    - instruction fetch
+    - `mem_valid`
+    - `mem_ready`
+    - SRAM data access address bits
+    - MMIO store address bits
   - checks that the expected CPU-only mode posture is active:
     - `feat_en = 0`
     - `ml_en = 0`
@@ -158,7 +190,18 @@ Currently covered modes:
     - `sleeping = 0`
 - `01011`
   - checks that the debug bus is enabled
+  - checks that the full 16-bit packed summary matches the live internal view
+    of:
+    - `test_force_wake`
+    - `host_i2c_irq_event`
+    - `ml_irq`
+    - `timer_event`
+    - hard-zero low 12 bits
   - checks that bit 15 reflects the forced wake input on `bidir[38]`
+  - forces the internal ML IRQ and timer-event sources to prove bits 13 and 12
+  - intentionally does not add host-I2C IRQ stimulus because that path is
+    transitional and planned for removal
+  - checks that the host-I2C bit stays low in the unstimulated harness
   - checks that the low 12 bits remain zero as expected for this summary mode
   - checks that the expected CPU-only mode posture is active:
     - `feat_en = 0`
@@ -173,12 +216,14 @@ Current coverage note:
   on the external GF180 pad-model setup
 - this still validates the real test-mode and debug-bus logic that `chip_top`
   uses
-- the current smoke suite contains 10 passing tests total:
+- the current smoke suite contains 11 passing tests total:
   - the covered modes above
   - plus a second, stronger execution-visibility test for `00111`
 - the new `01000` smoke check uses a tiny SRAM-preloaded Pico program to
   create one real CPU MMIO store inside the otherwise minimal `chip_core`
   harness
+- the new `01001` check uses controlled sleep / IRQ / wake stimulus because
+  selecting this mode must not itself force the FSM awake
 
 ## Best First Tests
 
@@ -196,9 +241,9 @@ These are the best modes to bring up first:
 4. `10000`
    - normal external-clock mode
    - proves external test clock selection works
-5. `00111` and `01000`
-   - CPU state / MMIO write summaries
-   - useful sanity checks once firmware is running
+5. `00111`, `01000`, and `01001`
+   - CPU state / MMIO write / sleep-IRQ summaries
+   - useful sanity checks once firmware or controlled sleep/wake stimulus is running
 
 ## Coordination Items
 
