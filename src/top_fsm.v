@@ -28,7 +28,8 @@ module top_fsm
     output        feat_en_o,
     output        ml_en_o,
     output        cpu_en_o,
-    output        sleeping_o
+    output        sleeping_o,
+    output        init_o          // if the cpu initalization was done
 );
 
     localparam BOOT      = 3'd0;
@@ -93,7 +94,8 @@ module top_fsm
     assign ml_en_o    = (state_q == ALL) || (state_q == FEAT_ML) || (state_q == BOOT);
     assign cpu_en_o   = cpu_clk_en_r;
     assign sleeping_o = (state_q == SLEEP);
-    assign watchdog_o = (state_q == FEAT_ONLY) || (state_q == ALL) || (state_q == CPU_FEAT) || (state_q == FEAT_ML) || (state_q == SLEEP); 
+    assign watchdog_o = (state_q == FEAT_ONLY) || (state_q == ALL) || (state_q == CPU_FEAT) || (state_q == FEAT_ML) || (state_q == SLEEP);
+    assign init_o     = (state_q != BOOT); 
 
     always @(posedge clk_i) begin
         if (!resetn_i) begin
