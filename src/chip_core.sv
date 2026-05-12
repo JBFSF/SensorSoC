@@ -44,6 +44,8 @@ module chip_core #(
     parameter NUM_BIDIR_PADS = 40,
     parameter NUM_ANALOG_PADS = 2,
     parameter DEBUG_STIM_EN = 0,
+    parameter FIRMWARE_HEX    = "",
+    parameter WEIGHT_INIT_HEX = "",
     parameter CLK_HZ = 10_000_000,
     parameter GT_CLK_HZ = 10_000_000,
     parameter GT_EPOCH_HZ = 100,
@@ -425,6 +427,8 @@ module chip_core #(
     end
 
     top #(
+        .FIRMWARE_HEX(FIRMWARE_HEX),
+        .WEIGHT_INIT_HEX(WEIGHT_INIT_HEX),
         .CLK_HZ(CLK_HZ),
         .GT_CLK_HZ(GT_CLK_HZ),
         .GT_EPOCH_HZ(GT_EPOCH_HZ),

@@ -324,7 +324,7 @@ def chip_top_runner():
 
         # Sim wrapper is only needed when it is the selected HDL toplevel.
         if hdl_toplevel == "chip_top_sim_wrap":
-            sources.append(proj_path / "sim/tb/chip_top_sim_wrap.sv")
+            sources.append(proj_path / "chip_top_sim_wrap.sv")
 
         # Pad-level builds need GF180 IO models. Direct chip_core RTL DFT does not.
         if pad_level:
