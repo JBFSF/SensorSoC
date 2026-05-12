@@ -52,6 +52,13 @@ module top #(
     input  logic i2c_sda_i,
     output logic i2c_sda_drive_low_o,
 
+    // Sensor I2C bus: master drives accel (LIS2DW12) and PPG (ADPD144RI).
+    // Separate from the host I2C target above. SCL is push-pull; SDA is
+    // open-drain (sensor_sda_oe=1 drives low, 0 releases to external pullup).
+    output logic sensor_scl_o,
+    input  logic sensor_sda_i,
+    output logic sensor_sda_oe,
+
     `ifdef SIM 
         // Functional simulation bus to sensor models (through i2c_master).
         output logic        sim_req_o,     // request strobe from i2c_master into simulated sensor bus
@@ -238,6 +245,15 @@ module top #(
     logic       sim_rvalid_w;
     logic       sim_rlast_w;
     logic       sim_err_w;
+
+    // Internal wires for the sensor I2C bus (i2c_master <-> top-level ports)
+    logic sensor_scl_w;
+    logic sensor_sda_i_w;
+    logic sensor_sda_oe_w;
+
+    assign sensor_scl_o   = sensor_scl_w;
+    assign sensor_sda_oe  = sensor_sda_oe_w;
+    assign sensor_sda_i_w = sensor_sda_i;
 
 `ifdef SIM
     assign sim_req_o = sim_req_w;
@@ -549,7 +565,10 @@ module top #(
 
 
     //JF: Feat Pipline, sleep until watchdog
-    i2c_master u_i2c_master (
+    i2c_master #(
+        .CLK_HZ    (CLK_HZ),
+        .I2C_CLK_HZ(100_000)
+    ) u_i2c_master (
         .clk(clk_i),
         .resetn(~reset_i),
         .en_i(feat_en),
@@ -579,6 +598,9 @@ module top #(
         .ppg_rsp_done_o(ppg_i2c_rsp_done_w),       // PPG transaction done
         .ppg_rsp_err_o(ppg_i2c_rsp_err_w),         // PPG transaction error
         .ppg_rsp_ready_i(ppg_i2c_rsp_ready_w),     // backpressure from ppg_fifo_reader during bursts
+        .scl_o  (sensor_scl_w),                    // sensor I2C SCL output (push-pull)
+        .sda_i  (sensor_sda_i_w),                  // sensor I2C SDA input (sampled from pad)
+        .sda_oe (sensor_sda_oe_w),                 // sensor I2C SDA drive-low enable (open-drain)
         .sim_req(sim_req_w),                       // drive sim sensor-bus request (to TB sensor models)
         .sim_addr(sim_addr_w),                     // drive sim sensor-bus device address
         .sim_reg(sim_reg_w),                       // drive sim sensor-bus register address

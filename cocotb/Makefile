@@ -1650,6 +1650,22 @@ check-ml-logit-sram-mmio: $(ML_LOGIT_SRAM_MMIO_VVP)
 	@echo "== Built $(ML_LOGIT_SRAM_MMIO_VVP) =="
 
 # ============================================================
+# I2C MASTER RTL (synthesis-path unit test — compiled without -DSIM)
+# ============================================================
+
+I2C_MASTER_RTL_TOP := tb_i2c_master_rtl
+I2C_MASTER_RTL_VVP := $(BUILD_DIR)/$(I2C_MASTER_RTL_TOP).vvp
+I2C_MASTER_RTL_SRCS := sim/tb/tb_i2c_master_rtl.sv $(RTL_DIR)/i2c_master.sv
+
+$(I2C_MASTER_RTL_VVP): $(I2C_MASTER_RTL_SRCS) | $(BUILD_DIR)
+	$(IVERILOG) -g2012 -o $@ $(I2C_MASTER_RTL_SRCS)
+
+.PHONY: sim-i2c-master-rtl
+sim-i2c-master-rtl: $(I2C_MASTER_RTL_VVP)
+	@echo "== Running $(I2C_MASTER_RTL_TOP) (real I2C state machine, no -DSIM) =="
+	$(VVP) $(I2C_MASTER_RTL_VVP)
+
+# ============================================================
 # SENSOR PIPELINE (i2c_master + slave models + tb_sensor_pipeline)
 # ============================================================
 

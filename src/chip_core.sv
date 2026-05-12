@@ -11,6 +11,8 @@
     // bidir[5]      : I2C SCL input
     // bidir[6]      : I2C SDA open drain
     // bidir[22:7]   : 16-bit debug bus for test mode outputs
+    // bidir[23]     : sensor I2C SCL output (master to accel/PPG sensors, push-pull)
+    // bidir[24]     : sensor I2C SDA open-drain (master to accel/PPG sensors)
     // bidir[37]     : force Pico IRQ input, only used by test modes = 01010 / 11010
     // bidir[38]     : force wake source input, only used by test modes = 01011 / 11011
     // bidir[39]     : external test clock, used by the 1xxxx test-mode bank
@@ -107,6 +109,8 @@ module chip_core #(
 
     localparam int DEBUG_BUS_LO        = 7;
     localparam int DEBUG_BUS_HI        = 22;
+    localparam int SENSOR_SCL_PAD      = 23; // sensor I2C SCL (push-pull output)
+    localparam int SENSOR_SDA_PAD      = 24; // sensor I2C SDA (open-drain)
     localparam int TEST_FORCE_IRQ_PAD  = 37;
     localparam int TEST_FORCE_WAKE_PAD = 38;
     localparam int TEST_CLK_PAD        = 39;
@@ -136,6 +140,8 @@ module chip_core #(
     logic spi_mosi_w;
     logic spi_cs_n_w;
     logic i2c_sda_drive_low_w;
+    logic sensor_scl_w;    // sensor I2C SCL from i2c_master
+    logic sensor_sda_oe_w; // sensor I2C SDA drive-low enable from i2c_master
 
     logic epoch_end_w;
     logic alarm_w;
@@ -156,6 +162,7 @@ module chip_core #(
     logic        test_force_irq_w;
     logic        test_force_wake_w;
     logic        host_i2c_irq_event_w;
+    assign host_i2c_irq_event_w = 1'b0; // port removed from top.sv
     logic        ml_irq_w;
     logic        timer_event_w;
 
@@ -407,6 +414,11 @@ module chip_core #(
         bidir_oe_w[3] = 1'b1;
         bidir_oe_w[6] = i2c_sda_drive_low_w;
 
+        bidir_out_w[SENSOR_SCL_PAD] = sensor_scl_w;
+        bidir_oe_w[SENSOR_SCL_PAD]  = 1'b1;
+        bidir_out_w[SENSOR_SDA_PAD] = 1'b0;
+        bidir_oe_w[SENSOR_SDA_PAD]  = sensor_sda_oe_w;
+
         if (test_mode_w[3:0] != 4'b0000) begin
             bidir_out_w[DEBUG_BUS_HI:DEBUG_BUS_LO] = debug_bus_w;
             bidir_oe_w[DEBUG_BUS_HI:DEBUG_BUS_LO] = '1;
@@ -441,10 +453,14 @@ module chip_core #(
         .clk_i                 (core_clk_w),
         .reset_i               (~rst_n),
 
-        .i2c_scl_i             (bidir_in[5]),
+        .i2c_scl_o             (),
         .i2c_sda_io            (),
         .i2c_sda_i             (bidir_in[6]),
         .i2c_sda_drive_low_o   (i2c_sda_drive_low_w),
+
+        .sensor_scl_o          (sensor_scl_w),
+        .sensor_sda_i          (bidir_in[SENSOR_SDA_PAD]),
+        .sensor_sda_oe         (sensor_sda_oe_w),
 
         `ifdef SIM
             .sim_req_o    (sim_req_w),
@@ -468,14 +484,16 @@ module chip_core #(
         .ml_update_gate_o      (ml_update_gate_w),
         .invalid_reason_o      (invalid_reason_w),
 
-        .spi_clk_o             (spi_clk_w),
-        .spi_mosi_o            (spi_mosi_w),
-        .spi_miso_i            (bidir_in[4]),
-        .spi_cs_n_o            (spi_cs_n_w),
-        .boot_spi_clk_o        (),
-        .boot_spi_mosi_o       (),
-        .boot_spi_miso_i       (1'b1),
-        .boot_spi_cs_n_o       (),
+        .boot_spi_clk_o        (spi_clk_w),
+        .boot_spi_mosi_o       (spi_mosi_w),
+        .boot_spi_miso_i       (bidir_in[4]),
+        .boot_spi_cs_n_o       (spi_cs_n_w),
+        .weight_spi_clk_o      (),
+        .weight_spi_mosi_o     (),
+        .weight_spi_miso_i     (1'b1),
+        .weight_spi_cs_n_o     (),
+        .weight_boot_done_o    (),
+        .start_i               (1'b1),
 
         .epoch_end_o           (epoch_end_w),
         .alarm_o               (alarm_w),
@@ -499,7 +517,6 @@ module chip_core #(
         .pico_mem_wdata_o      (pico_mem_wdata_w),
         .pico_irq_o            (pico_irq_w),
         .pico_sleeping_o       (pico_sleeping_w),
-        .host_i2c_irq_event_o  (host_i2c_irq_event_w),
         .ml_irq_o              (ml_irq_w),
         .timer_event_o         (timer_event_w)
 
