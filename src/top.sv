@@ -107,19 +107,12 @@ module top #(
     output logic                      ml_update_gate_o,  // gate: only update ML when signal-quality checks pass
     output logic [7:0]                invalid_reason_o,  // reason code when ML update is gated off    
 
-    // Dedicated SPI interface for hardware boot controller (firmware load).
-    output logic                      boot_spi_clk_o,
-    output logic                      boot_spi_mosi_o,
-    input  logic                      boot_spi_miso_i,
-    output logic                      boot_spi_cs_n_o,
+    // SPI interface which gets handed off after boot
+    output logic                      spi_clk_o,
+    output logic                      spi_mosi_o,
+    input  logic                      spi_miso_i,
+    output logic                      spi_cs_n_o,
 
-    // Dedicated SPI interface for hardware weight boot controller (ML weight load).
-    output logic                      weight_spi_clk_o,
-    output logic                      weight_spi_mosi_o,
-    input  logic                      weight_spi_miso_i,
-    output logic                      weight_spi_cs_n_o,
-
-    output logic                      weight_boot_done_o,
 
     // Epoch pulse for TB orchestration
     input  logic                      start_i,          // Start button to start watchdog timer
@@ -422,6 +415,16 @@ module top #(
     logic       feat_gate_latched_r;
     logic [7:0] feat_invalid_reason_latched_r;
     logic       feat_valid_d;
+
+
+    //wires for handing off spi interface
+    wire       init_done;
+    wire        boot_spi_mosi_w;
+    wire        weight_spi_mosi_w;
+    wire        boot_spi_clk_w;
+    wire        weight_spi_clk_w;
+    wire        boot_spi_cs_n_w;
+    wire        weight_spi_cs_n_w;
 
     // Lightweight feature register bank exposed to firmware. This is the
     // current handoff point between the sensor pipeline and the CPU-owned ML
@@ -981,11 +984,10 @@ module top #(
         .mem_wstrb(mem_wstrb),
         .mem_ready(weight_ready),
         .mem_rdata(weight_rdata),
-        .weight_boot_done(weight_boot_done_o),
-        .spi_cs_n (weight_spi_cs_n_o),
-        .spi_clk  (weight_spi_clk_o),
-        .spi_mosi (weight_spi_mosi_o),
-        .spi_miso (weight_spi_miso_i),
+        .spi_cs_n (weight_spi_cs_n_w),
+        .spi_clk  (weight_spi_clk_w),
+        .spi_mosi (weight_spi_mosi_w),
+        .spi_miso ((init_done) ? spi_miso_i : 1'b0),
         // AXI slave — write channel (accept-and-discard)
         .saxi_awid    (wram_awid),
         .saxi_awaddr  (wram_awaddr),
@@ -1038,10 +1040,10 @@ module top #(
     ) u_boot_ctrl (
         .clk         (clk_i),
         .resetn      (~reset_i),
-        .spi_clk_o   (boot_spi_clk_o),
-        .spi_mosi_o  (boot_spi_mosi_o),
-        .spi_miso_i  (boot_spi_miso_i),
-        .spi_cs_n_o  (boot_spi_cs_n_o),
+        .spi_clk_o   (boot_spi_clk_w),
+        .spi_mosi_o  (boot_spi_mosi_w),
+        .spi_miso_i  ((init_done) ? 1'b0 : spi_miso_i),
+        .spi_cs_n_o  (boot_spi_cs_n_w),
         .sram_valid_o(boot_sram_valid_w),
         .sram_wstrb_o(boot_sram_wstrb_w),
         .sram_addr_o (boot_sram_addr_w),
@@ -1156,7 +1158,8 @@ module top #(
         .feat_en_o(feat_en),
         .ml_en_o(ml_en),
         .cpu_en_o(cpu_clk_en),
-        .sleeping_o(sleeping_r)
+        .sleeping_o(sleeping_r),
+        .init_o(init_done)
     );
 
     alarm_mmio #(.BASE_ADDR(ALARM_BASE)) u_alarm_mmio (
@@ -1188,8 +1191,6 @@ module top #(
     assign timer_event_o     = timer_event;
 
     assign epoch_end_o = epoch_end_w;
-    //assign alarm_o = 1'b0;
-    // assign weight_boot_done_o = 1'b1;
 
     // Placeholder drives for the i2c_master physical interface.
     // Replace these assigns with connections to i2c_master ports once the
@@ -1197,4 +1198,8 @@ module top #(
     assign i2c_scl_o           = 1'b1; // SCL idle high
     assign i2c_sda_drive_low_o = 1'b0; // not driving SDA low
 
+    //Logic for handing off spi interface after initalization
+    assign spi_clk_o = (init_done) ? weight_spi_clk_w : boot_spi_clk_w;
+    assign spi_mosi_o = (init_done) ? weight_spi_mosi_w : boot_spi_mosi_w;
+    assign spi_cs_n_o = (init_done) ? weight_spi_cs_n_w : boot_spi_cs_n_w;
 endmodule
