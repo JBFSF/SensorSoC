@@ -101,12 +101,6 @@ module top #(
     output logic                      ml_update_gate_o,  // gate: only update ML when signal-quality checks pass
     output logic [7:0]                invalid_reason_o,  // reason code when ML update is gated off    
 
-    // SPI flash interface used by the simulation boot stub.
-    output logic                      spi_clk_o,
-    output logic                      spi_mosi_o,
-    input  logic                      spi_miso_i,
-    output logic                      spi_cs_n_o,
-
     // Dedicated SPI interface for hardware boot controller (firmware load).
     output logic                      boot_spi_clk_o,
     output logic                      boot_spi_mosi_o,
@@ -1019,24 +1013,6 @@ module top #(
         .saxi_rlast   (wram_rlast),
         .saxi_rvalid  (wram_rvalid),
         .saxi_rready  (wram_rready)
-    );
-
-    // CPU-driven SPI master used by the simulation boot stub to stream
-    // taketwo weights from external flash into shared WRAM.
-    //JF: probably not needed
-    spi_master_mmio #(.BASE_ADDR(SPI_BASE)) u_spi (
-        .clk       (clk_i),
-        .resetn    (~reset_i),
-        .mem_valid (mmio_sel),
-        .mem_addr  (mem_addr),
-        .mem_wdata (mem_wdata),
-        .mem_wstrb (mem_wstrb),
-        .mem_ready (spi_ready),
-        .mem_rdata (spi_rdata),
-        .spi_clk_o (spi_clk_o),
-        .spi_mosi_o(spi_mosi_o),
-        .spi_miso_i(spi_miso_i),
-        .spi_cs_n_o(spi_cs_n_o)
     );
 
     // Hardware SPI boot controller: loads BOOT_WORDS words from external flash
