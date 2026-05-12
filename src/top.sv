@@ -84,7 +84,6 @@ module top #(
     // output logic [31:0] pico_mem_wdata_o,
     // output logic [31:0] pico_irq_o,
     // output logic        pico_sleeping_o,
-    // output logic        host_i2c_irq_event_o,
     // output logic        ml_irq_o,
     // output logic        timer_event_o,
 
@@ -145,7 +144,6 @@ module top #(
     output logic [31:0] pico_mem_wdata_o,
     output logic [31:0] pico_irq_o,
     output logic        pico_sleeping_o,
-    output logic        host_i2c_irq_event_o,
     output logic        ml_irq_o,
     output logic        timer_event_o
 );
@@ -1079,12 +1077,6 @@ module top #(
         .mem_wstrb  (mem_wstrb),
         .mem_ready  (irqc_ready),
         .mem_rdata  (irqc_rdata),
-        .host_req_i (host_i2c_irqc_req),
-        .host_we_i  (host_i2c_irqc_we),
-        .host_off_i (host_i2c_irqc_off),
-        .host_wdata_i(host_i2c_irqc_wdata),
-        .host_ready_o(host_i2c_irqc_ready),
-        .host_rdata_o(host_i2c_irqc_rdata),
         .irq_src_i  (irq_sources),
         .irq_o      (irq),
         .wake_req_o (irqc_wake_req)
@@ -1115,13 +1107,6 @@ module top #(
         .mem_addr(mem_addr),
         .mem_wdata(mem_wdata),
         .mem_wstrb(mem_wstrb),
-        .cfg_target_wake_sec_i(host_cfg_target_wake_sec),
-        .cfg_window_sec_i(host_cfg_window_sec),
-        .cfg_step_sec_i(host_cfg_step_sec),
-        .cfg_motion_hi_th_i(host_cfg_motion_hi_th),
-        .cfg_motion_hi_count_i(host_cfg_motion_hi_count),
-        .cfg_policy_i(host_cfg_policy),
-        .cfg_conf_thr_i(host_cfg_conf_thr),
         .mem_ready(test_ready),
         .mem_rdata(test_rdata),
         .status_o(test_status),
@@ -1209,7 +1194,6 @@ module top #(
     assign pico_mem_wdata_o  = mem_wdata;
     assign pico_irq_o        = pico_irq;
     assign pico_sleeping_o   = sleeping_r;
-    assign host_i2c_irq_event_o = host_i2c_irq_event;
     assign ml_irq_o          = ml_irq;
     assign timer_event_o     = timer_event;
 
