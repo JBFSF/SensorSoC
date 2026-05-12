@@ -1177,8 +1177,14 @@ module top #(
         .alarm_o(alarm_o)
     );
     
+    logic cpu_clk_en_lat_dbg;
+    always_ff @(posedge clk_i or posedge reset_i) begin
+        if (reset_i) cpu_clk_en_lat_dbg <= 1'b1;
+        else         cpu_clk_en_lat_dbg <= cpu_clk_en_lat;
+    end
+
     assign pico_trap_o       = trap;
-    assign pico_cpu_clk_en_o = cpu_clk_en_lat;
+    assign pico_cpu_clk_en_o = cpu_clk_en_lat_dbg;
     assign pico_mem_valid_o  = mem_valid;
     assign pico_mem_instr_o  = mem_instr;
     assign pico_mem_ready_o  = mem_ready;
