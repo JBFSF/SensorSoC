@@ -52,8 +52,6 @@ module i2c_slave_lis2dw12 #(
 
     rsp_state_t rsp_state;
     reg [2:0] byte_cnt;
-    reg       sim_req_q;
-    wire      sim_req_rise = sim_req && !sim_req_q;
 
     initial begin
         if (!$value$plusargs("DATA_DIR=%s", data_dir))
@@ -89,9 +87,7 @@ module i2c_slave_lis2dw12 #(
             sim_err    <= 1'b0;
             rsp_state  <= RSP_IDLE;
             byte_cnt   <= '0;
-            sim_req_q  <= 1'b0;
         end else begin
-            sim_req_q  <= sim_req;
             sim_ack    <= 1'b0;
             sim_rvalid <= 1'b0;
             sim_rlast  <= 1'b0;
@@ -99,7 +95,7 @@ module i2c_slave_lis2dw12 #(
 
             case (rsp_state)
                 RSP_IDLE: begin
-                    if (sim_req_rise && (sim_addr == I2C_ADDR)) begin
+                    if (sim_req && (sim_addr == I2C_ADDR)) begin
                         sim_ack <= 1'b1;
                         if (sim_reg == REG_STATUS) begin
                             rsp_state <= RSP_STATUS;

@@ -296,8 +296,6 @@ async def test_chip_top_feature_inject(dut):
 
 def chip_top_runner():
     proj_path = Path(__file__).resolve().parent
-    final_path = Path(final_dir).expanduser() if final_dir else proj_path / "../final"
-    gl_netlist = final_path / "pnl" / f"{netlist_toplevel}.pnl.v"
 
     sources = []
     # Compile with SIM define so the sim bus and sensor models are active.
@@ -309,8 +307,6 @@ def chip_top_runner():
         sources.append(Path(pdk_root) / pdk / "libs.ref" / scl / "verilog" / "primitives.v")
         sources.append(proj_path / f"../final/pnl/{hdl_toplevel}.pnl.v")
         defines = {"FUNCTIONAL": True, "USE_POWER_PINS": True}
-        if hdl_toplevel == "sim_chip_top_gl_sensor_bridge_env":
-            defines["SENSOR_SIM_PAD_BRIDGE"] = True
     else:
         src_dir = proj_path / "../src"
         pad_level = hdl_toplevel in {"chip_top", "chip_top_sim_wrap"}
@@ -370,7 +366,6 @@ def chip_top_runner():
     runner.test(
         hdl_toplevel=hdl_toplevel,
         test_module=test_module,
-        test_filter=test_filter,
         plusargs=plusargs,
         waves=True,
     )

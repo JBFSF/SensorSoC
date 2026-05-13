@@ -61,8 +61,6 @@ module i2c_slave_adpd144ri #(
     rsp_state_t rsp_state;
     reg [1:0]  byte_cnt;
     reg [7:0]  bytes_left;
-    reg        sim_req_q;
-    wire       sim_req_rise = sim_req && !sim_req_q;
 
     initial begin
         if (!$value$plusargs("DATA_DIR=%s", data_dir))
@@ -100,9 +98,7 @@ module i2c_slave_adpd144ri #(
             rsp_state  <= RSP_IDLE;
             byte_cnt   <= 2'd0;
             bytes_left <= 8'd0;
-            sim_req_q  <= 1'b0;
         end else begin
-            sim_req_q  <= sim_req;
             sim_ack    <= 1'b0;
             sim_rvalid <= 1'b0;
             sim_rlast  <= 1'b0;
@@ -110,7 +106,7 @@ module i2c_slave_adpd144ri #(
 
             case (rsp_state)
                 RSP_IDLE: begin
-                    if (sim_req_rise && (sim_addr == I2C_ADDR)) begin
+                    if (sim_req && (sim_addr == I2C_ADDR)) begin
                         sim_ack <= 1'b1;
                         byte_cnt <= 2'd0;
                         if (sim_write) begin
