@@ -39,8 +39,6 @@ module sim_top_sensor_pipeline;
   wire        weight_spi_mosi;
   wire        weight_spi_cs_n;
   wire        weight_boot_done;
-  wire        host_i2c_scl;
-  tri1        host_i2c_sda;
 
   wire                      feat_valid_o;
   wire signed [15:0]        time_feat_o;
@@ -116,9 +114,9 @@ module sim_top_sensor_pipeline;
   ) u_dut (
     .clk_i(clk),
     .reset_i(reset),
-    .i2c_scl_i(host_i2c_scl),
-    .i2c_sda_io(host_i2c_sda),
-    .i2c_sda_i(host_i2c_sda),
+    .i2c_scl_o(),
+    .i2c_sda_io(),
+    .i2c_sda_i(1'b1),
     .i2c_sda_drive_low_o(),
     .sim_req_o(sim_req),
     .sim_addr_o(sim_addr),
@@ -131,10 +129,6 @@ module sim_top_sensor_pipeline;
     .sim_rvalid_i(sim_rvalid),
     .sim_rlast_i(sim_rlast),
     .sim_err_i(sim_err),
-    .spi_clk_o(spi_clk),
-    .spi_mosi_o(spi_mosi),
-    .spi_miso_i(1'b1),
-    .spi_cs_n_o(spi_cs_n),
     .boot_spi_clk_o(boot_spi_clk),
     .boot_spi_mosi_o(boot_spi_mosi),
     .boot_spi_miso_i(1'b1),
@@ -163,8 +157,6 @@ module sim_top_sensor_pipeline;
     .irq_eoi_o(),
     .boot_done_o()
   );
-
-  assign host_i2c_scl = 1'b1;
 
   i2c_slave_lis2dw12 #(
     .I2C_ADDR(ACC_ADDR)

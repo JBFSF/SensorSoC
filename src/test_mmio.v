@@ -79,13 +79,6 @@ module test_mmio #(
     input  wire [31:0] mem_addr,          // address
     input  wire [31:0] mem_wdata,         // write data
     input  wire [3:0]  mem_wstrb,         // write byte strobes
-    input  wire [31:0] cfg_target_wake_sec_i,
-    input  wire [31:0] cfg_window_sec_i,
-    input  wire [15:0] cfg_step_sec_i,
-    input  wire [15:0] cfg_motion_hi_th_i,
-    input  wire [7:0]  cfg_motion_hi_count_i,
-    input  wire [7:0]  cfg_policy_i,
-    input  wire [15:0] cfg_conf_thr_i,
 
     output reg         mem_ready,         // transaction complete
     output reg  [31:0] mem_rdata,         // read data
@@ -93,7 +86,7 @@ module test_mmio #(
     // Debug outputs (observed by testbench)
     output reg  [31:0] status_o,          // firmware test status
     output reg  [31:0] code_o,            // debug code / step number
-    output reg  [31:0] score_o            // ML confidence score for host I2C threshold compare
+    output reg  [31:0] score_o            // ML confidence score
 );
 
     //-------------------------------------------------------------------------
@@ -109,15 +102,9 @@ module test_mmio #(
     //-------------------------------------------------------------------------
     // Register offsets
     //-------------------------------------------------------------------------
-    localparam OFF_STATUS   = 32'h0;  // status register
-    localparam OFF_CODE     = 32'h4;  // debug code register
-    localparam OFF_ML_SCORE = 32'h20; // ML confidence score (drives ml_score_i)
-    localparam OFF_CFG_TARGET_SEC = 32'h8;
-    localparam OFF_CFG_WINDOW_SEC = 32'hC;
-    localparam OFF_CFG_STEP_SEC   = 32'h10;
-    localparam OFF_CFG_MOTION     = 32'h14;
-    localparam OFF_CFG_CONF_THR   = 32'h18;
-    localparam OFF_CFG_POLICY     = 32'h1C;
+    localparam OFF_STATUS   = 32'h0;   // status register
+    localparam OFF_CODE     = 32'h4;   // debug code register
+    localparam OFF_ML_SCORE = 32'h20;  // ML confidence score
 
     //-------------------------------------------------------------------------
     // MMIO register logic
@@ -148,13 +135,7 @@ module test_mmio #(
                     OFF_STATUS:   mem_rdata <= status_o;
                     OFF_CODE:     mem_rdata <= code_o;
                     OFF_ML_SCORE: mem_rdata <= score_o;
-                    OFF_CFG_TARGET_SEC: mem_rdata <= cfg_target_wake_sec_i;
-                    OFF_CFG_WINDOW_SEC: mem_rdata <= cfg_window_sec_i;
-                    OFF_CFG_STEP_SEC:   mem_rdata <= {16'h0, cfg_step_sec_i};
-                    OFF_CFG_MOTION:     mem_rdata <= {8'h0, cfg_motion_hi_count_i, cfg_motion_hi_th_i};
-                    OFF_CFG_CONF_THR:   mem_rdata <= {16'h0, cfg_conf_thr_i};
-                    OFF_CFG_POLICY:     mem_rdata <= {24'h0, cfg_policy_i};
-                    default:    mem_rdata <= 32'h0;
+                    default:      mem_rdata <= 32'h0;
                 endcase
 
                 // -------------------------

@@ -26,6 +26,7 @@ module sim_top_mlp_features;
   wire [7:0]                invalid_reason;
   wire                      epoch_end;
   wire                      alarm;
+  wire                      boot_done;
 
   wire [31:0] mlp_word0;
   wire [31:0] mlp_word1;
@@ -43,11 +44,14 @@ module sim_top_mlp_features;
   wire        ppg_sim_rvalid;
   wire        ppg_sim_rlast;
   wire        ppg_sim_err;
+  wire        flash_spi_clk;
+  wire        flash_spi_mosi;
+  wire        flash_spi_miso;
+  wire        flash_spi_cs_n;
   wire        spi_clk;
   wire        spi_mosi;
+  wire        spi_miso;
   wire        spi_cs_n;
-  wire        host_i2c_scl;
-  tri1        host_i2c_sda;
 
   localparam [6:0] ACC_ADDR = 7'h19;
   localparam [6:0] PPG_ADDR = 7'h64;
@@ -86,10 +90,13 @@ module sim_top_mlp_features;
   ) u_dut (
     .clk_i(clk),
     .reset_i(reset),
-    .i2c_scl_i(host_i2c_scl),
-    .i2c_sda_io(host_i2c_sda),
-    .i2c_sda_i(host_i2c_sda),
+    .i2c_scl_o(),
+    .i2c_sda_io(),
+    .i2c_sda_i(1'b1),
     .i2c_sda_drive_low_o(),
+    .sensor_scl_o(),
+    .sensor_sda_i(1'b1),
+    .sensor_sda_oe(),
     .sim_req_o(sim_req),
     .sim_addr_o(sim_addr),
     .sim_reg_o(sim_reg),
@@ -101,14 +108,22 @@ module sim_top_mlp_features;
     .sim_rvalid_i(sim_rvalid),
     .sim_rlast_i(sim_rlast),
     .sim_err_i(sim_err),
-    .spi_clk_o(spi_clk),
-    .spi_mosi_o(spi_mosi),
-    .spi_miso_i(1'b1),
-    .spi_cs_n_o(spi_cs_n),
+    .flash_spi_clk_o(flash_spi_clk),
+    .flash_spi_mosi_o(flash_spi_mosi),
+    .flash_spi_miso_i(flash_spi_miso),
+    .flash_spi_cs_n_o(flash_spi_cs_n),
     .boot_spi_clk_o(),
     .boot_spi_mosi_o(),
     .boot_spi_miso_i(1'b1),
     .boot_spi_cs_n_o(),
+    .weight_spi_clk_o(),
+    .weight_spi_mosi_o(),
+    .weight_spi_miso_i(1'b1),
+    .weight_spi_cs_n_o(),
+    .spi_clk_o(spi_clk),
+    .spi_mosi_o(spi_mosi),
+    .spi_miso_i(spi_miso),
+    .spi_cs_n_o(spi_cs_n),
     .feat_valid_o(feat_valid),
     .time_feat_o(time_feat),
     .motion_feat_o(motion_feat),
@@ -117,15 +132,29 @@ module sim_top_mlp_features;
     .ml_update_gate_o(ml_update_gate),
     .invalid_reason_o(invalid_reason),
     .epoch_end_o(epoch_end),
+    .start_i(1'b1),
     .alarm_o(alarm),
+    .logit0(),
+    .logit1(),
+    .test_mode_i(4'b0101),
     .test_force_irq_i(1'b0),
     .test_force_wake_i(1'b0),
     .test_irq_src_i(3'b000),
     .irq_eoi_o(),
-    .boot_done_o()
+    .boot_done_o(boot_done)
   );
 
-  assign host_i2c_scl = 1'b1;
+  spi_flash_model #(
+    .FLASH_WORDS(1232),
+    .FLASH_INIT_HEX("firmware/build/generated/combined_flash_test_top_feature_ml_cpu.hex")
+  ) u_shared_flash (
+    .spi_clk(flash_spi_clk),
+    .spi_cs_n(flash_spi_cs_n),
+    .spi_mosi(flash_spi_mosi),
+    .spi_miso(flash_spi_miso)
+  );
+
+  assign spi_miso = 1'b1;
 
   i2c_slave_lis2dw12 #(
     .I2C_ADDR(ACC_ADDR)
@@ -161,13 +190,13 @@ module sim_top_mlp_features;
     .sim_err(ppg_sim_err)
   );
 
-  assign mlp_word0 = u_dut.u_weight_ram.mem[16];
-  assign mlp_word1 = u_dut.u_weight_ram.mem[17];
+  assign mlp_word0 = u_dut.u_weight_ram.feat_reg_0;
+  assign mlp_word1 = u_dut.u_weight_ram.feat_reg_1;
   assign tk_ar_fire = u_dut.wram_arvalid && u_dut.wram_arready;
   assign tk_araddr = u_dut.wram_araddr;
 
   initial begin
-    $dumpfile("sim/waves/top_mlp_features.vcd");
+    $dumpfile("sim/build/top_mlp_features.vcd");
     $dumpvars(0, clk, reset);
     $dumpvars(0, feat_valid, time_feat, motion_feat, delta_hr_feat, mssd_feat);
     $dumpvars(0, ml_update_gate, invalid_reason, epoch_end, alarm);

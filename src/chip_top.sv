@@ -11,9 +11,21 @@ module chip_top #(
     parameter NUM_DVSS_PADS = `NUM_DVSS_PADS,
 
     // Signal pads
-    parameter NUM_INPUT_PADS = `NUM_INPUT_PADS,
-    parameter NUM_BIDIR_PADS = `NUM_BIDIR_PADS,
-    parameter NUM_ANALOG_PADS = `NUM_ANALOG_PADS
+    parameter NUM_INPUT_PADS  = `NUM_INPUT_PADS,
+    parameter NUM_BIDIR_PADS  = `NUM_BIDIR_PADS,
+    parameter NUM_ANALOG_PADS = `NUM_ANALOG_PADS,
+
+    // Simulation / timing overrides forwarded to chip_core -> top
+    parameter FIRMWARE_HEX          = "",
+    parameter WEIGHT_INIT_HEX       = "",
+    parameter integer CLK_HZ                = 10_000_000,
+    parameter integer GT_CLK_HZ             = 10_000_000,
+    parameter integer GT_EPOCH_HZ           = 100,
+    parameter integer GT_EPOCH_COUNT_MAX    = 1000,
+    parameter integer ACC_POLL_PERIOD_TICKS = 50_000,
+    parameter integer PPG_POLL_PERIOD_TICKS = 100,
+    parameter integer PPG_WATERMARK         = 8,
+    parameter integer PPG_MAX_BURST_SAMPLES = 32
     )(
     `ifdef USE_POWER_PINS
     inout  wire VDD,
@@ -25,8 +37,23 @@ module chip_top #(
     
     inout  wire [NUM_INPUT_PADS-1:0] input_PAD,
     inout  wire [NUM_BIDIR_PADS-1:0] bidir_PAD,
-    
+
     inout  wire [NUM_ANALOG_PADS-1:0] analog_PAD
+
+    `ifdef SIM
+    ,
+    output wire         sim_req_o,
+    output wire [6:0]   sim_addr_o,
+    output wire [7:0]   sim_reg_o,
+    output wire [7:0]   sim_len_o,
+    output wire         sim_write_o,
+    output wire [7:0]   sim_wdata_o,
+    input  wire         sim_ack_i,
+    input  wire [7:0]   sim_rdata_i,
+    input  wire         sim_rvalid_i,
+    input  wire         sim_rlast_i,
+    input  wire         sim_err_i
+    `endif
 );
 
     wire clk_PAD2CORE;
@@ -168,19 +195,29 @@ module chip_top #(
     // Core design
 
     chip_core #(
-        .NUM_INPUT_PADS  (NUM_INPUT_PADS),
-        .NUM_BIDIR_PADS  (NUM_BIDIR_PADS),
-        .NUM_ANALOG_PADS (NUM_ANALOG_PADS),
-        .DEBUG_STIM_EN   (0)
+        .NUM_INPUT_PADS         (NUM_INPUT_PADS),
+        .NUM_BIDIR_PADS         (NUM_BIDIR_PADS),
+        .NUM_ANALOG_PADS        (NUM_ANALOG_PADS),
+        .DEBUG_STIM_EN          (0),
+        .FIRMWARE_HEX           (FIRMWARE_HEX),
+        .WEIGHT_INIT_HEX        (WEIGHT_INIT_HEX),
+        .CLK_HZ                 (CLK_HZ),
+        .GT_CLK_HZ              (GT_CLK_HZ),
+        .GT_EPOCH_HZ            (GT_EPOCH_HZ),
+        .GT_EPOCH_COUNT_MAX     (GT_EPOCH_COUNT_MAX),
+        .ACC_POLL_PERIOD_TICKS  (ACC_POLL_PERIOD_TICKS),
+        .PPG_POLL_PERIOD_TICKS  (PPG_POLL_PERIOD_TICKS),
+        .PPG_WATERMARK          (PPG_WATERMARK),
+        .PPG_MAX_BURST_SAMPLES  (PPG_MAX_BURST_SAMPLES)
     ) i_chip_core (
         `ifdef USE_POWER_PINS
         .VDD        (VDD),
         .VSS        (VSS),
         `endif
-    
+
         .clk        (clk_PAD2CORE),
         .rst_n      (rst_n_PAD2CORE),
-    
+
         .input_in   (input_PAD2CORE),
         .input_pu   (input_CORE2PAD_PU),
         .input_pd   (input_CORE2PAD_PD),
@@ -194,24 +231,26 @@ module chip_top #(
         .bidir_pu   (bidir_CORE2PAD_PU),
         .bidir_pd   (bidir_CORE2PAD_PD),
 
-        .sim_req_o    (),
-        .sim_addr_o   (),
-        .sim_reg_o    (),
-        .sim_len_o    (),
-        .sim_write_o  (),
-        .sim_wdata_o  (),
-        .sim_ack_i    (1'b0),
-        .sim_rdata_i  (8'h00),
-        .sim_rvalid_i (1'b0),
-        .sim_rlast_i  (1'b0),
-        .sim_err_i    (1'b0),
+        `ifdef SIM
+            .sim_req_o    (sim_req_o),
+            .sim_addr_o   (sim_addr_o),
+            .sim_reg_o    (sim_reg_o),
+            .sim_len_o    (sim_len_o),
+            .sim_write_o  (sim_write_o),
+            .sim_wdata_o  (sim_wdata_o),
+            .sim_ack_i    (sim_ack_i),
+            .sim_rdata_i  (sim_rdata_i),
+            .sim_rvalid_i (sim_rvalid_i),
+            .sim_rlast_i  (sim_rlast_i),
+            .sim_err_i    (sim_err_i),
+        `endif
 
         .debug_stim_override_en_i (1'b0),
         .debug_stim_mssd_i        (16'h0000),
         .debug_stim_delta_hr_i    (16'h0000),
         .debug_stim_time_i        (16'h0000),
         .debug_stim_motion_i      (16'h0000),
-        
+
         .analog     (analog_PAD)
     );
     

@@ -1,7 +1,6 @@
 `timescale 1ns/1ps
 
 // IRQ controller MMIO block with pending/mask/wake management.
-// Supports CPU MMIO access plus optional host sideband proxy access.
 // Provides IRQ lines and wake pulse generation for SoC power control.
 
 module irq_ctrl_mmio #(
@@ -16,14 +15,6 @@ module irq_ctrl_mmio #(
     input  wire [3:0]  mem_wstrb,
     output reg         mem_ready,
     output reg  [31:0] mem_rdata,
-
-    // Host-I2C sideband access (byte offset based, same register map)
-    input  wire        host_req_i,
-    input  wire        host_we_i,
-    input  wire [7:0]  host_off_i,
-    input  wire [31:0] host_wdata_i,
-    output reg         host_ready_o,
-    output reg  [31:0] host_rdata_o,
 
     input  wire [31:0] irq_src_i,      // raw source bits
     output wire [31:0] irq_o,          // routed to CPU
@@ -41,7 +32,6 @@ module irq_ctrl_mmio #(
     wire        sel = mem_valid && (mem_addr[31:12] == BASE_ADDR[31:12]);
     wire [31:0] off = mem_addr - BASE_ADDR;
     wire        wr  = sel && (mem_wstrb != 4'b0000);
-    wire        host_do = host_req_i && !sel; // prioritize CPU MMIO when both collide
 
     reg [31:0] src_d;
     reg [31:0] pending;
@@ -75,8 +65,6 @@ module irq_ctrl_mmio #(
         if (!resetn) begin
             mem_ready       <= 1'b0;
             mem_rdata       <= 32'h0;
-            host_ready_o    <= 1'b0;
-            host_rdata_o    <= 32'h0;
             src_d           <= 32'h0;
             pending         <= 32'h0;
             mask            <= 32'h0000_0000;
@@ -85,7 +73,6 @@ module irq_ctrl_mmio #(
             wake_pending_d  <= 32'h0;
         end else begin
             mem_ready      <= 1'b0;
-            host_ready_o   <= 1'b0;
             src_d          <= irq_src_i;
             pending        <= pending | src_rise;
             wake_pending_d <= pending_armed;
@@ -124,44 +111,6 @@ module irq_ctrl_mmio #(
                     end
                     default: begin end
                 endcase
-            end
-
-            // Host sideband access to the same register map.
-            if (host_do) begin
-                host_ready_o <= 1'b1;
-
-                case (host_off_i)
-                    OFF_PENDING[7:0]: host_rdata_o <= pending;
-                    OFF_MASK[7:0]:    host_rdata_o <= mask;
-                    OFF_WAKE_EN[7:0]: host_rdata_o <= wake_en;
-                    OFF_ACTIVE[7:0]:  host_rdata_o <= active;
-                    OFF_RAW[7:0]:     host_rdata_o <= irq_src_i;
-                    OFF_CLAIM[7:0]:   host_rdata_o <= claim_id;
-                    default:          host_rdata_o <= 32'h0;
-                endcase
-
-                if (host_we_i) begin
-                    case (host_off_i)
-                        OFF_PENDING[7:0]: begin
-                            pending <= pending & ~host_wdata_i; // W1C
-                        end
-                        OFF_MASK[7:0]: begin
-                            mask <= host_wdata_i;
-                        end
-                        OFF_WAKE_EN[7:0]: begin
-                            wake_en <= host_wdata_i;
-                        end
-                        OFF_CLAIM[7:0]: begin
-                            if (claim_id != 0)
-                                active <= 32'h1 << (claim_id - 1);
-                        end
-                        OFF_COMPLETE[7:0]: begin
-                            if ((host_wdata_i >= 1) && (host_wdata_i <= 32))
-                                active[host_wdata_i - 1] <= 1'b0;
-                        end
-                        default: begin end
-                    endcase
-                end
             end
         end
     end

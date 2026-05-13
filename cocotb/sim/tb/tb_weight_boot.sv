@@ -75,7 +75,7 @@ top #(
 ) dut (
     .clk_i                 (clk),
     .reset_i               (reset),
-    .i2c_scl_i             (1'b1),
+    .i2c_scl_o(),
     .i2c_sda_io            (),
     .i2c_sda_i             (1'b1),
     .i2c_sda_drive_low_o   (),
@@ -94,10 +94,6 @@ top #(
     .weight_spi_cs_n_o     (weight_spi_cs_n),
     .weight_boot_done_o    (weight_boot_done),
     // CPU-driven SPI master — not used
-    .spi_clk_o             (),
-    .spi_mosi_o            (),
-    .spi_miso_i            (1'b1),
-    .spi_cs_n_o            (),
     // Firmware boot SPI — MISO tied high: one 0xFFFFFFFF word, boot_done fires fast
     .boot_spi_clk_o        (),
     .boot_spi_mosi_o       (),
@@ -124,7 +120,6 @@ top #(
     .pico_mem_wdata_o      (),
     .pico_irq_o            (),
     .pico_sleeping_o       (),
-    .host_i2c_irq_event_o  (),
     .ml_irq_o              (),
     .timer_event_o         ()
 );

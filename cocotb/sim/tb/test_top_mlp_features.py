@@ -1,6 +1,6 @@
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, Timer, with_timeout
+from cocotb.triggers import ClockCycles, RisingEdge, Timer, with_timeout
 
 
 def pack_feature_word(upper_16: int, lower_16: int) -> int:

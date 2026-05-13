@@ -54,13 +54,14 @@ wire [7:0]  ppg_sim_rdata;
 wire        ppg_sim_rvalid;
 wire        ppg_sim_rlast;
 wire        ppg_sim_err;
-
-wire        host_i2c_scl;
-tri1        host_i2c_sda;
-wire        boot_spi_clk;
-wire        boot_spi_mosi;
-wire        boot_spi_miso;
-wire        boot_spi_cs_n;
+wire        flash_spi_clk;
+wire        flash_spi_mosi;
+wire        flash_spi_miso;
+wire        flash_spi_cs_n;
+wire        spi_clk;
+wire        spi_mosi;
+wire        spi_miso;
+wire        spi_cs_n;
 
 localparam [6:0] ACC_ADDR = 7'h19;
 localparam [6:0] PPG_ADDR = 7'h64;
@@ -125,8 +126,10 @@ top #(
 ) dut (
     .clk_i(clk),
     .reset_i(reset),
-    .i2c_scl_i(host_i2c_scl),
-    .i2c_sda_io(host_i2c_sda),
+    .i2c_scl_o(),
+    .i2c_sda_io(),
+    .i2c_sda_i(1'b1),
+    .i2c_sda_drive_low_o(),
     .sim_req_o(sim_req),
     .sim_addr_o(sim_addr),
     .sim_reg_o(sim_reg),
@@ -145,14 +148,22 @@ top #(
     .mssd_feat_o(),
     .ml_update_gate_o(),
     .invalid_reason_o(),
-    .spi_clk_o(),
-    .spi_mosi_o(),
-    .spi_miso_i(1'b1),
-    .spi_cs_n_o(),
-    .boot_spi_clk_o(boot_spi_clk),
-    .boot_spi_mosi_o(boot_spi_mosi),
-    .boot_spi_miso_i(boot_spi_miso),
-    .boot_spi_cs_n_o(boot_spi_cs_n),
+    .flash_spi_clk_o(flash_spi_clk),
+    .flash_spi_mosi_o(flash_spi_mosi),
+    .flash_spi_miso_i(flash_spi_miso),
+    .flash_spi_cs_n_o(flash_spi_cs_n),
+    .boot_spi_clk_o(),
+    .boot_spi_mosi_o(),
+    .boot_spi_miso_i(1'b1),
+    .boot_spi_cs_n_o(),
+    .weight_spi_clk_o(),
+    .weight_spi_mosi_o(),
+    .weight_spi_miso_i(1'b1),
+    .weight_spi_cs_n_o(),
+    .spi_clk_o(spi_clk),
+    .spi_mosi_o(spi_mosi),
+    .spi_miso_i(spi_miso),
+    .spi_cs_n_o(spi_cs_n),
     .epoch_end_o(),
     .alarm_o(),
     .test_mode_i(4'b0101),
@@ -162,8 +173,6 @@ top #(
     .irq_eoi_o(),
     .boot_done_o()
 );
-
-assign host_i2c_scl = 1'b1;
 
 i2c_slave_lis2dw12 #(
     .I2C_ADDR(ACC_ADDR)
@@ -203,11 +212,13 @@ spi_flash_model #(
     .FLASH_WORDS(512),
     .FLASH_INIT_HEX("firmware/build/test_top_ml_control_unified/firmware.hex")
 ) u_boot_flash (
-    .spi_clk(boot_spi_clk),
-    .spi_cs_n(boot_spi_cs_n),
-    .spi_mosi(boot_spi_mosi),
-    .spi_miso(boot_spi_miso)
+    .spi_clk(flash_spi_clk),
+    .spi_cs_n(flash_spi_cs_n),
+    .spi_mosi(flash_spi_mosi),
+    .spi_miso(flash_spi_miso)
 );
+
+assign spi_miso = 1'b1;
 
 always #10 clk = ~clk;
 

@@ -24,7 +24,6 @@
 // This lets Python tests focus on:
 //
 //   - reset and initialization checks
-//   - host-I2C behavior
 //   - repeated production-loop smoke checks
 //   - future test-force wake/IRQ injection
 //
@@ -65,11 +64,6 @@ module sim_top_unified_env;
   logic test_force_wake = 1'b0;
   logic [2:0] test_irq_src = 3'b000;
 
-  // Host-I2C drive controls. Cocotb can bit-bang transactions by driving SCL
-  // directly and pulling SDA low when needed. Idle state is released/high.
-  logic host_scl_drv = 1'b1;
-  logic host_sda_drv_low = 1'b0;
-
   // Sensor-model simulation bus driven by top.sv's i2c_master.
   wire        sim_req;
   wire [6:0]  sim_addr;
@@ -95,7 +89,7 @@ module sim_top_unified_env;
   wire        ppg_sim_rlast;
   wire        ppg_sim_err;
 
-  // Host-facing IO kept in the wrapper so multiple cocotb tests can share the
+  // External IO kept in the wrapper so multiple cocotb tests can share the
   // same top-level environment without rebuilding separate benches.
   wire        spi_clk;
   wire        spi_mosi;
@@ -109,8 +103,6 @@ module sim_top_unified_env;
   wire        weight_spi_mosi;
   wire        weight_spi_miso;
   wire        weight_spi_cs_n;
-  wire        host_i2c_scl;
-  tri1        host_i2c_sda;
 
   // Directly exposed DUT outputs from top.sv.
   wire                      feat_valid;
@@ -137,7 +129,6 @@ module sim_top_unified_env;
   wire [31:0]               pico_mem_wdata;
   wire [31:0]               pico_irq;
   wire                      pico_sleeping;
-  wire                      host_i2c_irq_event;
   wire                      ml_irq;
   wire                      timer_event;
 
@@ -160,10 +151,6 @@ module sim_top_unified_env;
   wire [31:0]               ml_score_hw;
   wire [31:0]               test_status;
   wire [31:0]               test_code;
-  wire [15:0]               host_irq_count;
-  wire [15:0]               host_conf_abs;
-  wire [15:0]               host_logit0_proxy;
-  wire [7:0]                host_conf_stat_mirror;
 
   localparam [6:0] ACC_ADDR = 7'h19;
   localparam [6:0] PPG_ADDR = 7'h64;
@@ -178,12 +165,6 @@ module sim_top_unified_env;
                       (sim_addr == PPG_ADDR) ? ppg_sim_rlast    : 1'b0;
   assign sim_err    = (sim_addr == ACC_ADDR) ? accel_sim_err    :
                       (sim_addr == PPG_ADDR) ? ppg_sim_err      : 1'b1;
-
-  // Host-I2C is idle-high by default in this shared wrapper. Tests that need
-  // active host-I2C transactions can later drive additional wrapper-level hooks
-  // or extend this environment with bit-banged helpers from cocotb.
-  assign host_i2c_scl = host_scl_drv;
-  assign host_i2c_sda = host_sda_drv_low ? 1'b0 : 1'bz;
 
   // Unified SoC + sensor pipeline under test.
   //
@@ -217,9 +198,9 @@ module sim_top_unified_env;
   ) u_dut (
     .clk_i(clk),
     .reset_i(reset),
-    .i2c_scl_i(host_i2c_scl),
-    .i2c_sda_io(host_i2c_sda),
-    .i2c_sda_i(host_i2c_sda),
+    .i2c_scl_o(),
+    .i2c_sda_io(),
+    .i2c_sda_i(1'b1),
     .i2c_sda_drive_low_o(),
     .sim_req_o(sim_req),
     .sim_addr_o(sim_addr),
@@ -239,10 +220,6 @@ module sim_top_unified_env;
     .mssd_feat_o(mssd_feat),
     .ml_update_gate_o(ml_update_gate),
     .invalid_reason_o(invalid_reason),
-    .spi_clk_o(spi_clk),
-    .spi_mosi_o(spi_mosi),
-    .spi_miso_i(spi_miso),
-    .spi_cs_n_o(spi_cs_n),
     .boot_spi_clk_o(boot_spi_clk),
     .boot_spi_mosi_o(boot_spi_mosi),
     .boot_spi_miso_i(boot_spi_miso),
@@ -273,7 +250,6 @@ module sim_top_unified_env;
     .pico_mem_wdata_o(pico_mem_wdata),
     .pico_irq_o(pico_irq),
     .pico_sleeping_o(pico_sleeping),
-    .host_i2c_irq_event_o(host_i2c_irq_event),
     .ml_irq_o(ml_irq),
     .timer_event_o(timer_event)
   );
@@ -368,15 +344,6 @@ module sim_top_unified_env;
   assign ml_score_hw                 = u_dut.ml_score_hw;
   assign test_status                 = u_dut.test_status;
   assign test_code                   = u_dut.test_code;
-  assign host_irq_count              = u_dut.u_host_i2c_bridge_regs.irq_count;
-  assign host_conf_abs               = u_dut.u_host_i2c_bridge_regs.score_conf;
-  assign host_logit0_proxy           = u_dut.u_host_i2c_bridge_regs.score_proxy0;
-  assign host_conf_stat_mirror       = {4'b0,
-                                        u_dut.u_host_i2c_bridge_regs.conf_armed,
-                                        u_dut.u_host_i2c_bridge_regs.conf_thr_irq_fired_sticky,
-                                        u_dut.u_host_i2c_bridge_regs.conf_cross_seen_sticky,
-                                        u_dut.u_host_i2c_bridge_regs.above_thr_live};
-
   // Shared waveform dump for cocotb runs using this wrapper. Tests may ignore
   // it during normal passes, but it is invaluable when a new cocotb regression
   // fails during bring-up.

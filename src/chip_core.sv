@@ -13,6 +13,8 @@
     // bidir[5]      : I2C SCL input
     // bidir[6]      : I2C SDA open drain
     // bidir[22:7]   : 16-bit debug bus for test mode outputs
+    // bidir[23]     : sensor I2C SCL output (master to accel/PPG sensors, push-pull)
+    // bidir[24]     : sensor I2C SDA open-drain (master to accel/PPG sensors)
     // bidir[37]     : force Pico IRQ input, only used by test modes = 01010 / 11010
     // bidir[38]     : force wake source input, only used by test modes = 01011 / 11011
     // bidir[39]     : external test clock, used by the 1xxxx test-mode bank
@@ -69,18 +71,10 @@ module chip_core #(
     parameter NUM_BIDIR_PADS = 40,
     parameter NUM_ANALOG_PADS = 2,
     parameter DEBUG_STIM_EN = 0,
-    parameter CLK_HZ =
-    `ifdef SENSOR_SIM_PAD_BRIDGE
-        1000,
-    `else
-        10_000_000,
-    `endif
-    parameter GT_CLK_HZ =
-    `ifdef SENSOR_SIM_PAD_BRIDGE
-        1000,
-    `else
-        10_000_000,
-    `endif
+    parameter FIRMWARE_HEX    = "",
+    parameter WEIGHT_INIT_HEX = "",
+    parameter CLK_HZ = 10_000_000,
+    parameter GT_CLK_HZ = 10_000_000,
     parameter GT_EPOCH_HZ = 100,
     parameter GT_EPOCH_COUNT_MAX =
     `ifdef SENSOR_SIM_PAD_BRIDGE
@@ -160,17 +154,19 @@ module chip_core #(
     output wire [NUM_BIDIR_PADS-1:0] bidir_pu,   // Pull-up
     output wire [NUM_BIDIR_PADS-1:0] bidir_pd,   // Pull-down
 
-    output wire       sim_req_o,
-    output wire [6:0] sim_addr_o,
-    output wire [7:0] sim_reg_o,
-    output wire [7:0] sim_len_o,
-    output wire       sim_write_o,
-    output wire [7:0] sim_wdata_o,
-    input  wire       sim_ack_i,
-    input  wire [7:0] sim_rdata_i,
-    input  wire       sim_rvalid_i,
-    input  wire       sim_rlast_i,
-    input  wire       sim_err_i,
+    `ifdef SIM
+        output wire       sim_req_o,
+        output wire [6:0] sim_addr_o,
+        output wire [7:0] sim_reg_o,
+        output wire [7:0] sim_len_o,
+        output wire       sim_write_o,
+        output wire [7:0] sim_wdata_o,
+        input  wire       sim_ack_i,
+        input  wire [7:0] sim_rdata_i,
+        input  wire       sim_rvalid_i,
+        input  wire       sim_rlast_i,
+        input  wire       sim_err_i,
+    `endif
 
     input  wire        debug_stim_override_en_i,
     input  wire [15:0] debug_stim_mssd_i,
@@ -184,6 +180,8 @@ module chip_core #(
 
     localparam int DEBUG_BUS_LO        = 7;
     localparam int DEBUG_BUS_HI        = 22;
+    localparam int SENSOR_SCL_PAD      = 23; // sensor I2C SCL (push-pull output)
+    localparam int SENSOR_SDA_PAD      = 24; // sensor I2C SDA (open-drain)
     localparam int TEST_FORCE_IRQ_PAD  = 37;
     localparam int TEST_FORCE_WAKE_PAD = 38;
     localparam int TEST_CLK_PAD        = 39;
@@ -232,7 +230,10 @@ module chip_core #(
     logic spi_clk_w;
     logic spi_mosi_w;
     logic spi_cs_n_w;
+    logic i2c_scl_w;
     logic i2c_sda_drive_low_w;
+    logic sensor_scl_w;    // sensor I2C SCL from i2c_master
+    logic sensor_sda_oe_w; // sensor I2C SDA drive-low enable from i2c_master
 
     logic epoch_end_w;
     logic alarm_w;
@@ -252,47 +253,38 @@ module chip_core #(
     logic        pico_sleeping_w;
     logic        test_force_irq_w;
     logic        test_force_wake_w;
-    logic        host_i2c_irq_event_w;
     logic        ml_irq_w;
     logic        timer_event_w;
 
-    logic       sim_req_w;
-    logic [6:0] sim_addr_w;
-    logic [7:0] sim_reg_w;
-    logic [7:0] sim_len_w;
-    logic       sim_write_w;
-    logic [7:0] sim_wdata_w;
-    logic       sensor_bridge_en_w;
-    logic       sensor_sim_ack_w;
-    logic [7:0] sensor_sim_rdata_w;
-    logic       sensor_sim_rvalid_w;
-    logic       sensor_sim_rlast_w;
-    logic       sensor_sim_err_w;
-    logic       sensor_status_clear_w;
-    logic       sensor_feature_valid_seen_q;
+    `ifdef SIM
+        logic       sim_req_w;
+        logic [6:0] sim_addr_w;
+        logic [7:0] sim_reg_w;
+        logic [7:0] sim_len_w;
+        logic       sim_write_w;
+        logic [7:0] sim_wdata_w;
 
-    assign sim_req_o   = sim_req_w;
-    assign sim_addr_o  = sim_addr_w;
-    assign sim_reg_o   = sim_reg_w;
-    assign sim_len_o   = sim_len_w;
-    assign sim_write_o = sim_write_w;
-    assign sim_wdata_o = sim_wdata_w;
-
-    `ifndef CHIP_CORE_HAS_SENSOR_SIM_BUS
-        assign sim_req_w   = 1'b0;
-        assign sim_addr_w  = 7'b0;
-        assign sim_reg_w   = 8'b0;
-        assign sim_len_w   = 8'b0;
-        assign sim_write_w = 1'b0;
-        assign sim_wdata_w = 8'b0;
+        assign sim_req_o   = sim_req_w;
+        assign sim_addr_o  = sim_addr_w;
+        assign sim_reg_o   = sim_reg_w;
+        assign sim_len_o   = sim_len_w;
+        assign sim_write_o = sim_write_w;
+        assign sim_wdata_o = sim_wdata_w;
     `endif
 
 
     assign input_pu = '0;
     assign input_pd = '0;
 
-    assign bidir_out = bidir_out_w;
-    assign bidir_oe = bidir_oe_w;
+    // Debug-bus contribution shifted into bits [DEBUG_BUS_HI:DEBUG_BUS_LO] = [22:7].
+    // Computed with continuous assigns (no always_comb bit-select) to avoid iverilog limitation.
+    logic [39:0] dbg_bidir_out_w;
+    logic [39:0] dbg_bidir_oe_w;
+    assign dbg_bidir_out_w = (test_mode_w[3:0] != 4'b0000) ? {{17{1'b0}}, debug_bus_w, 7'b0} : '0;
+    assign dbg_bidir_oe_w  = (test_mode_w[3:0] != 4'b0000) ? {{17{1'b0}}, {16{1'b1}}, 7'b0} : '0;
+
+    assign bidir_out = bidir_out_w | dbg_bidir_out_w;
+    assign bidir_oe  = bidir_oe_w  | dbg_bidir_oe_w;
     assign bidir_cs = '0;
     assign bidir_sl = '0;
     assign bidir_ie = ~bidir_oe_w;
@@ -406,8 +398,8 @@ module chip_core #(
                     test_force_irq_w, pico_trap_w, pico_cpu_clk_en_w, pico_mem_instr_w, pico_mem_valid_w, pico_mem_ready_w, pico_mem_addr_w[9:0]};
             end
             5'b01011: begin 
-                // force pico wake and expose the wake/IRQ sources directly
-                debug_bus_w = {test_force_wake_w, host_i2c_irq_event_w, ml_irq_w, timer_event_w, 12'b0};
+                // force pico wake and expose the remaining wake/IRQ sources directly
+                debug_bus_w = {test_force_wake_w, 1'b0, ml_irq_w, timer_event_w, 12'b0};
             end
 
 
@@ -495,7 +487,7 @@ module chip_core #(
             end
             5'b11011: begin 
                 // force pico wake and expose the wake/IRQ sources directly
-                debug_bus_w = {test_force_wake_w, host_i2c_irq_event_w, ml_irq_w, timer_event_w, 12'b0};
+                debug_bus_w = {test_force_wake_w, 1'b0, ml_irq_w, timer_event_w, 12'b0};
             end
 
 
@@ -530,54 +522,26 @@ module chip_core #(
         bidir_out_w[1] = spi_clk_w;
         bidir_out_w[2] = spi_mosi_w;
         bidir_out_w[3] = spi_cs_n_w;
+        bidir_out_w[5] = i2c_scl_w;
         bidir_out_w[6] = 1'b0;
 
         bidir_oe_w[0] = 1'b1;
         bidir_oe_w[1] = 1'b1;
         bidir_oe_w[2] = 1'b1;
         bidir_oe_w[3] = 1'b1;
+        bidir_oe_w[5] = 1'b1;
         bidir_oe_w[6] = i2c_sda_drive_low_w;
 
-        if (test_mode_w[3:0] != 4'b0000) begin
-            bidir_out_w[DEBUG_BUS_HI:DEBUG_BUS_LO] = debug_bus_w;
-            bidir_oe_w[DEBUG_BUS_HI:DEBUG_BUS_LO] = '1;
-        end
+        bidir_out_w[23] = sensor_scl_w;   // SENSOR_SCL_PAD = 23
+        bidir_oe_w[23]  = 1'b1;
+        bidir_out_w[24] = 1'b0;           // SENSOR_SDA_PAD = 24
+        bidir_oe_w[24]  = sensor_sda_oe_w;
 
-        `ifdef SENSOR_SIM_PAD_BRIDGE
-        if (!sensor_bridge_en_w) begin
-            bidir_out_w[SENSOR_STATUS_FEAT_SEEN_PAD] = sensor_feature_valid_seen_q;
-            bidir_out_w[SENSOR_STATUS_FEAT_VALID_PAD] = feat_valid_w;
-            bidir_out_w[SENSOR_STATUS_EPOCH_END_PAD] = epoch_end_w;
-            bidir_out_w[SENSOR_STATUS_ML_GATE_PAD] = ml_update_gate_w;
-            bidir_oe_w[SENSOR_STATUS_FEAT_SEEN_PAD] = 1'b1;
-            bidir_oe_w[SENSOR_STATUS_FEAT_VALID_PAD] = 1'b1;
-            bidir_oe_w[SENSOR_STATUS_EPOCH_END_PAD] = 1'b1;
-            bidir_oe_w[SENSOR_STATUS_ML_GATE_PAD] = 1'b1;
-        end
-        `endif
-
-        if (sensor_bridge_en_w) begin
-            bidir_out_w[SENSOR_DATA_HI:SENSOR_DATA_LO] = sim_wdata_w;
-            bidir_out_w[SENSOR_REQ_PAD] = sim_req_w;
-            bidir_out_w[SENSOR_WRITE_PAD] = sim_write_w;
-            bidir_out_w[SENSOR_ADDR_HI:SENSOR_ADDR_LO] = sim_addr_w;
-            bidir_out_w[SENSOR_REG_HI:SENSOR_REG_LO] = sim_reg_w;
-            bidir_out_w[SENSOR_LEN_HI:SENSOR_LEN_LO] = sim_len_w;
-
-            bidir_oe_w[SENSOR_DATA_HI:SENSOR_DATA_LO] = {8{sim_req_w && sim_write_w}};
-            bidir_oe_w[SENSOR_REQ_PAD] = 1'b1;
-            bidir_oe_w[SENSOR_WRITE_PAD] = 1'b1;
-            bidir_oe_w[SENSOR_ADDR_HI:SENSOR_ADDR_LO] = '1;
-            bidir_oe_w[SENSOR_REG_HI:SENSOR_REG_LO] = '1;
-            bidir_oe_w[SENSOR_LEN_HI:SENSOR_LEN_LO] = '1;
-            bidir_oe_w[SENSOR_ACK_PAD] = 1'b0;
-            bidir_oe_w[SENSOR_RVALID_PAD] = 1'b0;
-            bidir_oe_w[SENSOR_RLAST_PAD] = 1'b0;
-            bidir_oe_w[SENSOR_ERR_PAD] = 1'b0;
-        end
     end
 
     top #(
+        .FIRMWARE_HEX(FIRMWARE_HEX),
+        .WEIGHT_INIT_HEX(WEIGHT_INIT_HEX),
         .CLK_HZ(CLK_HZ),
         .GT_CLK_HZ(GT_CLK_HZ),
         .GT_EPOCH_HZ(GT_EPOCH_HZ),
@@ -605,12 +569,16 @@ module chip_core #(
         .clk_i                 (core_clk_w),
         .reset_i               (~rst_n),
 
-        .i2c_scl_i             (bidir_in[5]),
+        .i2c_scl_o             (i2c_scl_w),
         .i2c_sda_io            (),
         .i2c_sda_i             (bidir_in[6]),
         .i2c_sda_drive_low_o   (i2c_sda_drive_low_w),
 
-        `ifdef CHIP_CORE_HAS_SENSOR_SIM_BUS
+        .sensor_scl_o          (sensor_scl_w),
+        .sensor_sda_i          (bidir_in[SENSOR_SDA_PAD]),
+        .sensor_sda_oe         (sensor_sda_oe_w),
+
+        `ifdef SIM
             .sim_req_o    (sim_req_w),
             .sim_addr_o   (sim_addr_w),
             .sim_reg_o    (sim_reg_w),
@@ -632,14 +600,22 @@ module chip_core #(
         .ml_update_gate_o      (ml_update_gate_w),
         .invalid_reason_o      (invalid_reason_w),
 
-        .spi_clk_o             (spi_clk_w),
-        .spi_mosi_o            (spi_mosi_w),
-        .spi_miso_i            (bidir_in[4]),
-        .spi_cs_n_o            (spi_cs_n_w),
-        .boot_spi_clk_o        (),
-        .boot_spi_mosi_o       (),
-        .boot_spi_miso_i       (1'b1),
-        .boot_spi_cs_n_o       (),
+        .flash_spi_clk_o  (spi_clk_w),
+        .flash_spi_mosi_o (spi_mosi_w),
+        .flash_spi_miso_i (bidir_in[4]),
+        .flash_spi_cs_n_o (spi_cs_n_w),
+        .boot_spi_clk_o   (),
+        .boot_spi_mosi_o  (),
+        .boot_spi_miso_i  (1'b1),
+        .boot_spi_cs_n_o  (),
+        .weight_spi_clk_o (),
+        .weight_spi_mosi_o(),
+        .weight_spi_miso_i(1'b1),
+        .weight_spi_cs_n_o(),
+        .spi_clk_o        (),
+        .spi_mosi_o       (),
+        .spi_miso_i       (1'b1),
+        .spi_cs_n_o       (),
 
         .epoch_end_o           (epoch_end_w),
         .alarm_o               (alarm_w),
@@ -663,7 +639,6 @@ module chip_core #(
         .pico_mem_wdata_o      (pico_mem_wdata_w),
         .pico_irq_o            (pico_irq_w),
         .pico_sleeping_o       (pico_sleeping_w),
-        .host_i2c_irq_event_o  (host_i2c_irq_event_w),
         .ml_irq_o              (ml_irq_w),
         .timer_event_o         (timer_event_w)
 

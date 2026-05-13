@@ -24,7 +24,7 @@ async def test_unified_top_reset_and_init_state(dut):
         - feature latch starts empty
         - IRQ controller state starts clean
         - wake bookkeeping starts clean
-        - no spurious timer / ML / host IRQ events appear during early boot
+        - no spurious timer / ML events appear during early boot
         - reset now lands the chip in the sleep-first FSM posture
         - a wake source is required before feature-pipeline / firmware activity is expected
         - no immediate trap occurs
@@ -45,13 +45,12 @@ async def test_unified_top_reset_and_init_state(dut):
     assert _u(dut.feat_latched_valid) == 0, "feature latch valid should reset low"
     assert _u(dut.irq_pending) == 0, "IRQC pending should reset clear"
     assert _u(dut.irq_mask) == 0, "IRQC mask should reset clear"
-    assert _u(dut.irq_wake_en) == 0x7, "IRQC wake enable should reset to timer/ML/host default"
+    assert _u(dut.irq_wake_en) == 0x7, "IRQC wake enable should reset to timer/ML/test-source default"
     assert _u(dut.pwr_wake_status) == 0, "wake status should reset clear"
     assert _u(dut.pwr_wake_reason) == 0, "wake reason should reset clear"
     assert _u(dut.sleep_req) == 0, "sleep request should reset clear"
     assert _u(dut.ml_irq) == 0, "ML IRQ should be idle during reset"
     assert _u(dut.timer_event) == 0, "timer event should be idle during reset"
-    assert _u(dut.host_i2c_irq_event) == 0, "host-I2C IRQ event should be idle during reset"
     assert _u(dut.pico_sleeping) == 0, "CPU should not report sleeping during reset"
     assert _u(dut.pico_cpu_clk_en) == 1, "CPU clock gate should default enabled at reset"
     assert _u(dut.pico_irq) == 0, "CPU IRQ vector should be clear during reset"
@@ -79,7 +78,6 @@ async def test_unified_top_reset_and_init_state(dut):
         await ReadOnly()
         assert _u(dut.pwr_wake_status) == 0, "wake status should remain clear during boot load"
         assert _u(dut.pwr_wake_reason) == 0, "wake reason should remain clear during boot load"
-        assert _u(dut.host_i2c_irq_event) == 0, "host-I2C IRQ event should not spuriously pulse during boot load"
         assert _u(dut.ml_irq) == 0, "ML IRQ should not spuriously assert during boot load"
         assert _u(dut.timer_event) == 0, "timer event should not spuriously assert during boot load"
         assert _u(dut.pico_trap) == 0, "CPU trap asserted during boot load"
@@ -109,7 +107,6 @@ async def test_unified_top_reset_and_init_state(dut):
             _u(dut.pico_mem_valid) != 0 or
             _u(dut.test_status) != 0
         )
-        assert _u(dut.host_i2c_irq_event) == 0, "host-I2C IRQ event should not spuriously pulse during init"
         assert _u(dut.ml_irq) == 0, "ML IRQ should not spuriously assert during init"
         assert _u(dut.pico_trap) == 0, "CPU trap asserted during early init"
         if saw_postwake_progress:

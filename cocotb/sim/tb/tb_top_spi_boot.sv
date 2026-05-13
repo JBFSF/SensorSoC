@@ -45,13 +45,6 @@ wire boot_spi_miso;
 wire boot_spi_cs_n;
 
 // ----------------------------------------------------------------
-// Weight SPI wires — not used in this test, tie MISO high
-// ----------------------------------------------------------------
-wire spi_clk;
-wire spi_mosi;
-wire spi_cs_n;
-
-// ----------------------------------------------------------------
 // DUT — top.sv
 // ----------------------------------------------------------------
 top #(
@@ -81,7 +74,7 @@ top #(
 ) dut (
     .clk_i              (clk),
     .reset_i            (reset),
-    .i2c_scl_i          (1'b1),
+    .i2c_scl_o(),
     .i2c_sda_io         (),
     .i2c_sda_i          (1'b1),
     .i2c_sda_drive_low_o(),
@@ -105,11 +98,6 @@ top #(
     .mssd_feat_o        (),
     .ml_update_gate_o   (),
     .invalid_reason_o   (),
-    // Weight SPI — not used in this test
-    .spi_clk_o          (spi_clk),
-    .spi_mosi_o         (spi_mosi),
-    .spi_miso_i         (1'b1),
-    .spi_cs_n_o         (spi_cs_n),
     // Boot SPI — connected to boot flash model
     .boot_spi_clk_o     (boot_spi_clk),
     .boot_spi_mosi_o    (boot_spi_mosi),
@@ -133,7 +121,6 @@ top #(
     .pico_mem_wdata_o   (),
     .pico_irq_o         (),
     .pico_sleeping_o    (),
-    .host_i2c_irq_event_o(),
     .ml_irq_o           (),
     .timer_event_o      ()
 );

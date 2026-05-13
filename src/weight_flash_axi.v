@@ -40,9 +40,6 @@ module weight_flash_axi #(
     output reg         mem_ready,
     output wire [31:0] mem_rdata,
 
-    // Asserts immediately (no boot preload phase)
-    output wire        weight_boot_done,
-
     // SPI flash — driven on demand during each inference weight fetch
     output reg         spi_cs_n,
     output reg         spi_clk,
@@ -95,9 +92,6 @@ module weight_flash_axi #(
     output reg         saxi_rvalid,
     input  wire        saxi_rready
 );
-
-    // No boot preload: ready immediately
-    assign weight_boot_done = 1'b1;
 
     // Write channel: accept-and-discard so taketwo never stalls on writes
     assign saxi_awready = 1'b1;

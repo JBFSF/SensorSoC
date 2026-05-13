@@ -1,38 +1,38 @@
 /*
  * test_top_spi_boot_weights.c
  *
- * Test 1: SPI flash boot — weight load only.
+ * Dedicated weight-SPI ML smoke test.
  *
- * Boots from SPI flash, loads ML weights into WRAM, verifies the first
- * four words written to WRAM match what was read from flash. No sensor
- * pipeline, no ML inference. Fast isolation test for the SPI boot path.
+ * The legacy version manually drove spi_master_mmio, copied bytes into the
+ * weight window, and then read those addresses back.  That is no longer the
+ * architecture: weight_flash_axi fetches weights directly from the shared
+ * flash bus during taketwo AXI reads.
  *
- * PASS criteria:
- *   - SPI CS asserted at least once
- *   - 208 words (832 bytes) transferred from flash to WRAM
- *   - First 4 WRAM words read back and match expected flash content
+ * This firmware writes the canonical input vector, starts taketwo through the
+ * normal ML control registers, and numerically checks the packed output word.
+ * The SystemVerilog bench separately verifies that flash_spi_* toggled and
+ * spi_master_mmio stayed idle.
  */
 
 #include <stdint.h>
 
 #define WEIGHT_BASE  0x03006000u
-#define SPI_BASE     0x0300A000u
+#define ML_BASE      0x03003000u
 #define TEST_BASE    0x0300F000u
 
 #define TEST_STATUS  (*(volatile uint32_t*)(TEST_BASE + 0x00u))
 #define TEST_CODE    (*(volatile uint32_t*)(TEST_BASE + 0x04u))
 
+#define ML_REG(off)  (*(volatile uint32_t*)(ML_BASE + (off)))
 #define WRAM_U32(off) (*(volatile uint32_t*)(WEIGHT_BASE + (off)))
+#define WRAM_I16(off) (*(volatile int16_t*) (WEIGHT_BASE + (off)))
 
-#define SPI_CS       (*(volatile uint32_t*)(SPI_BASE + 0x00u))
-#define SPI_STATUS   (*(volatile uint32_t*)(SPI_BASE + 0x04u))
-#define SPI_DATA     (*(volatile uint32_t*)(SPI_BASE + 0x08u))
-#define SPI_DIVIDER  (*(volatile uint32_t*)(SPI_BASE + 0x0Cu))
-#define SPI_BUSY_BIT (1u << 0)
-
-/* Weight layout in WRAM — matches taketwo firmware convention */
+#define X_BASE       64u
 #define VAR_BASE     128u
-#define WEIGHT_WORDS 208u
+#define TMP_BASE     5312u
+#define LOGIT_BASE   5504u
+
+#define EXPECTED_LOGIT_WORD 0x3585F96Au
 
 #define TEST_PASS    0xCAFEBABEu
 #define TEST_FAIL    0xDEADBEEFu
@@ -43,72 +43,54 @@ static void fail(uint32_t code) {
     for (;;) {}
 }
 
-static uint8_t spi_xfer(uint8_t tx) {
-    uint32_t delay;
-
-    SPI_DATA = (uint32_t)tx;
-    for (delay = 0u; delay < 8u; delay++) {
-        __asm__ volatile ("nop");
+static int wait_busy_value(uint32_t target, uint32_t timeout) {
+    while (timeout--) {
+        if ((ML_REG(0x14u) & 1u) == target) return 1;
     }
-    while (SPI_STATUS & SPI_BUSY_BIT) {}
-    (void)SPI_DATA;               /* dummy read to latch rx_data */
-    return (uint8_t)(SPI_DATA & 0xFFu);
-}
-
-static void spi_boot_load(void) {
-    uint32_t i;
-    uint32_t settle;
-
-    SPI_DIVIDER = 2u;
-
-    /* Assert CS and send READ (0x03) command + 24-bit address 0x000000 */
-    SPI_CS = 0u;
-    spi_xfer(0x03u);
-    spi_xfer(0x00u);
-    spi_xfer(0x00u);
-    spi_xfer(0x00u);
-
-    /* Read WEIGHT_WORDS 32-bit words, little-endian byte order */
-    for (i = 0u; i < WEIGHT_WORDS; i++) {
-        uint32_t b0 = spi_xfer(0x00u);
-        uint32_t b1 = spi_xfer(0x00u);
-        uint32_t b2 = spi_xfer(0x00u);
-        uint32_t b3 = spi_xfer(0x00u);
-        WRAM_U32(VAR_BASE + (i * 4u)) = b0 | (b1 << 8u) | (b2 << 16u) | (b3 << 24u);
-
-        /* Brief settle between words */
-        for (settle = 0u; settle < 16u; settle++) {
-            __asm__ volatile ("nop");
-        }
-    }
-
-    SPI_CS = 1u;
+    return 0;
 }
 
 void main(void) {
-    uint32_t w0, w1, w2, w3;
+    uint32_t out_word;
+    uint32_t saw_busy;
 
     TEST_STATUS = 0u;
     TEST_CODE   = 0u;
 
-    spi_boot_load();
+    ML_REG(0x80u) = WEIGHT_BASE;
+    if (ML_REG(0x80u) != WEIGHT_BASE) fail(0xB000u);
+    ML_REG(0x84u) = TMP_BASE;
+    if (ML_REG(0x84u) != TMP_BASE) fail(0xB004u);
+    ML_REG(0x88u) = LOGIT_BASE;
+    if (ML_REG(0x88u) != LOGIT_BASE) fail(0xB001u);
+    ML_REG(0x8Cu) = X_BASE;
+    if (ML_REG(0x8Cu) != X_BASE) fail(0xB002u);
+    ML_REG(0x90u) = VAR_BASE;
+    if (ML_REG(0x90u) != VAR_BASE) fail(0xB003u);
 
-    /*
-     * Read back the first 4 WRAM words and encode them into TEST_CODE
-     * so the testbench can compare against the flash model contents.
-     */
-    w0 = WRAM_U32(VAR_BASE + 0u);
-    w1 = WRAM_U32(VAR_BASE + 4u);
-    w2 = WRAM_U32(VAR_BASE + 8u);
-    w3 = WRAM_U32(VAR_BASE + 12u);
+    /* canonical_v1 from sim/tb/golden_vectors.py */
+    WRAM_I16(X_BASE + 0u) = (int16_t)256;
+    WRAM_I16(X_BASE + 2u) = (int16_t)-128;
+    WRAM_I16(X_BASE + 4u) = (int16_t)51;
+    WRAM_I16(X_BASE + 6u) = (int16_t)-512;
 
-    /* Sanity: at least one word must be non-zero for a valid weight file */
-    if ((w0 == 0u) && (w1 == 0u) && (w2 == 0u) && (w3 == 0u)) {
-        fail(0xB001u);
-    }
+    if (WRAM_I16(X_BASE + 0u) != (int16_t)256) fail(0xB010u);
+    if (WRAM_I16(X_BASE + 2u) != (int16_t)-128) fail(0xB011u);
+    if (WRAM_I16(X_BASE + 4u) != (int16_t)51) fail(0xB012u);
+    if (WRAM_I16(X_BASE + 6u) != (int16_t)-512) fail(0xB013u);
 
-    /* Report PASS — testbench cross-checks WRAM vs flash model directly */
-    TEST_CODE   = w0;   /* first weight word for TB verification */
+    ML_REG(0x28u) = 1u;
+    ML_REG(0x2Cu) = 1u;
+    ML_REG(0x10u) = 1u;
+
+    saw_busy = wait_busy_value(1u, 200000u);
+    if (!saw_busy) fail(0xB020u);
+    if (!wait_busy_value(0u, 2000000u)) fail(0xB021u);
+    ML_REG(0x10u) = 0u;
+    ML_REG(0x2Cu) = 1u;
+
+    out_word = WRAM_U32(LOGIT_BASE);
+    TEST_CODE   = out_word;
     TEST_STATUS = TEST_PASS;
 
     for (;;) {}

@@ -28,7 +28,8 @@ module top_fsm
     output        feat_en_o,
     output        ml_en_o,
     output        cpu_en_o,
-    output        sleeping_o
+    output        sleeping_o,
+    output        init_o          // if the cpu initalization was done
 );
 
     localparam BOOT      = 3'd0;
@@ -79,9 +80,11 @@ module top_fsm
 
         case (test_mode_i)
             4'b0001, 4'b0010, 4'b0011, 4'b0100: state_d = FEAT_ONLY; //just feat_pl
-            4'b0110, 4'b1100, 4'b1101: state_d = FEAT_ML; //feat and ML
-            4'b0111, 4'b1000, 4'b1001, 4'b1010, 4'b1011: state_d = CPU_ONLY; //just cpu?
-            4'b0101: state_d = ALL; //all 
+            4'b0110: state_d = FEAT_ML; //feat and ML
+            // 01001 is an observer mode for live sleep/IRQ state; do not
+            // override the FSM or it cannot expose sleeping_o=1.
+            4'b0111, 4'b1000, 4'b1010, 4'b1011: state_d = CPU_ONLY; //just cpu?
+            4'b0101, 4'b1100, 4'b1101: state_d = ALL; //all 
         endcase
     end
 
@@ -91,7 +94,8 @@ module top_fsm
     assign ml_en_o    = (state_q == ALL) || (state_q == FEAT_ML) || (state_q == BOOT);
     assign cpu_en_o   = cpu_clk_en_r;
     assign sleeping_o = (state_q == SLEEP);
-    assign watchdog_o = (state_q == FEAT_ONLY) || (state_q == ALL) || (state_q == CPU_FEAT) || (state_q == FEAT_ML) || (state_q == SLEEP); 
+    assign watchdog_o = (state_q == FEAT_ONLY) || (state_q == ALL) || (state_q == CPU_FEAT) || (state_q == FEAT_ML) || (state_q == SLEEP);
+    assign init_o     = (state_q != BOOT); 
 
     always @(posedge clk_i) begin
         if (!resetn_i) begin

@@ -6,7 +6,7 @@ BOOT_WAIT_CYCLES = 120_000   # covers ~33k SPI boot (256 words) + firmware init
 INJECT_HOLD      = 10        # cycles to hold test_irq_src high (IRQC edge capture)
 TIMEOUT          = 200_000   # cycles per step before failing
 
-IRQ_NAMES = ["timer", "ML", "host_i2c"]
+IRQ_NAMES = ["timer", "ML", "test_src2"]
 
 def maybe_getattr(obj, name):
     try:

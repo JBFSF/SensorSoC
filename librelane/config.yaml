@@ -25,7 +25,7 @@ meta:
     #Checker.LVS: null
 
 DESIGN_NAME: chip_top
-VERILOG_DEFINES: ["SLOT_1X1", "USE_POWER_PINS", "SENSOR_SIM_PAD_BRIDGE"]
+VERILOG_DEFINES: ["SLOT_1X1", "USE_POWER_PINS"]
 VERILOG_FILES:
 - dir::../src/chip_top.sv
 - dir::../src/chip_core.sv

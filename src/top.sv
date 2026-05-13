@@ -1,14 +1,5 @@
 `timescale 1ns/1ps
 
-`include "taketwo_feature_bridge.sv"
-
-`ifdef SIM
-`define TOP_HAS_SENSOR_SIM_BUS
-`endif
-`ifdef SENSOR_SIM_PAD_BRIDGE
-`define TOP_HAS_SENSOR_SIM_BUS
-`endif
-
 module top #(
     parameter integer MEM_WORDS    = 1024,
     parameter integer BOOT_WORDS   = 1024,
@@ -56,12 +47,19 @@ module top #(
     `endif
     input  logic clk_i,
     input  logic reset_i,
-    input  logic i2c_scl_i,
+    output logic i2c_scl_o,
     inout  wire  i2c_sda_io,
     input  logic i2c_sda_i,
     output logic i2c_sda_drive_low_o,
 
-    `ifdef TOP_HAS_SENSOR_SIM_BUS
+    // Sensor I2C bus: master drives accel (LIS2DW12) and PPG (ADPD144RI).
+    // Separate from the host I2C target above. SCL is push-pull; SDA is
+    // open-drain (sensor_sda_oe=1 drives low, 0 releases to external pullup).
+    output logic sensor_scl_o,
+    input  logic sensor_sda_i,
+    output logic sensor_sda_oe,
+
+    `ifdef SIM 
         // Functional simulation bus to sensor models (through i2c_master).
         output logic        sim_req_o,     // request strobe from i2c_master into simulated sensor bus
         output logic [6:0]  sim_addr_o,    // 7-bit I2C address for the active simulated sensor transaction
@@ -74,7 +72,6 @@ module top #(
         input  logic        sim_rvalid_i,  // read data valid strobe from simulated sensor
         input  logic        sim_rlast_i,   // marks last read byte of the transaction from simulated sensor
         input  logic        sim_err_i,     // error indicator from simulated sensor (e.g., NACK/invalid access)
-
     `endif
     
     // Signals used for test modes.
@@ -93,7 +90,6 @@ module top #(
     // output logic [31:0] pico_mem_wdata_o,
     // output logic [31:0] pico_irq_o,
     // output logic        pico_sleeping_o,
-    // output logic        host_i2c_irq_event_o,
     // output logic        ml_irq_o,
     // output logic        timer_event_o,
 
@@ -111,25 +107,28 @@ module top #(
     output logic                      ml_update_gate_o,  // gate: only update ML when signal-quality checks pass
     output logic [7:0]                invalid_reason_o,  // reason code when ML update is gated off    
 
-    // SPI flash interface used by the simulation boot stub.
-    output logic                      spi_clk_o,
-    output logic                      spi_mosi_o,
-    input  logic                      spi_miso_i,
-    output logic                      spi_cs_n_o,
+    // Shared flash SPI bus: spi_boot_ctrl owns before boot_done, weight_flash_axi owns after
+    output logic                      flash_spi_clk_o,
+    output logic                      flash_spi_mosi_o,
+    input  logic                      flash_spi_miso_i,
+    output logic                      flash_spi_cs_n_o,
 
-    // Dedicated SPI interface for hardware boot controller (firmware load).
+    // Compatibility/debug views of the two internal flash owners.
     output logic                      boot_spi_clk_o,
     output logic                      boot_spi_mosi_o,
     input  logic                      boot_spi_miso_i,
     output logic                      boot_spi_cs_n_o,
-
-    // Dedicated SPI interface for hardware weight boot controller (ML weight load).
     output logic                      weight_spi_clk_o,
     output logic                      weight_spi_mosi_o,
     input  logic                      weight_spi_miso_i,
     output logic                      weight_spi_cs_n_o,
 
-    output logic                      weight_boot_done_o,
+    // CPU SPI master (spi_master_mmio) kept idle in this configuration
+    output logic                      spi_clk_o,
+    output logic                      spi_mosi_o,
+    input  logic                      spi_miso_i,
+    output logic                      spi_cs_n_o,
+
 
     // Epoch pulse for TB orchestration
     input  logic                      start_i,          // Start button to start watchdog timer
@@ -154,7 +153,6 @@ module top #(
     output logic [31:0] pico_mem_wdata_o,
     output logic [31:0] pico_irq_o,
     output logic        pico_sleeping_o,
-    output logic        host_i2c_irq_event_o,
     output logic        ml_irq_o,
     output logic        timer_event_o
 );
@@ -242,38 +240,42 @@ module top #(
 
     logic       feat_en;                 // Feature pipeline enable wire
     logic       ml_en;                   // ML enable wire
-    logic       cpu_clk_en;                  // CPU clock enable wire
-    logic       sleeping_r;
-    logic       sim_req_w;
-    logic [6:0] sim_addr_w;
-    logic [7:0] sim_reg_w;
-    logic [7:0] sim_len_w;
-    logic       sim_write_w;
-    logic [7:0] sim_wdata_w;
-    logic       sim_ack_w;
-    logic [7:0] sim_rdata_w;
-    logic       sim_rvalid_w;
-    logic       sim_rlast_w;
-    logic       sim_err_w;
+    logic       cpu_clk_en;             // CPU clock enable wire
+    logic       sleeping_r;             // top_fsm sleeping status (used in both paths)
+    `ifdef SIM
+        logic       sim_req_w;
+        logic [6:0] sim_addr_w;
+        logic [7:0] sim_reg_w;
+        logic [7:0] sim_len_w;
+        logic       sim_write_w;
+        logic [7:0] sim_wdata_w;
+        logic       sim_ack_w;
+        logic [7:0] sim_rdata_w;
+        logic       sim_rvalid_w;
+        logic       sim_rlast_w;
+        logic       sim_err_w;
+    `endif
+    // Internal wires for the sensor I2C bus (i2c_master <-> top-level ports)
+    logic sensor_scl_w;
+    logic sensor_sda_i_w;
+    logic sensor_sda_oe_w;
 
-`ifdef TOP_HAS_SENSOR_SIM_BUS
-    assign sim_req_o = sim_req_w;
-    assign sim_addr_o = sim_addr_w;
-    assign sim_reg_o = sim_reg_w;
-    assign sim_len_o = sim_len_w;
+    assign sensor_scl_o   = sensor_scl_w;
+    assign sensor_sda_oe  = sensor_sda_oe_w;
+    assign sensor_sda_i_w = sensor_sda_i;
+
+`ifdef SIM
+    assign sim_req_o   = sim_req_w;
+    assign sim_addr_o  = sim_addr_w;
+    assign sim_reg_o   = sim_reg_w;
+    assign sim_len_o   = sim_len_w;
     assign sim_write_o = sim_write_w;
     assign sim_wdata_o = sim_wdata_w;
-    assign sim_ack_w = sim_ack_i;
+    assign sim_ack_w   = sim_ack_i;
     assign sim_rdata_w = sim_rdata_i;
     assign sim_rvalid_w = sim_rvalid_i;
     assign sim_rlast_w = sim_rlast_i;
-    assign sim_err_w = sim_err_i;
-`else
-    assign sim_ack_w = 1'b0;
-    assign sim_rdata_w = 8'h00;
-    assign sim_rvalid_w = 1'b0;
-    assign sim_rlast_w = 1'b0;
-    assign sim_err_w = 1'b0;
+    assign sim_err_w   = sim_err_i;
 `endif
 
     // ---------------------------------------------------------------------
@@ -430,6 +432,26 @@ module top #(
     logic [7:0] feat_invalid_reason_latched_r;
     logic       feat_valid_d;
 
+
+    //wires for handing off spi interface
+    wire       init_done;
+    wire        boot_spi_mosi_w;
+    wire        weight_spi_mosi_w;
+    wire        boot_spi_clk_w;
+    wire        weight_spi_clk_w;
+    wire        boot_spi_cs_n_w;
+    wire        weight_spi_cs_n_w;
+    wire        boot_spi_miso_mux_w;
+    wire        weight_spi_miso_mux_w;
+
+`ifdef SIM
+    assign boot_spi_miso_mux_w   = (flash_spi_miso_i === 1'bz) ? boot_spi_miso_i   : flash_spi_miso_i;
+    assign weight_spi_miso_mux_w = (flash_spi_miso_i === 1'bz) ? weight_spi_miso_i : flash_spi_miso_i;
+`else
+    assign boot_spi_miso_mux_w   = flash_spi_miso_i;
+    assign weight_spi_miso_mux_w = flash_spi_miso_i;
+`endif
+
     // Lightweight feature register bank exposed to firmware. This is the
     // current handoff point between the sensor pipeline and the CPU-owned ML
     // path; firmware reads these latched values and copies them into WEIGHT_BASE.
@@ -439,26 +461,6 @@ module top #(
 
     wire [31:0] irq_sources;
     wire [31:0] wake_sources;
-    wire        host_i2c_wr_en;
-    wire [7:0]  host_i2c_wr_addr;
-    wire [7:0]  host_i2c_wr_data;
-    wire [7:0]  host_i2c_rd_addr;
-    wire [7:0]  host_i2c_rd_data;
-    wire        host_i2c_proto_err;
-    wire        host_i2c_irq_event;
-    wire        host_i2c_irqc_req;
-    wire        host_i2c_irqc_we;
-    wire [7:0]  host_i2c_irqc_off;
-    wire [31:0] host_i2c_irqc_wdata;
-    wire        host_i2c_irqc_ready;
-    wire [31:0] host_i2c_irqc_rdata;
-    wire [31:0] host_cfg_target_wake_sec;
-    wire [31:0] host_cfg_window_sec;
-    wire [15:0] host_cfg_step_sec;
-    wire [15:0] host_cfg_motion_hi_th;
-    wire [7:0]  host_cfg_motion_hi_count;
-    wire [7:0]  host_cfg_policy;
-    wire [15:0] host_cfg_conf_thr;
 
     always_ff @(posedge clk_i) begin
         if (reset_i) begin
@@ -581,7 +583,10 @@ module top #(
 
 
     //JF: Feat Pipline, sleep until watchdog
-    i2c_master u_i2c_master (
+    i2c_master #(
+        .CLK_HZ    (CLK_HZ),
+        .I2C_CLK_HZ(100_000)
+    ) u_i2c_master (
         .clk(clk_i),
         .resetn(~reset_i),
         .en_i(feat_en),
@@ -610,18 +615,24 @@ module top #(
         .ppg_rsp_last_o(ppg_i2c_rsp_last_w),       // PPG response last-byte marker
         .ppg_rsp_done_o(ppg_i2c_rsp_done_w),       // PPG transaction done
         .ppg_rsp_err_o(ppg_i2c_rsp_err_w),         // PPG transaction error
-        .ppg_rsp_ready_i(ppg_i2c_rsp_ready_w),     // backpressure from ppg_fifo_reader during bursts
-        .sim_req(sim_req_w),                       // drive sim sensor-bus request (to TB sensor models)
-        .sim_addr(sim_addr_w),                     // drive sim sensor-bus device address
-        .sim_reg(sim_reg_w),                       // drive sim sensor-bus register address
-        .sim_len(sim_len_w),                       // drive sim sensor-bus transfer length
-        .sim_write(sim_write_w),                   // drive sim sensor-bus direction
-        .sim_wdata(sim_wdata_w),                   // drive sim sensor-bus write data
-        .sim_ack(sim_ack_w),                       // receive sim sensor-bus ack from model
-        .sim_rdata(sim_rdata_w),                   // receive sim sensor-bus read data from model
-        .sim_rvalid(sim_rvalid_w),                 // receive sim sensor-bus read valid strobe
-        .sim_rlast(sim_rlast_w),                   // receive sim sensor-bus last-byte marker
-        .sim_err(sim_err_w)                        // receive sim sensor-bus error indication
+        .ppg_rsp_ready_i(ppg_i2c_rsp_ready_w),
+        .scl_o  (sensor_scl_w),
+        .sda_i  (sensor_sda_i_w),
+        .sda_oe (sensor_sda_oe_w)
+        `ifdef SIM
+            ,
+            .sim_req(sim_req_w),
+            .sim_addr(sim_addr_w),
+            .sim_reg(sim_reg_w),
+            .sim_len(sim_len_w),
+            .sim_write(sim_write_w),
+            .sim_wdata(sim_wdata_w),
+            .sim_ack(sim_ack_w),
+            .sim_rdata(sim_rdata_w),
+            .sim_rvalid(sim_rvalid_w),
+            .sim_rlast(sim_rlast_w),
+            .sim_err(sim_err_w)
+        `endif
     );
 
     //JF: Feat Pipline, sleep until watchdog
@@ -988,7 +999,7 @@ module top #(
     weight_flash_axi #(
         .BASE_ADDR (WEIGHT_BASE),
         .CLK_DIV   (8'd2),
-        .FLASH_BASE(24'h00_0000)
+        .FLASH_BASE(24'h00_1000)
     ) u_weight_ram (
         .clk      (clk_i),
         .resetn   (~reset_i),
@@ -999,11 +1010,10 @@ module top #(
         .mem_wstrb(mem_wstrb),
         .mem_ready(weight_ready),
         .mem_rdata(weight_rdata),
-        .weight_boot_done(weight_boot_done_o),
-        .spi_cs_n (weight_spi_cs_n_o),
-        .spi_clk  (weight_spi_clk_o),
-        .spi_mosi (weight_spi_mosi_o),
-        .spi_miso (weight_spi_miso_i),
+        .spi_cs_n (weight_spi_cs_n_w),
+        .spi_clk  (weight_spi_clk_w),
+        .spi_mosi (weight_spi_mosi_w),
+        .spi_miso (boot_done ? weight_spi_miso_mux_w : 1'b0),
         // AXI slave — write channel (accept-and-discard)
         .saxi_awid    (wram_awid),
         .saxi_awaddr  (wram_awaddr),
@@ -1047,24 +1057,6 @@ module top #(
         .saxi_rready  (wram_rready)
     );
 
-    // CPU-driven SPI master used by the simulation boot stub to stream
-    // taketwo weights from external flash into shared WRAM.
-    //JF: probably not needed
-    spi_master_mmio #(.BASE_ADDR(SPI_BASE)) u_spi (
-        .clk       (clk_i),
-        .resetn    (~reset_i),
-        .mem_valid (mmio_sel),
-        .mem_addr  (mem_addr),
-        .mem_wdata (mem_wdata),
-        .mem_wstrb (mem_wstrb),
-        .mem_ready (spi_ready),
-        .mem_rdata (spi_rdata),
-        .spi_clk_o (spi_clk_o),
-        .spi_mosi_o(spi_mosi_o),
-        .spi_miso_i(spi_miso_i),
-        .spi_cs_n_o(spi_cs_n_o)
-    );
-
     // Hardware SPI boot controller: loads BOOT_WORDS words from external flash
     // into SRAM before releasing the CPU from reset.
     spi_boot_ctrl #(
@@ -1074,10 +1066,10 @@ module top #(
     ) u_boot_ctrl (
         .clk         (clk_i),
         .resetn      (~reset_i),
-        .spi_clk_o   (boot_spi_clk_o),
-        .spi_mosi_o  (boot_spi_mosi_o),
-        .spi_miso_i  (boot_spi_miso_i),
-        .spi_cs_n_o  (boot_spi_cs_n_o),
+        .spi_clk_o   (boot_spi_clk_w),
+        .spi_mosi_o  (boot_spi_mosi_w),
+        .spi_miso_i  (boot_done ? 1'b0 : boot_spi_miso_mux_w),
+        .spi_cs_n_o  (boot_spi_cs_n_w),
         .sram_valid_o(boot_sram_valid_w),
         .sram_wstrb_o(boot_sram_wstrb_w),
         .sram_addr_o (boot_sram_addr_w),
@@ -1086,56 +1078,7 @@ module top #(
     );
 
 
-    // Off-chip host I2C target bridge in the always-on domain. This mirrors
-    // soc_top so the unified top can participate in end-to-end host config and
-    // score visibility tests without changing production firmware.
-    //JF: we can probably remove this
-    host_i2c_target #(
-        .SLAVE_ADDR(7'h42)
-    ) u_host_i2c_target (
-        .clk                (clk_i),
-        .resetn             (~reset_i),
-        .i2c_scl_i          (i2c_scl_i),
-        .i2c_sda_io         (i2c_sda_io),
-        .i2c_sda_i          (i2c_sda_i),
-        .i2c_sda_drive_low_o(i2c_sda_drive_low_o),
-        .wr_en_o            (host_i2c_wr_en),
-        .wr_addr_o          (host_i2c_wr_addr),
-        .wr_data_o          (host_i2c_wr_data),
-        .rd_addr_o          (host_i2c_rd_addr),
-        .rd_data_i          (host_i2c_rd_data),
-        .proto_err_o        (host_i2c_proto_err)
-    );
-
-    //JF: do we need this?
-    host_i2c_bridge_regs u_host_i2c_bridge_regs (
-        .clk                  (clk_i),
-        .resetn               (~reset_i),
-        .wr_en_i              (host_i2c_wr_en),
-        .wr_addr_i            (host_i2c_wr_addr),
-        .wr_data_i            (host_i2c_wr_data),
-        .rd_addr_i            (host_i2c_rd_addr),
-        .rd_data_o            (host_i2c_rd_data),
-        .proto_err_i          (host_i2c_proto_err),
-        .ml_score_i           (ml_score_hw),
-        .event_o              (host_i2c_irq_event),
-        .cfg_target_wake_sec_o(host_cfg_target_wake_sec),
-        .cfg_window_sec_o     (host_cfg_window_sec),
-        .cfg_step_sec_o       (host_cfg_step_sec),
-        .cfg_motion_hi_th_o   (host_cfg_motion_hi_th),
-        .cfg_motion_hi_count_o(host_cfg_motion_hi_count),
-        .cfg_policy_o         (host_cfg_policy),
-        .cfg_conf_thr_o       (host_cfg_conf_thr),
-        .irqc_req_o           (host_i2c_irqc_req),
-        .irqc_we_o            (host_i2c_irqc_we),
-        .irqc_off_o           (host_i2c_irqc_off),
-        .irqc_wdata_o         (host_i2c_irqc_wdata),
-        .irqc_ready_i         (host_i2c_irqc_ready),
-        .irqc_rdata_i         (host_i2c_irqc_rdata)
-    );
-
-    assign irq_sources = {28'b0, test_force_wake_i,
-        host_i2c_irq_event | test_irq_src_i[2],
+    assign irq_sources = {28'b0, test_force_wake_i, test_irq_src_i[2],
         ml_irq             | test_irq_src_i[1],
         timer_event        | test_irq_src_i[0]};
     assign wake_sources = irq_sources;
@@ -1152,12 +1095,6 @@ module top #(
         .mem_wstrb  (mem_wstrb),
         .mem_ready  (irqc_ready),
         .mem_rdata  (irqc_rdata),
-        .host_req_i (host_i2c_irqc_req),
-        .host_we_i  (host_i2c_irqc_we),
-        .host_off_i (host_i2c_irqc_off),
-        .host_wdata_i(host_i2c_irqc_wdata),
-        .host_ready_o(host_i2c_irqc_ready),
-        .host_rdata_o(host_i2c_irqc_rdata),
         .irq_src_i  (irq_sources),
         .irq_o      (irq),
         .wake_req_o (irqc_wake_req)
@@ -1188,13 +1125,6 @@ module top #(
         .mem_addr(mem_addr),
         .mem_wdata(mem_wdata),
         .mem_wstrb(mem_wstrb),
-        .cfg_target_wake_sec_i(host_cfg_target_wake_sec),
-        .cfg_window_sec_i(host_cfg_window_sec),
-        .cfg_step_sec_i(host_cfg_step_sec),
-        .cfg_motion_hi_th_i(host_cfg_motion_hi_th),
-        .cfg_motion_hi_count_i(host_cfg_motion_hi_count),
-        .cfg_policy_i(host_cfg_policy),
-        .cfg_conf_thr_i(host_cfg_conf_thr),
         .mem_ready(test_ready),
         .mem_rdata(test_rdata),
         .status_o(test_status),
@@ -1254,7 +1184,8 @@ module top #(
         .feat_en_o(feat_en),
         .ml_en_o(ml_en),
         .cpu_en_o(cpu_clk_en),
-        .sleeping_o(sleeping_r)
+        .sleeping_o(sleeping_r),
+        .init_o(init_done)
     );
 
     alarm_mmio #(.BASE_ADDR(ALARM_BASE)) u_alarm_mmio (
@@ -1272,8 +1203,14 @@ module top #(
         .alarm_o(alarm_o)
     );
     
+    logic cpu_clk_en_lat_dbg;
+    always_ff @(posedge clk_i or posedge reset_i) begin
+        if (reset_i) cpu_clk_en_lat_dbg <= 1'b1;
+        else         cpu_clk_en_lat_dbg <= cpu_clk_en_lat;
+    end
+
     assign pico_trap_o       = trap;
-    assign pico_cpu_clk_en_o = cpu_clk_en_lat;
+    assign pico_cpu_clk_en_o = cpu_clk_en_lat_dbg;
     assign pico_mem_valid_o  = mem_valid;
     assign pico_mem_instr_o  = mem_instr;
     assign pico_mem_ready_o  = mem_ready;
@@ -1282,12 +1219,33 @@ module top #(
     assign pico_mem_wdata_o  = mem_wdata;
     assign pico_irq_o        = pico_irq;
     assign pico_sleeping_o   = sleeping_r;
-    assign host_i2c_irq_event_o = host_i2c_irq_event;
     assign ml_irq_o          = ml_irq;
     assign timer_event_o     = timer_event;
 
     assign epoch_end_o = epoch_end_w;
-    //assign alarm_o = 1'b0;
-    // assign weight_boot_done_o = 1'b1;
 
+    // Placeholder drives for the i2c_master physical interface.
+    // Replace these assigns with connections to i2c_master ports once the
+    // master is updated to drive real I2C pins.
+    assign i2c_scl_o           = 1'b1; // SCL idle high
+    assign i2c_sda_drive_low_o = 1'b0; // not driving SDA low
+
+    // Shared flash bus: spi_boot_ctrl drives until boot_done, weight_flash_axi drives after
+    assign flash_spi_clk_o  = boot_done ? weight_spi_clk_w  : boot_spi_clk_w;
+    assign flash_spi_mosi_o = boot_done ? weight_spi_mosi_w : boot_spi_mosi_w;
+    assign flash_spi_cs_n_o = boot_done ? weight_spi_cs_n_w : boot_spi_cs_n_w;
+
+    // Compatibility/debug views for older benches that model boot and weight
+    // flash as separate devices.
+    assign boot_spi_clk_o     = boot_spi_clk_w;
+    assign boot_spi_mosi_o    = boot_spi_mosi_w;
+    assign boot_spi_cs_n_o    = boot_spi_cs_n_w;
+    assign weight_spi_clk_o   = weight_spi_clk_w;
+    assign weight_spi_mosi_o  = weight_spi_mosi_w;
+    assign weight_spi_cs_n_o  = weight_spi_cs_n_w;
+
+    // CPU SPI master not instantiated; keep pins idle.
+    assign spi_clk_o  = 1'b0;
+    assign spi_mosi_o = 1'b0;
+    assign spi_cs_n_o = 1'b1;
 endmodule

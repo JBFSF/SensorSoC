@@ -33,9 +33,6 @@ module sim_top_ml_golden_env;
   logic test_force_wake = 1'b0;
   logic [2:0] test_irq_src = 3'b000;
 
-  logic host_scl_drv = 1'b1;
-  logic host_sda_drv_low = 1'b0;
-
   wire        sim_req;
   wire [6:0]  sim_addr;
   wire [7:0]  sim_reg;
@@ -68,8 +65,6 @@ module sim_top_ml_golden_env;
   wire        boot_spi_mosi;
   wire        boot_spi_miso;
   wire        boot_spi_cs_n;
-  wire        host_i2c_scl;
-  tri1        host_i2c_sda;
 
   wire                      feat_valid;
   wire signed [15:0]        time_feat;
@@ -93,7 +88,6 @@ module sim_top_ml_golden_env;
   wire [31:0]               pico_mem_wdata;
   wire [31:0]               pico_irq;
   wire                      pico_sleeping;
-  wire                      host_i2c_irq_event;
   wire                      ml_irq;
   wire                      timer_event;
   wire signed [15:0]        logit0;
@@ -115,9 +109,6 @@ module sim_top_ml_golden_env;
                       (sim_addr == PPG_ADDR) ? ppg_sim_rlast    : 1'b0;
   assign sim_err    = (sim_addr == ACC_ADDR) ? accel_sim_err    :
                       (sim_addr == PPG_ADDR) ? ppg_sim_err      : 1'b1;
-
-  assign host_i2c_scl = host_scl_drv;
-  assign host_i2c_sda = host_sda_drv_low ? 1'b0 : 1'bz;
 
   top #(
     .MEM_WORDS(8192),
@@ -146,9 +137,9 @@ module sim_top_ml_golden_env;
   ) u_dut (
     .clk_i(clk),
     .reset_i(reset),
-    .i2c_scl_i(host_i2c_scl),
-    .i2c_sda_io(host_i2c_sda),
-    .i2c_sda_i(host_i2c_sda),
+    .i2c_scl_o(),
+    .i2c_sda_io(),
+    .i2c_sda_i(1'b1),
     .i2c_sda_drive_low_o(),
     .sim_req_o(sim_req),
     .sim_addr_o(sim_addr),
@@ -168,10 +159,6 @@ module sim_top_ml_golden_env;
     .mssd_feat_o(mssd_feat),
     .ml_update_gate_o(ml_update_gate),
     .invalid_reason_o(invalid_reason),
-    .spi_clk_o(spi_clk),
-    .spi_mosi_o(spi_mosi),
-    .spi_miso_i(spi_miso),
-    .spi_cs_n_o(spi_cs_n),
     .boot_spi_clk_o(boot_spi_clk),
     .boot_spi_mosi_o(boot_spi_mosi),
     .boot_spi_miso_i(boot_spi_miso),
@@ -197,7 +184,6 @@ module sim_top_ml_golden_env;
     .pico_mem_wdata_o(pico_mem_wdata),
     .pico_irq_o(pico_irq),
     .pico_sleeping_o(pico_sleeping),
-    .host_i2c_irq_event_o(host_i2c_irq_event),
     .ml_irq_o(ml_irq),
     .timer_event_o(timer_event)
   );
