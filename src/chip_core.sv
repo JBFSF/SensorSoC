@@ -3,6 +3,8 @@
 
     // Current pinout:
     // input_in[4:0] : test mode selector
+    // input_in[10]  : clear sticky feature-valid status when SENSOR_SIM_PAD_BRIDGE is defined
+    // input_in[11]  : sensor sim-bus pad bridge enable when SENSOR_SIM_PAD_BRIDGE is defined
     // bidir[0]      : alarm output
     // bidir[1]      : SPI flash clock output
     // bidir[2]      : SPI flash MOSI output
@@ -16,6 +18,24 @@
     // bidir[37]     : force Pico IRQ input, only used by test modes = 01010 / 11010
     // bidir[38]     : force wake source input, only used by test modes = 01011 / 11011
     // bidir[39]     : external test clock, used by the 1xxxx test-mode bank
+    //
+    // SENSOR_SIM_PAD_BRIDGE mode, enabled by input_in[11], repurposes bidir pads:
+    // bidir[7:0]    : sim_wdata from chip on writes, sim_rdata from TB on reads
+    // bidir[8]      : sim_req output from chip
+    // bidir[9]      : sim_write output from chip
+    // bidir[16:10]  : sim_addr output from chip
+    // bidir[24:17]  : sim_reg output from chip
+    // bidir[32:25]  : sim_len output from chip
+    // bidir[33]     : sim_ack input to chip
+    // bidir[34]     : sim_rvalid input to chip
+    // bidir[35]     : sim_rlast input to chip
+    // bidir[36]     : sim_err input to chip
+    //
+    // When SENSOR_SIM_PAD_BRIDGE is defined and input_in[11] is low:
+    // bidir[33]     : sticky feature-valid-seen status, cleared by input_in[10]
+    // bidir[34]     : live feat_valid pulse
+    // bidir[35]     : live epoch_end pulse
+    // bidir[36]     : live ml_update_gate status
     //
     // Test mode map:
     //   00000 : normal mode, PLL clock, debug bus disabled
@@ -39,6 +59,13 @@
 
 `default_nettype none
 
+`ifdef SIM
+`define CHIP_CORE_HAS_SENSOR_SIM_BUS
+`endif
+`ifdef SENSOR_SIM_PAD_BRIDGE
+`define CHIP_CORE_HAS_SENSOR_SIM_BUS
+`endif
+
 module chip_core #(
     parameter NUM_INPUT_PADS = 12,
     parameter NUM_BIDIR_PADS = 40,
@@ -49,21 +76,61 @@ module chip_core #(
     parameter CLK_HZ = 10_000_000,
     parameter GT_CLK_HZ = 10_000_000,
     parameter GT_EPOCH_HZ = 100,
-    parameter GT_EPOCH_COUNT_MAX = 1000,
-    parameter ACC_POLL_PERIOD_TICKS = 50_000,
-    parameter PPG_POLL_PERIOD_TICKS = 100,
+    parameter GT_EPOCH_COUNT_MAX =
+    `ifdef SENSOR_SIM_PAD_BRIDGE
+        300,
+    `else
+        1000,
+    `endif
+    parameter ACC_POLL_PERIOD_TICKS =
+    `ifdef SENSOR_SIM_PAD_BRIDGE
+        8,
+    `else
+        50_000,
+    `endif
+    parameter PPG_POLL_PERIOD_TICKS =
+    `ifdef SENSOR_SIM_PAD_BRIDGE
+        2,
+    `else
+        100,
+    `endif
     parameter PPG_WATERMARK = 8,
     parameter PPG_MAX_BURST_SAMPLES = 32,
     parameter CFG_REFRACT_MS = 32'd250,
     parameter CFG_RR_MIN_MS = 32'd300,
     parameter CFG_RR_MAX_MS = 32'd2000,
-    parameter CFG_Q_MIN_ACCEPT = 8'd10,
-    parameter CFG_BEAT_Q_MIN = 8'd16,
-    parameter CFG_MIN_VALID_FRAC = 8'd96,
+    parameter CFG_Q_MIN_ACCEPT =
+    `ifdef SENSOR_SIM_PAD_BRIDGE
+        8'd0,
+    `else
+        8'd10,
+    `endif
+    parameter CFG_BEAT_Q_MIN =
+    `ifdef SENSOR_SIM_PAD_BRIDGE
+        8'd0,
+    `else
+        8'd16,
+    `endif
+    parameter CFG_MIN_VALID_FRAC =
+    `ifdef SENSOR_SIM_PAD_BRIDGE
+        8'd0,
+    `else
+        8'd96,
+    `endif
     parameter CFG_MAX_DOUBLE = 8'd4,
     parameter CFG_MAX_MISSED = 8'd3,
-    parameter CFG_MOTION_HI_TH = 16'd2000,
-    parameter CFG_MAX_MOTION_HI = 16'd3,
+    parameter CFG_MOTION_HI_TH =
+    `ifdef SENSOR_SIM_PAD_BRIDGE
+        16'hFFFF,
+    `else
+        16'd2000,
+    `endif
+    parameter CFG_MAX_MOTION_HI =
+    `ifdef SENSOR_SIM_PAD_BRIDGE
+        16'hFFFF,
+    `else
+        16'd3,
+    `endif
     parameter MSSD_MIN_RR_COUNT = 1
 )(
     `ifdef USE_POWER_PINS
@@ -118,6 +185,26 @@ module chip_core #(
     localparam int TEST_FORCE_IRQ_PAD  = 37;
     localparam int TEST_FORCE_WAKE_PAD = 38;
     localparam int TEST_CLK_PAD        = 39;
+    localparam int SENSOR_STATUS_CLEAR_PAD = 10;
+    localparam int SENSOR_BRIDGE_EN_PAD = 11;
+    localparam int SENSOR_DATA_LO      = 0;
+    localparam int SENSOR_DATA_HI      = 7;
+    localparam int SENSOR_REQ_PAD      = 8;
+    localparam int SENSOR_WRITE_PAD    = 9;
+    localparam int SENSOR_ADDR_LO      = 10;
+    localparam int SENSOR_ADDR_HI      = 16;
+    localparam int SENSOR_REG_LO       = 17;
+    localparam int SENSOR_REG_HI       = 24;
+    localparam int SENSOR_LEN_LO       = 25;
+    localparam int SENSOR_LEN_HI       = 32;
+    localparam int SENSOR_ACK_PAD      = 33;
+    localparam int SENSOR_RVALID_PAD   = 34;
+    localparam int SENSOR_RLAST_PAD    = 35;
+    localparam int SENSOR_ERR_PAD      = 36;
+    localparam int SENSOR_STATUS_FEAT_SEEN_PAD = 33;
+    localparam int SENSOR_STATUS_FEAT_VALID_PAD = 34;
+    localparam int SENSOR_STATUS_EPOCH_END_PAD = 35;
+    localparam int SENSOR_STATUS_ML_GATE_PAD = 36;
 
     logic [4:0] test_mode_w;
     logic       core_clk_w;
@@ -207,6 +294,18 @@ module chip_core #(
     assign test_mode_w = input_in[4:0];
     assign test_force_irq_w = bidir_in[TEST_FORCE_IRQ_PAD];
     assign test_force_wake_w = bidir_in[TEST_FORCE_WAKE_PAD];
+    `ifdef SENSOR_SIM_PAD_BRIDGE
+        assign sensor_bridge_en_w = input_in[SENSOR_BRIDGE_EN_PAD];
+        assign sensor_status_clear_w = input_in[SENSOR_STATUS_CLEAR_PAD];
+    `else
+        assign sensor_bridge_en_w = 1'b0;
+        assign sensor_status_clear_w = 1'b0;
+    `endif
+    assign sensor_sim_ack_w = sensor_bridge_en_w ? bidir_in[SENSOR_ACK_PAD] : sim_ack_i;
+    assign sensor_sim_rdata_w = sensor_bridge_en_w ? bidir_in[SENSOR_DATA_HI:SENSOR_DATA_LO] : sim_rdata_i;
+    assign sensor_sim_rvalid_w = sensor_bridge_en_w ? bidir_in[SENSOR_RVALID_PAD] : sim_rvalid_i;
+    assign sensor_sim_rlast_w = sensor_bridge_en_w ? bidir_in[SENSOR_RLAST_PAD] : sim_rlast_i;
+    assign sensor_sim_err_w = sensor_bridge_en_w ? bidir_in[SENSOR_ERR_PAD] : sim_err_i;
 
     // Upper-half test modes run from the external test clock.
     assign core_clk_w = test_mode_w[4] ? bidir_in[TEST_CLK_PAD] : clk;
@@ -215,6 +314,20 @@ module chip_core #(
     assign motion_feat_w = (DEBUG_STIM_EN && debug_stim_override_en_i) ? $signed(debug_stim_motion_i) : motion_feat_top_w;
     assign delta_hr_feat_w = (DEBUG_STIM_EN && debug_stim_override_en_i) ? $signed(debug_stim_delta_hr_i) : delta_hr_feat_top_w;
     assign mssd_feat_w = (DEBUG_STIM_EN && debug_stim_override_en_i) ? $signed(debug_stim_mssd_i) : mssd_feat_top_w;
+
+    `ifdef SENSOR_SIM_PAD_BRIDGE
+        always_ff @(posedge core_clk_w or negedge rst_n) begin
+            if (!rst_n) begin
+                sensor_feature_valid_seen_q <= 1'b0;
+            end else if (sensor_status_clear_w) begin
+                sensor_feature_valid_seen_q <= 1'b0;
+            end else if (feat_valid_w) begin
+                sensor_feature_valid_seen_q <= 1'b1;
+            end
+        end
+    `else
+        assign sensor_feature_valid_seen_q = 1'b0;
+    `endif
 
     always_comb begin
         debug_bus_w = '0;
@@ -472,11 +585,11 @@ module chip_core #(
             .sim_len_o    (sim_len_w),
             .sim_write_o  (sim_write_w),
             .sim_wdata_o  (sim_wdata_w),
-            .sim_ack_i    (sim_ack_i),
-            .sim_rdata_i  (sim_rdata_i),
-            .sim_rvalid_i (sim_rvalid_i),
-            .sim_rlast_i  (sim_rlast_i),
-            .sim_err_i    (sim_err_i),
+            .sim_ack_i    (sensor_sim_ack_w),
+            .sim_rdata_i  (sensor_sim_rdata_w),
+            .sim_rvalid_i (sensor_sim_rvalid_w),
+            .sim_rlast_i  (sensor_sim_rlast_w),
+            .sim_err_i    (sensor_sim_err_w),
         `endif
         .feat_valid_o          (feat_valid_w),
         .time_feat_o           (time_feat_top_w),
