@@ -18,7 +18,7 @@ localparam [31:0] FEAT_MOTION  = FEATURE_BASE + 32'h08;
 localparam [31:0] FEAT_DHR     = FEATURE_BASE + 32'h0C;
 localparam [31:0] FEAT_MSSD   = FEATURE_BASE + 32'h10;
 
-localparam int unsigned FLASH_WORDS = 1232;
+localparam int unsigned FLASH_WORDS = 1280; // 1024 firmware + 256 weight slots (taketwo reads up to word 227, needing flash index 1251)
 localparam int unsigned TB_TIMEOUT_CYCLES = 10_000_000;
 localparam int unsigned TB_PROGRESS_EVERY = 10_000;
 // The top-level SPI pins are shared. spi_boot_ctrl owns them until firmware
@@ -481,7 +481,7 @@ initial begin
         end
 
         if (dut.test_status == 32'hCAFE_BABE) begin
-            sampled_logit_word = {logit1[15:0], logit0[15:0]};
+            sampled_logit_word = dut.u_weight_ram.logit_reg_0;
             raw_logit_word = sampled_logit_word;
             log0_s = $signed(sampled_logit_word[15:0]);
             log1_s = $signed(sampled_logit_word[31:16]);
@@ -564,7 +564,7 @@ initial begin
                 $display("FAIL: no AXI write activity from taketwo");
                 failures = failures + 1;
             end
-            if ({logit1[15:0], logit0[15:0]} === 32'hA5A55A5A) begin
+            if (sampled_logit_word === 32'hA5A55A5A) begin
                 $display("FAIL: visible logit outputs kept sentinel value");
                 failures = failures + 1;
             end
