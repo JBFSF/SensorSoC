@@ -62,7 +62,16 @@ module chip_core #(
     parameter CFG_RR_MAX_MS = 32'd2000,
     parameter CFG_MAX_DOUBLE = 8'd4,
     parameter CFG_MAX_MISSED = 8'd3,
-    parameter MSSD_MIN_RR_COUNT = 1
+    parameter MSSD_MIN_RR_COUNT = 1,
+
+    parameter integer GT_EPOCH_COUNT_MAX = 1000,
+    parameter integer ACC_POLL_PERIOD_TICKS = 50_000,
+    parameter integer PPG_POLL_PERIOD_TICKS = 100,
+    parameter CFG_BEAT_Q_MIN = 8'd16,
+    parameter CFG_MIN_VALID_FRAC = 8'd96,
+    parameter CFG_MOTION_HI_TH = 16'd2000,
+    parameter CFG_MAX_MOTION_HI = 16'd3,
+    parameter CFG_Q_MIN_ACCEPT = 8'd10
 )(
     `ifdef USE_POWER_PINS
     inout  wire VDD,
