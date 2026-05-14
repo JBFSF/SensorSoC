@@ -460,7 +460,6 @@ module top #(
     wire        feat_wr  = feat_sel && (mem_wstrb != 4'b0000);
 
     wire [31:0] irq_sources;
-    wire [31:0] wake_sources;
 
     always_ff @(posedge clk_i) begin
         if (reset_i) begin
@@ -1081,7 +1080,6 @@ module top #(
     assign irq_sources = {28'b0, test_force_wake_i, test_irq_src_i[2],
         ml_irq             | test_irq_src_i[1],
         timer_event        | test_irq_src_i[0]};
-    assign wake_sources = irq_sources;
     assign pico_irq = irq | {31'b0, test_force_irq_i};
 
     // Minimal interrupt controller used for CPU-visible pending bits and wake.
@@ -1112,7 +1110,7 @@ module top #(
         .mem_ready  (pwr_ready),
         .mem_rdata  (pwr_rdata),
         .sleep_req_o(sleep_req),
-        .wake_src_i (wake_sources),
+        .wake_src_i ({31'b0, irqc_wake_req}),
         .cpu_awake_i(cpu_clk_en_lat)
     );
 
@@ -1175,18 +1173,21 @@ module top #(
         .boot_done_i(boot_done),
 
         // CPU sleep/wake inputs
-        .wake_sources_i(wake_sources),
         .sleep_req_i(sleep_req),     // CPU requests sleep (from pwrctrl MMIO)
         .mem_valid_i(mem_valid),     // CPU memory-access valid (for idle detection)
         .irqc_wake_req_i(irqc_wake_req), // interrupt controller forces wake
+        .cpu_alarm_i(cpu_alarm_w),       // alarm is active from MMIO
 
         .watchdog_o(watchdog_w),
         .feat_en_o(feat_en),
         .ml_en_o(ml_en),
         .cpu_en_o(cpu_clk_en),
         .sleeping_o(sleeping_r),
-        .init_o(init_done)
+        .init_o(init_done),
+        alarm_o(alarm_o)
     );
+
+    wire cpu_alarm_w;
 
     alarm_mmio #(.BASE_ADDR(ALARM_BASE)) u_alarm_mmio (
         .clk(clk_i),
@@ -1200,7 +1201,7 @@ module top #(
         .mem_ready(alarm_ready),
         .mem_rdata(alarm_rdata),
 
-        .alarm_o(alarm_o)
+        .alarm_o(cpu_alarm_w)
     );
     
     logic cpu_clk_en_lat_dbg;

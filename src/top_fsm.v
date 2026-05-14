@@ -1,10 +1,11 @@
 /* TOP FSM that controls sleep for different sections, controllable via outside debug
     NORMAL operation:
     1. IDLE,      wait for reset to be released
-    2. SLEEP,     cpu/feat/ml all off, wake on irqc_wake_req or any wake_sources rising edge
+    2. SLEEP,     cpu/feat/ml all off, wake on interrupt controller request
     3. FEAT_ONLY, feat enabled, waits for first feature vector to be ready
     4. ALL,       feat + ML + CPU all on; waits for ML inference to complete
     5. CPU_FEAT,  feat + CPU on, goes back to just feats on when CPU is done
+    6. ALARM,     alarm is active, wait for user acknowledgment
 */
 module top_fsm
 (
@@ -19,17 +20,18 @@ module top_fsm
     input         ml_irq_i,        // ML inference complete (ALL -> CPU_FEAT)
 
     // CPU sleep/wake inputs
-    input  [31:0] wake_sources_i,  // this includes watchdog
     input         sleep_req_i,     // CPU requests sleep (from pwrctrl MMIO)
     input         mem_valid_i,     // CPU memory-access valid (for idle detection)
     input         irqc_wake_req_i, // interrupt controller forces wake
+    input         cpu_alarm_i,         // if the cpu says the alarm should be on
 
     output        watchdog_o,      // enable the watchdog after we've started
     output        feat_en_o,
     output        ml_en_o,
     output        cpu_en_o,
     output        sleeping_o,
-    output        init_o          // if the cpu initalization was done
+    output        init_o,          // if the cpu initalization was done
+    output        alarm_o
 );
 
     localparam BOOT      = 3'd0;
@@ -40,13 +42,9 @@ module top_fsm
     localparam CPU_FEAT  = 3'd5;
     localparam FEAT_ML   = 3'd6;
     localparam CPU_ONLY  = 3'd7;
+    localparam ALARM     = 3'd8;
 
-    reg [2:0] state_d, state_q, state_debug_q;
-
-    // Rising-edge detection on wake sources
-    reg  [31:0] wake_sources_d_r;
-    wire [31:0] wake_rise_w  = wake_sources_i & ~wake_sources_d_r;
-    wire        wake_event_w = |wake_rise_w;
+    reg [3:0] state_d, state_q, state_debug_q;
 
     // Rising-edge detection on sleep request
     reg  sleep_req_d_r;
@@ -57,7 +55,7 @@ module top_fsm
     reg  cpu_clk_en_r;
 
     // Safe to sleep: CPU asked, was seen idle, and no wake event racing in
-    wire can_sleep_w = sleep_req_i && cpu_idle_seen_r && !(irqc_wake_req_i || wake_event_w);
+    wire can_sleep_w = sleep_req_i && cpu_idle_seen_r && !irqc_wake_req_i;
 
     always @(posedge clk_i) begin
         if (!resetn_i)
@@ -72,10 +70,14 @@ module top_fsm
         case (state_q)
             BOOT:     if (boot_done_i) state_d = IDLE;
             IDLE:     if (start_i) state_d = SLEEP;
-            SLEEP:    if (irqc_wake_req_i || wake_event_w) state_d = FEAT_ONLY;
+            SLEEP:    if (irqc_wake_req_i) state_d = FEAT_ONLY;
             FEAT_ONLY:if (feat_valid_i)                    state_d = ALL;
             ALL:      if (ml_irq_i)                        state_d = CPU_FEAT;
-            CPU_FEAT: if (can_sleep_w)                     state_d = FEAT_ONLY;
+            CPU_FEAT: begin
+                if (cpu_alarm_i)                               state_d = ALARM;
+                else if (can_sleep_w)                      state_d = FEAT_ONLY;
+            end
+            ALARM:    if (start_i)                          state_d = SLEEP;
         endcase
 
         case (test_mode_i)
@@ -96,15 +98,14 @@ module top_fsm
     assign sleeping_o = (state_q == SLEEP);
     assign watchdog_o = (state_q == FEAT_ONLY) || (state_q == ALL) || (state_q == CPU_FEAT) || (state_q == FEAT_ML) || (state_q == SLEEP);
     assign init_o     = (state_q != BOOT); 
+    assign alarm_o    = (state_q == ALARM);
 
     always @(posedge clk_i) begin
         if (!resetn_i) begin
-            wake_sources_d_r <= 32'h0;
             sleep_req_d_r    <= 1'b0;
             cpu_clk_en_r     <= 1'b0;
             cpu_idle_seen_r  <= 1'b0;
         end else begin
-            wake_sources_d_r <= wake_sources_i;
             sleep_req_d_r    <= sleep_req_i;
 
             // Idle tracking: reset on new sleep req, accumulate when CPU active but bus idle

@@ -13,6 +13,7 @@ ALL       = 4
 CPU_FEAT  = 5
 FEAT_ML   = 6
 CPU_ONLY  = 7
+ALARM     = 8
 
 
 async def reset_dut(dut, cycles=5):
@@ -23,10 +24,10 @@ async def reset_dut(dut, cycles=5):
     dut.boot_done_i.value     = 0
     dut.feat_valid_i.value    = 0
     dut.ml_irq_i.value        = 0
-    dut.wake_sources_i.value  = 0
     dut.sleep_req_i.value     = 0
     dut.mem_valid_i.value     = 0
     dut.irqc_wake_req_i.value = 0
+    dut.cpu_alarm_i.value     = 0
     dut.test_mode_i.value     = 0
     await ClockCycles(dut.clk_i, cycles)
     await FallingEdge(dut.clk_i)
@@ -105,10 +106,10 @@ async def test_random_reset(dut): #Test for weird behavior on resets
     dut.boot_done_i.value     = 1  # asserted during reset, must not affect FSM
     dut.feat_valid_i.value    = 1
     dut.ml_irq_i.value        = 1
-    dut.wake_sources_i.value  = 0xF0EF_9FDF # arbitrary garbage input to wake sources
     dut.sleep_req_i.value     = 1
     dut.mem_valid_i.value     = 1
     dut.irqc_wake_req_i.value = 1
+    dut.cpu_alarm_i.value     = 1
     dut.test_mode_i.value     = 0
     await ClockCycles(dut.clk_i, 5)
     await FallingEdge(dut.clk_i)
@@ -121,6 +122,7 @@ async def test_random_reset(dut): #Test for weird behavior on resets
     dut.sleep_req_i.value     = 0
     dut.mem_valid_i.value     = 0
     dut.irqc_wake_req_i.value = 0
+    dut.cpu_alarm_i.value     = 0
     await ClockCycles(dut.clk_i, 2)   # settle in BOOT (wake_sources_d_r catches up)
     dut.boot_done_i.value     = 1
     await ClockCycles(dut.clk_i, 1)   # BOOT -> IDLE
@@ -216,7 +218,32 @@ async def test_full_pipeline_cycle(dut):
     assert dut.sleeping_o.value == 0
     
 @cocotb.test()
-async def test_modes_test(dut):
+async def test_alarm_state(dut): #Test alarm state transitions
+    await reset_dut(dut)
+    await wake_to_feat_only(dut)
+    await advance_to_all(dut)
+    await advance_to_cpu_feat(dut)
+
+    # Set alarm active
+    dut.cpu_alarm_i.value = 1
+    await ClockCycles(dut.clk_i, 1)
+    
+    # Should transition to ALARM state
+    assert dut.alarm_o.value == 1, "alarm_o should be 1 in ALARM state"
+    assert dut.feat_en_o.value == 1, "feat_en_o should remain 1 in ALARM"
+    assert dut.ml_en_o.value == 0, "ml_en_o should be 0 in ALARM"
+    assert dut.cpu_en_o.value == 1, "cpu_en_o should remain 1 in ALARM"
+    assert dut.sleeping_o.value == 0, "should not be sleeping in ALARM"
+
+    # User acknowledges alarm (start_i pressed)
+    dut.start_i.value = 1
+    await ClockCycles(dut.clk_i, 1)
+    dut.start_i.value = 0
+    await ClockCycles(dut.clk_i, 1)
+    
+    # Should transition back to SLEEP
+    assert dut.alarm_o.value == 0, "alarm_o should be 0 after acknowledgment"
+    assert dut.sleeping_o.value == 1, "should be sleeping after alarm acknowledgment"
     await reset_dut(dut)
     
     for i in range(1,5): #Feats tests
