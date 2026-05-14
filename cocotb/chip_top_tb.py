@@ -23,6 +23,7 @@ test_module = os.getenv("COCOTB_TEST_MODULE", "chip_top_tb")
 
 
 hdl_toplevel = os.getenv("CHIP_TOPLEVEL", "chip_top_sim_wrap")
+chip_netlist_top = os.getenv("CHIP_NETLIST_TOP", "chip_top")
 
 
 _PROJ = Path(__file__).resolve().parent
@@ -298,15 +299,37 @@ def chip_top_runner():
     proj_path = Path(__file__).resolve().parent
 
     sources = []
-    # Compile with SIM define so the sim bus and sensor models are active.
+    # RTL builds use the SIM-only sensor bus; GL builds below intentionally do not.
     defines = {f"SLOT_{slot.upper().replace('.', 'P')}": True, "SIM": True}
     includes = [proj_path / "../src/"]
 
     if gl:
-        sources.append(Path(pdk_root) / pdk / "libs.ref" / scl / "verilog" / f"{scl}.v")
-        sources.append(Path(pdk_root) / pdk / "libs.ref" / scl / "verilog" / "primitives.v")
-        sources.append(proj_path / f"../final/pnl/{hdl_toplevel}.pnl.v")
-        defines = {"FUNCTIONAL": True, "USE_POWER_PINS": True}
+        final_dir = Path(os.getenv("FINAL_DIR", proj_path / "../final")).resolve()
+        netlist = final_dir / "pnl" / f"{chip_netlist_top}.pnl.v"
+        if not netlist.exists():
+            raise FileNotFoundError(
+                f"gate-level netlist not found: {netlist}. "
+                "Set FINAL_DIR=<run>/final or CHIP_NETLIST_TOP if the netlist top is not chip_top."
+            )
+
+        sources += [
+            Path(pdk_root) / pdk / "libs.ref" / scl / "verilog" / f"{scl}.v",
+            Path(pdk_root) / pdk / "libs.ref" / scl / "verilog" / "primitives.v",
+            Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_fd_io.v",
+            Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_ws_io.v",
+            Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_ip_sram/verilog/gf180mcu_fd_ip_sram__sram512x8m8wm1.v",
+            proj_path / "../ip/gf180mcu_ws_ip__id/vh/gf180mcu_ws_ip__id.v",
+            proj_path / "../ip/gf180mcu_ws_ip__logo/vh/gf180mcu_ws_ip__logo.v",
+            netlist,
+        ]
+
+        if hdl_toplevel != chip_netlist_top:
+            wrapper = proj_path / "sim/tb" / f"{hdl_toplevel}.sv"
+            if not wrapper.exists():
+                raise FileNotFoundError(f"gate-level wrapper not found: {wrapper}")
+            sources.append(wrapper)
+
+        defines = {"FUNCTIONAL": True, "functional": True, "USE_POWER_PINS": True}
     else:
         src_dir = proj_path / "../src"
         pad_level = hdl_toplevel in {"chip_top", "chip_top_sim_wrap"}

@@ -17,12 +17,6 @@
     // bidir[38]     : force wake source input, only used by test modes = 01011 / 11011
     // bidir[39]     : external test clock, used by the 1xxxx test-mode bank
     //
-    // When SENSOR_SIM_PAD_BRIDGE is defined and input_in[11] is low:
-    // bidir[33]     : sticky feature-valid-seen status, cleared by input_in[10]
-    // bidir[34]     : live feat_valid pulse
-    // bidir[35]     : live epoch_end pulse
-    // bidir[36]     : live ml_update_gate status
-    //
     // Test mode map:
     //   00000 : normal mode, PLL clock, debug bus disabled
     //   00001 : MSSD feature
