@@ -1156,6 +1156,14 @@ test-top-unified-prod-loop: $(TOP_UNIFIED_ENV_VVP)
 	export COCOTB_TEST_FILTER=test_repeated_production_loop_smoke; \
 	$(call RUN_COCOTB_ICARUS,$(TOP_UNIFIED_ENV_VVP))
 
+.PHONY: test-top-unified-prod-alarm
+test-top-unified-prod-alarm: $(TOP_UNIFIED_ENV_VVP)
+	@echo "[COCOTB] Running production alarm-policy check on $(TOP_UNIFIED_ENV_TOP)"
+	@export COCOTB_TOPLEVEL=$(TOP_UNIFIED_ENV_TOP); \
+	export COCOTB_TEST_MODULES=$(TOP_UNIFIED_RUNTIME_PYMOD); \
+	export COCOTB_TEST_FILTER=test_prod_main_alarm_after_five_light_sleep_predictions; \
+	$(call RUN_COCOTB_ICARUS,$(TOP_UNIFIED_ENV_VVP))
+
 .PHONY: test-top-unified-forced-wake-irq
 test-top-unified-forced-wake-irq: $(TOP_UNIFIED_ENV_VVP)
 	@echo "[COCOTB] Running forced wake/IRQ corner check on $(TOP_UNIFIED_ENV_TOP)"
@@ -1165,7 +1173,7 @@ test-top-unified-forced-wake-irq: $(TOP_UNIFIED_ENV_VVP)
 	$(call RUN_COCOTB_ICARUS,$(TOP_UNIFIED_ENV_VVP))
 
 .PHONY: test-top-unified-runtime
-test-top-unified-runtime: test-top-unified-prod-loop test-top-unified-forced-wake-irq
+test-top-unified-runtime: test-top-unified-prod-loop test-top-unified-prod-alarm test-top-unified-forced-wake-irq
 	@true
 
 # ============================================================
