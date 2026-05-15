@@ -239,7 +239,6 @@ module sim_top_unified_env;
     .test_irq_src_i(test_irq_src),
     .irq_eoi_o(irq_eoi),
     .boot_done_o(boot_done),
-    .weight_boot_done_o(weight_boot_done),
     .pico_trap_o(pico_trap),
     .pico_cpu_clk_en_o(pico_cpu_clk_en),
     .pico_mem_valid_o(pico_mem_valid),
@@ -253,6 +252,10 @@ module sim_top_unified_env;
     .ml_irq_o(ml_irq),
     .timer_event_o(timer_event)
   );
+
+  // Current top.sv has no separate weight preload completion: weight_flash_axi
+  // takes the flash path after instruction boot and serves weights on demand.
+  assign weight_boot_done = boot_done;
 
   // Accelerometer model backing the top.sv simulated I2C path.
   i2c_slave_lis2dw12 #(

@@ -34,15 +34,15 @@ module top_fsm
     output        alarm_o
 );
 
-    localparam BOOT      = 3'd0;
-    localparam IDLE      = 3'd1;
-    localparam SLEEP     = 3'd2;
-    localparam FEAT_ONLY = 3'd3;
-    localparam ALL       = 3'd4;
-    localparam CPU_FEAT  = 3'd5;
-    localparam FEAT_ML   = 3'd6;
-    localparam CPU_ONLY  = 3'd7;
-    localparam ALARM     = 3'd8;
+    localparam BOOT      = 4'd0;
+    localparam IDLE      = 4'd1;
+    localparam SLEEP     = 4'd2;
+    localparam FEAT_ONLY = 4'd3;
+    localparam ALL       = 4'd4;
+    localparam CPU_FEAT  = 4'd5;
+    localparam FEAT_ML   = 4'd6;
+    localparam CPU_ONLY  = 4'd7;
+    localparam ALARM     = 4'd8;
 
     reg [3:0] state_d, state_q, state_debug_q;
 

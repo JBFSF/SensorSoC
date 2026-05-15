@@ -1184,7 +1184,7 @@ module top #(
         .cpu_en_o(cpu_clk_en),
         .sleeping_o(sleeping_r),
         .init_o(init_done),
-        alarm_o(alarm_o)
+        .alarm_o(alarm_o)
     );
 
     wire cpu_alarm_w;
