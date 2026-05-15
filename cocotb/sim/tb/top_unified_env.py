@@ -75,17 +75,24 @@ async def apply_reset(dut, cycles: int = 20) -> None:
     dut.reset.value = 1
     dut.test_force_irq.value = 0
     dut.test_force_wake.value = 0
+    dut.test_irq_src.value = 0
     await ClockCycles(dut.clk, cycles)
     dut.reset.value = 0
     await ClockCycles(dut.clk, 2)
 
 
 async def pulse_forced_wake(dut, cycles: int = 2) -> None:
-    """Inject a short wake pulse through the shared wrapper's test hook."""
+    """Inject a short wake pulse through a wake-enabled test source.
+
+    ``test_force_wake`` maps to IRQ bit 3, while the IRQ controller reset
+    enables wake on bits 0..2. For runtime boot helpers, pulse
+    ``test_irq_src[0]`` so the FSM sees a real ``irqc_wake_req`` and leaves
+    sleep without requiring firmware to reprogram wake_en first.
+    """
     await NextTimeStep()
-    dut.test_force_wake.value = 1
+    dut.test_irq_src.value = 0b001
     await ClockCycles(dut.clk, cycles)
-    dut.test_force_wake.value = 0
+    dut.test_irq_src.value = 0
     await ClockCycles(dut.clk, 2)
 
 
