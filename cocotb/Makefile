@@ -293,6 +293,9 @@ FW_ARCH := $(if $(FW_ARCH_$(FW_VARIANT)),$(FW_ARCH_$(FW_VARIANT)),$(FW_ARCH_DEFA
 FW_OPT_DEFAULT := -O2
 FW_OPT_test_ml_cpu_wake_i2c := -O0
 FW_OPT := $(if $(FW_OPT_$(FW_VARIANT)),$(FW_OPT_$(FW_VARIANT)),$(FW_OPT_DEFAULT))
+PROD_MAIN_FAST_WAKE ?= 1
+FW_CPPFLAGS_prod_main := $(if $(filter 1,$(PROD_MAIN_FAST_WAKE)),-DPROD_MAIN_FAST_WAKE_WINDOW,)
+FW_CPPFLAGS := $(FW_CPPFLAGS_$(FW_VARIANT))
 
 # Per-variant output paths
 FW_OUTDIR := $(FW_DIR)/build/$(FW_VARIANT)
@@ -328,6 +331,7 @@ $(FW_HEX): $(THIS_MAKEFILE) $(FW_DIR)/start.S $(FW_LDSCRIPT) $(FW_SRC) $(BIN2HEX
 	$(RISCV_GCC) \
 	  -march=$(FW_ARCH) -mabi=ilp32 \
 	  -nostdlib -ffreestanding $(FW_OPT) \
+	  $(FW_CPPFLAGS) \
 	  -I$(FW_GEN_DIR) \
 	  -Wl,-T,$(FW_LDSCRIPT) \
 	  -o $(FW_ELF) \

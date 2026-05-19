@@ -67,14 +67,19 @@
  * Wake policy:
  *   - Start the observation clock from the first feature timestamp seen after
  *     firmware starts.
- *   - During the 7h..8h window, class 1 is treated as light sleep / wake OK.
+ *   - During the wake window, class 1 is treated as light sleep / wake OK.
  *   - Five consecutive class-1 results assert alarm_mmio bit 0.
+ *
+ * PROD_MAIN_FAST_WAKE_WINDOW is a temporary simulation acceleration hook for
+ * chip-top/top-level normal-mode runs. It keeps the production policy shape
+ * intact, but moves the wake window close to startup so sim does not need to
+ * run for hours of firmware time before the alarm path can be observed.
  */
-#ifdef SIM
-#define WAKE_WINDOW_START_SEC  0u
-#define WAKE_WINDOW_END_SEC    0xFFFFFFFFu
+#ifdef PROD_MAIN_FAST_WAKE_WINDOW
+#define WAKE_WINDOW_START_SEC  5u
+#define WAKE_WINDOW_END_SEC    15u
 #define LIGHT_SLEEP_CLASS      1u
-#define LIGHT_SLEEP_STREAK_REQ 1u
+#define LIGHT_SLEEP_STREAK_REQ 5u
 #else
 #define WAKE_WINDOW_START_SEC  (7u * 60u * 60u)
 #define WAKE_WINDOW_END_SEC    (8u * 60u * 60u)

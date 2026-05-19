@@ -44,7 +44,7 @@ WAKE_ENABLED_IRQ_BIT = 1 << 0
 TEST_FAIL = 0xDEADBEEF
 ML_START_ADDR = 0x03003010
 ALARM_CTRL_ADDR = 0x03000000
-WAKE_WINDOW_START_SEC = 7 * 60 * 60
+WAKE_WINDOW_START_SEC = 5
 LIGHT_SLEEP_STREAK_REQ = 5
 LIGHT_SLEEP_LOGIT_WORD = (100 << 16) | 0
 
@@ -259,7 +259,7 @@ async def test_prod_main_alarm_after_five_light_sleep_predictions(dut):
     TEST_CODE, write ALARM_CTRL, and cause the top-level alarm output to assert.
 
     The forced pieces are only stimulus/acceleration:
-      - feature latch values, including timestamps in the 7h..8h window
+      - feature latch values, including timestamps in the accelerated wake window
       - CPU-visible weight_flash_axi logits for class 1
       - short ML-complete IRQ pulses after each observed ML start
       - live CPU/ML enables so the test is not dominated by sleep cadence
