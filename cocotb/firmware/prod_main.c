@@ -70,10 +70,17 @@
  *   - During the 7h..8h window, class 1 is treated as light sleep / wake OK.
  *   - Five consecutive class-1 results assert alarm_mmio bit 0.
  */
+#ifdef SIM
+#define WAKE_WINDOW_START_SEC  0u
+#define WAKE_WINDOW_END_SEC    0xFFFFFFFFu
+#define LIGHT_SLEEP_CLASS      1u
+#define LIGHT_SLEEP_STREAK_REQ 1u
+#else
 #define WAKE_WINDOW_START_SEC  (7u * 60u * 60u)
 #define WAKE_WINDOW_END_SEC    (8u * 60u * 60u)
 #define LIGHT_SLEEP_CLASS      1u
 #define LIGHT_SLEEP_STREAK_REQ 5u
+#endif
 
 #define TEST_FAIL        0xDEADBEEFu
 

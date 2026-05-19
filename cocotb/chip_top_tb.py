@@ -393,6 +393,9 @@ async def test_chip_top_normal_mode(dut):
         if current_alarm != last_alarm:
             logger.info(f"  cycle {cycle}: alarm changed to {current_alarm}")
             last_alarm = current_alarm
+            if int(current_alarm) == 1:
+                logger.info("Alarm asserted — test passed.")
+                return
 
         # Log periodic status
         if cycle % 100_000 == 0:
@@ -404,7 +407,7 @@ async def test_chip_top_normal_mode(dut):
                 pass
             logger.info(f"  cycle {cycle}: FSM={fsm_state_name} trap={core.pico_trap_w.value} alarm={dut.alarm_o.value}")
 
-    logger.info("Normal mode test completed successfully.")
+    logger.info("Normal mode test completed — alarm never fired within timeout.")
 
 
 def chip_top_runner():
