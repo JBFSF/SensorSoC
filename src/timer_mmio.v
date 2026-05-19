@@ -98,7 +98,7 @@ module timer_mmio #(
             mem_rdata <= 32'h0;
             rdata_o   <= 32'h0;
 
-            read_data <= 32'h0;
+            read_data = 32'h0;
         end else begin
             // default
             mem_ready <= 1'b0;

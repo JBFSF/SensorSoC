@@ -58,7 +58,9 @@ module chip_top_sim_wrap #(
     assign alarm_o = bidir_PAD[0];
 
 
-    chip_top #(
+    chip_top
+    `ifndef FUNCTIONAL
+    #(
         .FIRMWARE_HEX           (""),   // spi_boot_ctrl loads firmware; simple_sram skips readmemh
         .WEIGHT_INIT_HEX        (""),   // weight_flash_axi streams from flash; no preload needed
         .CLK_HZ                 (1000),
@@ -69,24 +71,28 @@ module chip_top_sim_wrap #(
         .PPG_POLL_PERIOD_TICKS  (2),
         .PPG_WATERMARK          (8),
         .PPG_MAX_BURST_SAMPLES  (32)
-    ) u_chip_top (
+    )
+    `endif
+    u_chip_top (
         .clk_PAD    (clk_PAD),
         .rst_n_PAD  (rst_n_PAD),
         .input_PAD  (input_PAD),
         .bidir_PAD  (bidir_PAD),
-        .analog_PAD (analog_PAD),
-        // sim bus (only compiled when SIM is defined — matches chip_top ports)
-        .sim_req_o    (sim_req_o),
-        .sim_addr_o   (sim_addr_o),
-        .sim_reg_o    (sim_reg_o),
-        .sim_len_o    (sim_len_o),
-        .sim_write_o  (sim_write_o),
-        .sim_wdata_o  (sim_wdata_o),
-        .sim_ack_i    (sim_ack_i),
-        .sim_rdata_i  (sim_rdata_i),
-        .sim_rvalid_i (sim_rvalid_i),
-        .sim_rlast_i  (sim_rlast_i),
-        .sim_err_i    (sim_err_i)
+        .analog_PAD (analog_PAD)
+        // sim bus only exists when SIM is defined — not present in GL netlist
+        `ifdef SIM
+        ,.sim_req_o    (sim_req_o)
+        ,.sim_addr_o   (sim_addr_o)
+        ,.sim_reg_o    (sim_reg_o)
+        ,.sim_len_o    (sim_len_o)
+        ,.sim_write_o  (sim_write_o)
+        ,.sim_wdata_o  (sim_wdata_o)
+        ,.sim_ack_i    (sim_ack_i)
+        ,.sim_rdata_i  (sim_rdata_i)
+        ,.sim_rvalid_i (sim_rvalid_i)
+        ,.sim_rlast_i  (sim_rlast_i)
+        ,.sim_err_i    (sim_err_i)
+        `endif
     );
 
     spi_flash_model #(
@@ -173,7 +179,8 @@ module chip_top_sim_wrap #(
             $fatal(1, "chip_top_sim_wrap: no WEIGHT_HEX — pass +WEIGHT_HEX=<abs_path>");
         end
 
-        // taketwo SRAM zero-init
+        // taketwo SRAM zero-init — RTL paths only; GL netlist maps these to SRAM macros
+        `ifndef FUNCTIONAL
         for (k = 0; k < 512; k = k + 1) begin
             u_chip_top.i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id0_0.mem_top.mem[k] = 8'h00;
             u_chip_top.i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id0_0.mem_bot.mem[k] = 8'h00;
@@ -196,6 +203,7 @@ module chip_top_sim_wrap #(
             u_chip_top.i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_1.mem_top.mem[k] = 8'h00;
             u_chip_top.i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_1.mem_bot.mem[k] = 8'h00;
         end
+        `endif
     end
 
 endmodule

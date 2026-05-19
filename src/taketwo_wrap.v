@@ -54,6 +54,7 @@ module taketwo_wrap (
   output wire         maxi_rready,
 
   input  wire [31:0]  saxi_awaddr,
+  input  wire [3:0]   saxi_awcache,
   input  wire [2:0]   saxi_awprot,
   input  wire         saxi_awvalid,
   output wire         saxi_awready,
@@ -68,6 +69,7 @@ module taketwo_wrap (
   input  wire         saxi_bready,
 
   input  wire [31:0]  saxi_araddr,
+  input  wire [3:0]   saxi_arcache,
   input  wire [2:0]   saxi_arprot,
   input  wire         saxi_arvalid,
   output wire         saxi_arready,
@@ -147,6 +149,7 @@ module taketwo_wrap (
 
 
     .saxi_awaddr (saxi_awaddr),
+    .saxi_awcache(saxi_awcache),
     .saxi_awprot (saxi_awprot),
     .saxi_awvalid(saxi_awvalid),
     .saxi_awready(saxi_awready),
@@ -161,6 +164,7 @@ module taketwo_wrap (
     .saxi_bready (saxi_bready),
 
     .saxi_araddr (saxi_araddr),
+    .saxi_arcache(saxi_arcache),
     .saxi_arprot (saxi_arprot),
     .saxi_arvalid(saxi_arvalid),
     .saxi_arready(saxi_arready),

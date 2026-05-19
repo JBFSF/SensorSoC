@@ -13,7 +13,7 @@ module top #(
     parameter FEATURE_BASE = 32'h0300_4000,
     parameter IRQC_BASE    = 32'h0300_5000,
     parameter WEIGHT_BASE  = 32'h0300_6000,
-    parameter SPI_BASE     = 32'h0300_A000,
+
     parameter TEST_BASE    = 32'h0300_F000,
 
     parameter integer CLK_HZ = 10_000_000,
@@ -314,7 +314,7 @@ module top #(
     wire ml_sel;
     wire weight_sel;
     wire irqc_sel;
-    wire spi_sel;
+
     wire test_sel;
     wire alarm_sel;
     wire [31:0] weight_off_sel;
@@ -353,8 +353,7 @@ module top #(
 
     wire        irqc_ready;
     wire [31:0] irqc_rdata;
-    wire        spi_ready;
-    wire [31:0] spi_rdata;
+
     wire        irqc_wake_req;
 
     wire        test_ready;
@@ -364,6 +363,7 @@ module top #(
     wire [31:0] ml_score_hw;
 
     wire [31:0] ml_saxi_awaddr;
+    wire [3:0]  ml_saxi_awcache = 4'b0000;
     wire [2:0]  ml_saxi_awprot;
     wire        ml_saxi_awvalid;
     wire        ml_saxi_awready;
@@ -382,6 +382,24 @@ module top #(
     wire [1:0]  ml_saxi_rresp;
     wire        ml_saxi_rvalid;
     wire        ml_saxi_rready;
+
+    wire        pico_mem_la_read_w;
+    wire        pico_mem_la_write_w;
+    wire [31:0] pico_mem_la_addr_w;
+    wire [31:0] pico_mem_la_wdata_w;
+    wire [3:0]  pico_mem_la_wstrb_w;
+
+    wire        pico_pcpi_valid_w;
+    wire [31:0] pico_pcpi_insn_w;
+    wire [31:0] pico_pcpi_rs1_w;
+    wire [31:0] pico_pcpi_rs2_w;
+    wire        pico_pcpi_wr_w    = 1'b0;
+    wire [31:0] pico_pcpi_rd_w   = 32'b0;
+    wire        pico_pcpi_wait_w  = 1'b0;
+    wire        pico_pcpi_ready_w = 1'b0;
+
+    wire        pico_trace_valid_w;
+    wire [35:0] pico_trace_data_w;
 
     wire [0:0]  wram_awid;
     wire [31:0] wram_awaddr;
@@ -521,9 +539,24 @@ module top #(
         .mem_wdata (mem_wdata),
         .mem_wstrb (mem_wstrb),
         .mem_rdata (mem_rdata),
-        .irq       (pico_irq),
-        .eoi       (irq_eoi_o_wide),
-        .trap      (trap)
+        .mem_la_read  (pico_mem_la_read_w),
+        .mem_la_write (pico_mem_la_write_w),
+        .mem_la_addr  (pico_mem_la_addr_w),
+        .mem_la_wdata (pico_mem_la_wdata_w),
+        .mem_la_wstrb (pico_mem_la_wstrb_w),
+        .pcpi_valid  (pico_pcpi_valid_w),
+        .pcpi_insn   (pico_pcpi_insn_w),
+        .pcpi_rs1    (pico_pcpi_rs1_w),
+        .pcpi_rs2    (pico_pcpi_rs2_w),
+        .pcpi_wr     (pico_pcpi_wr_w),
+        .pcpi_rd     (pico_pcpi_rd_w),
+        .pcpi_wait   (pico_pcpi_wait_w),
+        .pcpi_ready  (pico_pcpi_ready_w),
+        .trace_valid (pico_trace_valid_w),
+        .trace_data  (pico_trace_data_w),
+        .irq         (pico_irq),
+        .eoi         (irq_eoi_o_wide),
+        .trap        (trap)
     );
 
     assign irq_eoi_o   = irq_eoi_o_wide[2:0];
@@ -539,7 +572,7 @@ module top #(
     assign ml_sel     = mmio_sel && (mem_addr[31:12] == ML_BASE[31:12]);
     assign weight_sel = mmio_sel && (weight_off_sel[31:14] == 18'h0);
     assign irqc_sel   = mmio_sel && (mem_addr[31:12] == IRQC_BASE[31:12]);
-    assign spi_sel    = mmio_sel && (mem_addr[31:12] == SPI_BASE[31:12]);
+
     assign test_sel   = mmio_sel && (mem_addr[31:12] == TEST_BASE[31:12]);
     assign alarm_sel  = mmio_sel && (mem_addr[31:12] == ALARM_BASE[31:12]); 
 
@@ -619,18 +652,17 @@ module top #(
         .sda_i  (sensor_sda_i_w),
         .sda_oe (sensor_sda_oe_w)
         `ifdef SIM
-            ,
-            .sim_req(sim_req_w),
-            .sim_addr(sim_addr_w),
-            .sim_reg(sim_reg_w),
-            .sim_len(sim_len_w),
-            .sim_write(sim_write_w),
-            .sim_wdata(sim_wdata_w),
-            .sim_ack(sim_ack_w),
-            .sim_rdata(sim_rdata_w),
-            .sim_rvalid(sim_rvalid_w),
-            .sim_rlast(sim_rlast_w),
-            .sim_err(sim_err_w)
+        ,.sim_req(sim_req_w)
+        ,.sim_addr(sim_addr_w)
+        ,.sim_reg(sim_reg_w)
+        ,.sim_len(sim_len_w)
+        ,.sim_write(sim_write_w)
+        ,.sim_wdata(sim_wdata_w)
+        ,.sim_ack(sim_ack_w)
+        ,.sim_rdata(sim_rdata_w)
+        ,.sim_rvalid(sim_rvalid_w)
+        ,.sim_rlast(sim_rlast_w)
+        ,.sim_err(sim_err_w)
         `endif
     );
 
@@ -971,6 +1003,7 @@ module top #(
         .maxi_rvalid (wram_rvalid),
         .maxi_rready (wram_rready),
         .saxi_awaddr (ml_saxi_awaddr),
+        .saxi_awcache(ml_saxi_awcache),
         .saxi_awprot (ml_saxi_awprot),
         .saxi_awvalid(ml_saxi_awvalid),
         .saxi_awready(ml_saxi_awready),
@@ -1000,6 +1033,10 @@ module top #(
         .CLK_DIV   (8'd2),
         .FLASH_BASE(24'h00_1000)
     ) u_weight_ram (
+        `ifdef USE_POWER_PINS
+            .VDD   (VDD),
+            .VSS   (VSS),
+        `endif
         .clk      (clk_i),
         .resetn   (~reset_i),
         // CPU MMIO port — write live sensor features before inference
@@ -1137,7 +1174,7 @@ module top #(
         (ml_sel && ml_ready) |
         (weight_sel && weight_ready) |
         (irqc_sel && irqc_ready) |
-        (spi_sel && spi_ready) |
+
         (test_sel && test_ready) |
         feat_mmio_ready |
         (alarm_sel && alarm_ready);
@@ -1147,7 +1184,7 @@ module top #(
         (ml_sel && ml_ready)          ? ml_rdata       :
         (weight_sel && weight_ready)  ? weight_rdata   :
         (irqc_sel && irqc_ready)      ? irqc_rdata     :
-        (spi_sel && spi_ready)        ? spi_rdata      :
+
         (test_sel && test_ready)      ? test_rdata     :
         feat_mmio_ready? feat_mmio_rdata:
         (alarm_sel && alarm_ready)    ?  alarm_rdata   :
@@ -1157,6 +1194,8 @@ module top #(
     assign mem_rdata = sram_ready ? sram_rdata :
                        mmio_ready ? mmio_rdata :
                        32'h0000_0000;
+
+    wire cpu_alarm_w;
 
     // Sleep/wake control copied from soc_top.
     //JF: move this to top_fsm.v?
@@ -1186,8 +1225,6 @@ module top #(
         .init_o(init_done),
         .alarm_o(alarm_o)
     );
-
-    wire cpu_alarm_w;
 
     alarm_mmio #(.BASE_ADDR(ALARM_BASE)) u_alarm_mmio (
         .clk(clk_i),

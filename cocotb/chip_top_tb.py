@@ -27,10 +27,9 @@ chip_netlist_top = os.getenv("CHIP_NETLIST_TOP", "chip_top")
 
 
 _PROJ = Path(__file__).resolve().parent
-_FIRMWARE_HEX = str(
-    _PROJ / "firmware/build/test_top_feature_ml_cpu_spi_flash/firmware.hex"
-)
-_WEIGHT_HEX = str(_PROJ / "firmware/build/generated/taketwo_params.hex")
+_FIRMWARE_NAME = os.getenv("FIRMWARE_NAME", "test_top_feature_ml_cpu_spi_flash")
+_FIRMWARE_HEX = str(_PROJ / "firmware" / "build" / _FIRMWARE_NAME / "firmware.hex")
+_WEIGHT_HEX = str(_PROJ / "firmware" / "build" / "generated" / "taketwo_params.hex")
 
 
 def _u32_or_none(handle):
@@ -81,12 +80,18 @@ async def start_up(dut):
 def _core(dut):
     """Return the chip_core handle regardless of toplevel."""
     if hdl_toplevel == "chip_top_sim_wrap":
+        if gl:
+            # Flat GL netlist: hierarchy is collapsed into chip_top; return it directly.
+            return dut.u_chip_top
         return dut.u_chip_top.i_chip_core
-    return dut.i_chip_core 
+    return dut.i_chip_core
 
 
 def _top(dut):
     """Return the top handle (inside chip_core)."""
+    if gl:
+        # Flat GL netlist: no u_top sub-handle; signals live directly on chip_top.
+        return _core(dut)
     return _core(dut).u_top
 
 
@@ -411,8 +416,14 @@ def chip_top_runner():
         if hdl_toplevel != chip_netlist_top:
             wrapper = proj_path / "sim/tb" / f"{hdl_toplevel}.sv"
             if not wrapper.exists():
+                wrapper = proj_path / f"{hdl_toplevel}.sv"
+            if not wrapper.exists():
                 raise FileNotFoundError(f"gate-level wrapper not found: {wrapper}")
             sources.append(wrapper)
+            if hdl_toplevel == "chip_top_sim_wrap":
+                sources.append(proj_path / "sim/tb/spi_flash_model.v")
+                sources.append(proj_path / "sensors/i2c_slave_lis2dw12.sv")
+                sources.append(proj_path / "sensors/i2c_slave_adpd144ri.sv")
 
         defines = {"FUNCTIONAL": True, "functional": True, "USE_POWER_PINS": True}
     else:

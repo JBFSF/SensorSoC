@@ -1637,7 +1637,7 @@ module taketwo
   wire [33-1:0] _reduceadd_current_count_16;
   assign _reduceadd_current_count_16 = (_reduceadd_reset_cond_16)? 0 : _reduceadd_count_16;
   wire signed [64-1:0] _reduceadd_current_data_16;
-  assign _reduceadd_current_data_16 = (_reduceadd_reset_cond_16)? 1'sd0 : _reduceadd_data_16;
+  assign _reduceadd_current_data_16 = (_reduceadd_reset_cond_16)? 64'sd0 : _reduceadd_data_16;
   reg [1-1:0] _pulse_data_18;
   reg [33-1:0] _pulse_count_18;
   reg _pulse_prev_count_max_18;
@@ -1646,7 +1646,7 @@ module taketwo
   wire [33-1:0] _pulse_current_count_18;
   assign _pulse_current_count_18 = (_pulse_reset_cond_18)? 0 : _pulse_count_18;
   wire [1-1:0] _pulse_current_data_18;
-  assign _pulse_current_data_18 = (_pulse_reset_cond_18)? 1'sd0 : _pulse_data_18;
+  assign _pulse_current_data_18 = (_pulse_reset_cond_18)? 1'd0 : _pulse_data_18;
   reg [7-1:0] __delay_data_182__variable_1;
   reg signed [130-1:0] _sll_data_7;
   reg [1-1:0] __delay_data_179_greaterthan_3;
@@ -1699,7 +1699,7 @@ module taketwo
   wire signed [130-1:0] _sll_data_33;
   assign _sll_data_33 = 2'sd1 << _minus_data_30;
   wire [1-1:0] _eq_data_45;
-  assign _eq_data_45 = mul_rshift_round_clip_2_rshift_data == 1'sd0;
+  assign _eq_data_45 = mul_rshift_round_clip_2_rshift_data == 7'sd0;
   reg signed [130-1:0] __delay_data_195_sll_33;
   reg [7-1:0] __delay_data_199__variable_26;
   reg [1-1:0] __delay_data_203_eq_45;
@@ -1715,7 +1715,7 @@ module taketwo
   wire [1-1:0] _pointer_data_28;
   assign _pointer_data_28 = _times_data_27[8'sd79];
   wire signed [2-1:0] _cond_data_40;
-  assign _cond_data_40 = (_pointer_data_28)? -2'sd1 : 1'sd0;
+  assign _cond_data_40 = (_pointer_data_28)? -2'sd1 : 2'sd0;
   wire signed [81-1:0] _plus_data_41;
   assign _plus_data_41 = _times_data_27 + __delay_data_198__delay_197__delay_196__delay_195_sll_33;
   wire signed [81-1:0] _plus_data_42;
@@ -2124,7 +2124,7 @@ module taketwo
   wire signed [16-1:0] _reinterpretcast_data_152;
   assign _reinterpretcast_data_152 = _reinterpretcast_src_152;
   wire [1-1:0] _pointer_data_153;
-  assign _pointer_data_153 = stream_matmul_11_parameter_3_data[1'sd0];
+  assign _pointer_data_153 = stream_matmul_11_parameter_3_data[1'd0];
   reg [16-1:0] _plus_data_174;
   reg [16-1:0] _plus_data_190;
   reg [16-1:0] _plus_data_209;
@@ -2138,15 +2138,15 @@ module taketwo
   reg signed [16-1:0] __delay_data_257_cond_100;
   reg signed [16-1:0] __delay_data_274_cond_107;
   wire signed [16-1:0] _cond_data_136;
-  assign _cond_data_136 = (_eq_data_134)? __delay_data_222__variable_133 : 1'sd0;
+  assign _cond_data_136 = (_eq_data_134)? __delay_data_222__variable_133 : 16'sd0;
   wire signed [16-1:0] _cond_data_140;
-  assign _cond_data_140 = (_eq_data_138)? _cond_data_136 : 1'sd0;
+  assign _cond_data_140 = (_eq_data_138)? _cond_data_136 : 16'sd0;
   wire signed [16-1:0] _reinterpretcast_src_146;
   assign _reinterpretcast_src_146 = _cond_data_140;
   wire signed [16-1:0] _reinterpretcast_data_146;
   assign _reinterpretcast_data_146 = _reinterpretcast_src_146;
   wire signed [16-1:0] _cond_data_156;
-  assign _cond_data_156 = (__delay_data_223_pointer_153)? 1'sd0 : _reinterpretcast_data_146;
+  assign _cond_data_156 = (__delay_data_223_pointer_153)? 16'sd0 : _reinterpretcast_data_146;
   reg signed [16-1:0] __variable_wdata_58;
   assign mul_3_x_data = __variable_wdata_58;
   reg signed [16-1:0] __variable_wdata_59;
@@ -4733,10 +4733,10 @@ module taketwo
       __acc_0_stream_ivalid_5 <= 0;
       _greaterthan_data_3 <= 0;
       _minus_data_5 <= 0;
-      _reduceadd_data_16 <= 1'sd0;
+      _reduceadd_data_16 <= 64'sd0;
       _reduceadd_count_16 <= 0;
       _reduceadd_prev_count_max_16 <= 0;
-      _pulse_data_18 <= 1'sd0;
+      _pulse_data_18 <= 1'd0;
       _pulse_count_18 <= 0;
       _pulse_prev_count_max_18 <= 0;
       __delay_data_182__variable_1 <= 0;
@@ -4826,13 +4826,13 @@ module taketwo
         __acc_0_stream_ivalid_5 <= __acc_0_stream_ivalid_4;
       end 
       if(_acc_0_stream_oready) begin
-        _greaterthan_data_3 <= acc_0_rshift_data > 1'sd0;
+        _greaterthan_data_3 <= acc_0_rshift_data > 7'sd0;
       end 
       if(_acc_0_stream_oready) begin
         _minus_data_5 <= acc_0_rshift_data - 2'sd1;
       end 
       if(_acc_0_stream_ivalid && _acc_0_stream_oready && _reduceadd_reset_cond_16) begin
-        _reduceadd_data_16 <= 1'sd0;
+        _reduceadd_data_16 <= 64'sd0;
       end 
       if(_acc_0_stream_ivalid && _acc_0_stream_oready) begin
         _reduceadd_count_16 <= (_reduceadd_current_count_16 >= acc_0_size_data - 1)? 0 : _reduceadd_current_count_16 + 1;
@@ -4844,7 +4844,7 @@ module taketwo
         _reduceadd_data_16 <= _reduceadd_current_data_16 + acc_0_x_data;
       end 
       if(_acc_0_stream_ivalid && _acc_0_stream_oready && _pulse_reset_cond_18) begin
-        _pulse_data_18 <= 1'sd0;
+        _pulse_data_18 <= 1'd0;
       end 
       if(_acc_0_stream_ivalid && _acc_0_stream_oready) begin
         _pulse_count_18 <= (_pulse_current_count_18 >= acc_0_size_data - 1)? 0 : _pulse_current_count_18 + 1;
@@ -4874,7 +4874,7 @@ module taketwo
         __delay_data_186_pulse_18 <= _pulse_data_18;
       end 
       if(_acc_0_stream_oready) begin
-        _cond_data_13 <= (__delay_data_179_greaterthan_3)? _sll_data_7 : 1'sd0;
+        _cond_data_13 <= (__delay_data_179_greaterthan_3)? _sll_data_7 : 64'sd0;
       end 
       if(_acc_0_stream_oready) begin
         __delay_data_181__delay_180_reduceadd_16 <= __delay_data_180_reduceadd_16;
@@ -5401,7 +5401,7 @@ module taketwo
         _lessthan_data_51 <= _cond_data_46 < -16'sd32767;
       end 
       if(_mul_rshift_round_clip_2_stream_oready) begin
-        _greatereq_data_55 <= _cond_data_46 >= 1'sd0;
+        _greatereq_data_55 <= _cond_data_46 >= 80'sd0;
       end 
       if(_mul_rshift_round_clip_2_stream_oready) begin
         __delay_data_207_cond_46 <= _cond_data_46;
@@ -5730,13 +5730,13 @@ module taketwo
         __mul_3_stream_ivalid_8 <= __mul_3_stream_ivalid_7;
       end 
       if(_mul_3_stream_oready) begin
-        _greaterthan_data_61 <= mul_3_rshift_data > 1'sd0;
+        _greaterthan_data_61 <= mul_3_rshift_data > 5'sd0;
       end 
       if(_mul_3_stream_oready) begin
         _minus_data_63 <= mul_3_rshift_data - 2'sd1;
       end 
       if(_mul_3_stream_oready) begin
-        _greatereq_data_74 <= mul_3_x_data >= 1'sd0;
+        _greatereq_data_74 <= mul_3_x_data >= 16'sd0;
       end 
       if(_mul_3_stream_oready) begin
         __delay_data_161__variable_58 <= mul_3_x_data;
@@ -5766,7 +5766,7 @@ module taketwo
         __delay_data_168__delay_167__variable_60 <= __delay_data_167__variable_60;
       end 
       if(_mul_3_stream_oready) begin
-        _cond_data_71 <= (__delay_data_158_greaterthan_61)? _sll_data_65 : 1'sd0;
+        _cond_data_71 <= (__delay_data_158_greaterthan_61)? _sll_data_65 : 32'sd0;
       end 
       if(_mul_3_stream_oready) begin
         __delay_data_160__delay_159_greatereq_74 <= __delay_data_159_greatereq_74;
@@ -6707,10 +6707,10 @@ module taketwo
         __stream_matmul_11_stream_ivalid_29 <= __stream_matmul_11_stream_ivalid_28;
       end 
       if(_stream_matmul_11_stream_oready) begin
-        _eq_data_134 <= stream_matmul_11_parameter_1_data == 1'sd0;
+        _eq_data_134 <= stream_matmul_11_parameter_1_data == 1'd0;
       end 
       if(_stream_matmul_11_stream_oready) begin
-        _eq_data_138 <= stream_matmul_11_parameter_2_data == 1'sd0;
+        _eq_data_138 <= stream_matmul_11_parameter_2_data == 1'd0;
       end 
       if(_stream_matmul_11_stream_oready) begin
         _plus_data_174 <= _cond_data_114 + stream_matmul_11_parameter_16_data;
@@ -6722,7 +6722,7 @@ module taketwo
         _plus_data_209 <= _cond_data_128 + stream_matmul_11_parameter_18_data;
       end 
       if(_stream_matmul_11_stream_oready) begin
-        _eq_data_215 <= stream_matmul_11_parameter_19_data == 1'sd0;
+        _eq_data_215 <= stream_matmul_11_parameter_19_data == 2'sd0;
       end 
       if(_stream_matmul_11_stream_oready) begin
         _eq_data_218 <= stream_matmul_11_parameter_19_data == 2'sd1;
@@ -7178,7 +7178,7 @@ module taketwo
         __delay_data_376__delay_375__delay_374____substreamoutput_192 <= __delay_data_375__delay_374__delay_373____substreamoutput_192;
       end 
       if(_stream_matmul_11_stream_oready) begin
-        _greaterthan_data_212 <= __substreamoutput_data_210 > 1'sd0;
+        _greaterthan_data_212 <= __substreamoutput_data_210 > 16'sd0;
       end 
       if(_stream_matmul_11_stream_oready) begin
         __delay_data_309__substreamoutput_210 <= __substreamoutput_data_210;
@@ -7193,7 +7193,7 @@ module taketwo
         __delay_data_377__delay_376__delay_375____substreamoutput_192 <= __delay_data_376__delay_375__delay_374____substreamoutput_192;
       end 
       if(_stream_matmul_11_stream_oready) begin
-        _cond_data_214 <= (_greaterthan_data_212)? __delay_data_309__substreamoutput_210 : 1'sd0;
+        _cond_data_214 <= (_greaterthan_data_212)? __delay_data_309__substreamoutput_210 : 16'sd0;
       end 
       if(_stream_matmul_11_stream_oready) begin
         __delay_data_337__delay_336__delay_335__delay_334___eq_215 <= __delay_data_336__delay_335__delay_334__delay_333___eq_215;

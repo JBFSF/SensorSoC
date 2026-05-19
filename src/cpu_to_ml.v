@@ -21,15 +21,18 @@ module cpu_to_ml #(
 
   // AXI-Lite wires between bridge (master) and taketwo_wrap (slave)
   wire [31:0] saxi_awaddr, saxi_wdata, saxi_araddr;
+  wire [3:0]  saxi_awcache, saxi_wstrb, saxi_arcache;
   wire [2:0]  saxi_awprot, saxi_arprot;
   wire        saxi_awvalid, saxi_awready;
-  wire [3:0]  saxi_wstrb;
   wire        saxi_wvalid, saxi_wready;
   wire [1:0]  saxi_bresp;
   wire        saxi_bvalid, saxi_bready;
   wire [31:0] saxi_rdata;
   wire [1:0]  saxi_rresp;
   wire        saxi_rvalid, saxi_rready;
+
+  assign saxi_awcache = 4'd0;
+  assign saxi_arcache = 4'd0;
 
   // Optional outputs from bridge (not required for basic AXI-Lite testing)
   wire        ml_event;
@@ -181,6 +184,7 @@ module cpu_to_ml #(
 
     // AXI-Lite slave (bridge drives this)
     .saxi_awaddr (saxi_awaddr),
+    .saxi_awcache(saxi_awcache),
     .saxi_awprot (saxi_awprot),
     .saxi_awvalid(saxi_awvalid),
     .saxi_awready(saxi_awready),
@@ -195,6 +199,7 @@ module cpu_to_ml #(
     .saxi_bready (saxi_bready),
 
     .saxi_araddr (saxi_araddr),
+    .saxi_arcache(saxi_arcache),
     .saxi_arprot (saxi_arprot),
     .saxi_arvalid(saxi_arvalid),
     .saxi_arready(saxi_arready),
