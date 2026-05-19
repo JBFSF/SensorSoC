@@ -77,12 +77,35 @@ async def start_up(dut):
     await reset(dut.rst_n_PAD)
 
 
+class _FlatGL:
+    """Proxy for a flat GL module scope.
+
+    After synthesis flattening, nets that were inside sub-modules become
+    escaped identifiers in the top-level module (e.g. ``\\i_chip_core.u_top.boot_done ``).
+    Attribute access on this proxy translates to a VPI lookup by escaped name.
+    """
+    def __init__(self, scope, prefix):
+        object.__setattr__(self, "_scope", scope)
+        object.__setattr__(self, "_prefix", prefix)
+
+    def __getattr__(self, name):
+        scope  = object.__getattribute__(self, "_scope")
+        prefix = object.__getattribute__(self, "_prefix")
+        # Try with backslash+trailing-space (Verilog escaped identifier syntax),
+        # then without trailing space as a fallback.
+        for escaped in (f"\\{prefix}.{name} ", f"\\{prefix}.{name}"):
+            try:
+                return scope._id(escaped, extended=False)
+            except AttributeError:
+                pass
+        raise AttributeError(f"{scope._path} has no flat GL net for '{prefix}.{name}'")
+
+
 def _core(dut):
     """Return the chip_core handle regardless of toplevel."""
     if hdl_toplevel == "chip_top_sim_wrap":
         if gl:
-            # Flat GL netlist: hierarchy is collapsed into chip_top; return it directly.
-            return dut.u_chip_top
+            return _FlatGL(dut.u_chip_top, "i_chip_core")
         return dut.u_chip_top.i_chip_core
     return dut.i_chip_core
 
@@ -90,8 +113,7 @@ def _core(dut):
 def _top(dut):
     """Return the top handle (inside chip_core)."""
     if gl:
-        # Flat GL netlist: no u_top sub-handle; signals live directly on chip_top.
-        return _core(dut)
+        return _FlatGL(dut.u_chip_top, "i_chip_core.u_top")
     return _core(dut).u_top
 
 
