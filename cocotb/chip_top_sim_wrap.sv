@@ -3,13 +3,15 @@
 `define SLOT_1X1
 
 module chip_top_sim_wrap #(
-    // Firmware and weight hex paths are passed at runtime via plusargs:
-    //   +FIRMWARE_HEX=<abs_path>  +WEIGHT_HEX=<abs_path>
+    // Firmware and weight hex paths are passed at runtime via plusargs.
+    // The current top.sv architecture uses one shared SPI flash bus:
+    //   words [0:1023]     : boot firmware image
+    //   words [1024:$end]  : ML weights fetched by weight_flash_axi after boot
     // Parameters kept as overrides for direct instantiation (leave "" to use plusargs).
     parameter FIRMWARE_HEX       = "",
     parameter WEIGHT_HEX         = "",
-    parameter integer FLASH_WORDS        = 1024,
-    parameter integer WEIGHT_FLASH_WORDS = 2048
+    parameter integer FLASH_WORDS = 3072,
+    parameter integer WEIGHT_FLASH_OFFSET_WORDS = 1024
 )(
     input  wire        clk_PAD,
     input  wire        rst_n_PAD,
@@ -95,6 +97,9 @@ module chip_top_sim_wrap #(
         `endif
     );
 
+    // Shared external SPI flash. spi_boot_ctrl owns this bus until boot_done;
+    // weight_flash_axi owns the same bus afterward and reads weights at byte
+    // address 0x1000, i.e. word offset 1024.
     spi_flash_model #(
         .FLASH_WORDS    (FLASH_WORDS),
         .FLASH_INIT_HEX ("")   // loaded at sim start via $readmemh in initial block below
@@ -103,16 +108,6 @@ module chip_top_sim_wrap #(
         .spi_cs_n (bidir_PAD[3]),
         .spi_mosi (bidir_PAD[2]),
         .spi_miso (bidir_PAD[4])
-    );
-
-    spi_flash_model #(
-        .FLASH_WORDS    (WEIGHT_FLASH_WORDS),
-        .FLASH_INIT_HEX ("")   // loaded at sim start via $readmemh in initial block below
-    ) u_weight_flash (
-        .spi_clk  (bidir_PAD[23]),
-        .spi_cs_n (bidir_PAD[25]),
-        .spi_mosi (bidir_PAD[24]),
-        .spi_miso (bidir_PAD[26])
     );
 
     i2c_slave_lis2dw12 #(
@@ -159,8 +154,12 @@ module chip_top_sim_wrap #(
         else if (!$value$plusargs("FIRMWARE_HEX=%s", fw_hex))
             fw_hex = "";
 
+        if (WEIGHT_FLASH_OFFSET_WORDS >= FLASH_WORDS) begin
+            $fatal(1, "chip_top_sim_wrap: WEIGHT_FLASH_OFFSET_WORDS must be less than FLASH_WORDS");
+        end
+
         if (fw_hex != "") begin
-            $readmemh(fw_hex, u_boot_flash.mem);
+            $readmemh(fw_hex, u_boot_flash.mem, 0, WEIGHT_FLASH_OFFSET_WORDS - 1);
             $display("chip_top_sim_wrap: boot flash loaded from %s", fw_hex);
         end else begin
             $fatal(1, "chip_top_sim_wrap: no FIRMWARE_HEX — pass +FIRMWARE_HEX=<abs_path>");
@@ -173,8 +172,9 @@ module chip_top_sim_wrap #(
             wt_hex = "";
 
         if (wt_hex != "") begin
-            $readmemh(wt_hex, u_weight_flash.mem);
-            $display("chip_top_sim_wrap: weight flash loaded from %s", wt_hex);
+            $readmemh(wt_hex, u_boot_flash.mem, WEIGHT_FLASH_OFFSET_WORDS, FLASH_WORDS - 1);
+            $display("chip_top_sim_wrap: weight flash loaded into shared flash at word offset %0d from %s",
+                     WEIGHT_FLASH_OFFSET_WORDS, wt_hex);
         end else begin
             $fatal(1, "chip_top_sim_wrap: no WEIGHT_HEX — pass +WEIGHT_HEX=<abs_path>");
         end
