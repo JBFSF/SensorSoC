@@ -92,26 +92,34 @@ IGNORE_DISCONNECTED_MODULES:
 # Clock
 CLOCK_PORT: clk_PAD
 CLOCK_NET: clk_pad/Y
-CLOCK_PERIOD: 40 # 25 MHz
+CLOCK_PERIOD: 200 # 5 MHz
 
 # Fix hold violations
-PL_RESIZER_HOLD_SLACK_MARGIN: 0.35
-GRT_RESIZER_HOLD_SLACK_MARGIN: 0.3
+PL_RESIZER_HOLD_SLACK_MARGIN: 0.15
+GRT_RESIZER_HOLD_SLACK_MARGIN: 0.15
 
 # legalize design after repairs and having to insert one million buffers :(
 # these values control how far detailed placement can move cells when attempting to inserting hella buffers
 # 1200 / 250
-PL_MAX_DISPLACEMENT_X: 1200
-PL_MAX_DISPLACEMENT_Y: 250
+PL_MAX_DISPLACEMENT_X: 2000
+PL_MAX_DISPLACEMENT_Y: 1200
 
 # Increase for more logic
 # on your die
-PL_TARGET_DENSITY_PCT: 31
+PL_TARGET_DENSITY_PCT: 25
 GRT_ALLOW_CONGESTION: true
 
 # Fix antenna violations after DRT
 DRT_ANTENNA_REPAIR_ITERS: 10
 DRT_ANTENNA_REPAIR_MARGIN: 10 # %
+# Insert diodes before routed antenna repair so the late repair step has less
+# local placement pressure around the SRAM cluster.
+RUN_HEURISTIC_DIODE_INSERTION: true
+HEURISTIC_ANTENNA_THRESHOLD: 90
+DIODE_ON_PORTS: in
+
+GRT_ANTENNA_REPAIR_MARGIN: 0
+GRT_ANTENNA_REPAIR_ITERS: 5
 
 # PDN - Straps
 PDN_VWIDTH: 5
@@ -212,7 +220,7 @@ MACROS:
         - dir::../ip/gf180mcu_ws_ip__logo/lib/gf180mcu_ws_ip__logo.lib
     instances:
       wafer_space_logo:
-        location: ["expr::$DIE_AREA[2] + -169.25", "expr::$DIE_AREA[3] + -169.25"]
+        location: [3762.75, 4952.75]
         orientation: N
 
   gf180mcu_fd_ip_sram__sram512x8m8wm1:
@@ -270,49 +278,49 @@ MACROS:
         location: [2250, 1600]
         orientation: N
       i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id1_0.mem_top:
-        location: [490, 2120]
+        location: [490, 2180]
         orientation: N
       i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id1_1.mem_bot:
-        location: [930, 2120]
+        location: [930, 2180]
         orientation: N
       i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id1_1.mem_top:
-        location: [1370, 2120]
+        location: [1370, 2180]
         orientation: N
       i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id2_0.mem_bot:
-        location: [1810, 2120]
+        location: [1810, 2180]
         orientation: N
       i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id2_0.mem_top:
-        location: [2250, 2120]
+        location: [2250, 2180]
         orientation: N
       i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id2_1.mem_bot:
-        location: [490, 2640]
+        location: [490, 2760]
         orientation: N
       i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id2_1.mem_top:
-        location: [930, 2640]
+        location: [930, 2760]
         orientation: N
       i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id3_0.mem_bot:
-        location: [1370, 2640]
+        location: [1370, 2760]
         orientation: N
       i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id3_0.mem_top:
-        location: [1810, 2640]
+        location: [1810, 2760]
         orientation: N
       i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id3_1.mem_bot:
-        location: [2250, 2640]
+        location: [2250, 2760]
         orientation: N
       i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id3_1.mem_top:
-        location: [490, 3160]
+        location: [490, 3340]
         orientation: N
       i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_0.mem_bot:
-        location: [930, 3160]
+        location: [930, 3340]
         orientation: N
       i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_0.mem_top:
-        location: [1370, 3160]
+        location: [1370, 3340]
         orientation: N
       i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_1.mem_bot:
-        location: [1810, 3160]
+        location: [1810, 3340]
         orientation: N
       i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_1.mem_top:
-        location: [2250, 3160]
+        location: [2250, 3340]
         orientation: N
 
 # This is an alternative method compared to
