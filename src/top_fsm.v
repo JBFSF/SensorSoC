@@ -1,11 +1,12 @@
 /* TOP FSM that controls sleep for different sections, controllable via outside debug
     NORMAL operation:
     1. IDLE,      wait for reset to be released
-    2. SLEEP,     cpu/feat/ml all off, wake on interrupt controller request
-    3. FEAT_ONLY, feat enabled, waits for first feature vector to be ready
-    4. ALL,       feat + ML + CPU all on; waits for ML inference to complete
-    5. CPU_FEAT,  feat + CPU on, goes back to just feats on when CPU is done
-    6. ALARM,     alarm is active, wait for user acknowledgment
+    2. CPU_INIT,  CPU on only; firmware initialises ML/IRQC/timer then requests sleep
+    3. SLEEP,     cpu/feat/ml all off, wake on interrupt controller request (timer)
+    4. FEAT_ONLY, feat enabled, waits for first feature vector to be ready
+    5. ALL,       feat + ML + CPU all on; waits for ML inference to complete
+    6. CPU_FEAT,  feat + CPU on; firmware reads logits, applies policy, requests sleep
+    7. ALARM,     alarm is active, wait for user acknowledgment
 */
 module top_fsm
 (
@@ -23,7 +24,7 @@ module top_fsm
     input         sleep_req_i,     // CPU requests sleep (from pwrctrl MMIO)
     input         mem_valid_i,     // CPU memory-access valid (for idle detection)
     input         irqc_wake_req_i, // interrupt controller forces wake
-    input         cpu_alarm_i,         // if the cpu says the alarm should be on
+    input         cpu_alarm_i,     // if the cpu says the alarm should be on
 
     output        watchdog_o,      // enable the watchdog after we've started
     output        feat_en_o,
@@ -43,6 +44,7 @@ module top_fsm
     localparam FEAT_ML   = 4'd6;
     localparam CPU_ONLY  = 4'd7;
     localparam ALARM     = 4'd8;
+    localparam CPU_INIT  = 4'd9;   // CPU-only init: firmware sets up timer/IRQC then sleeps
 
     reg [3:0] state_d, state_q, state_debug_q;
 
@@ -69,15 +71,16 @@ module top_fsm
 
         case (state_q)
             BOOT:     if (boot_done_i) state_d = IDLE;
-            IDLE:     if (start_i) state_d = SLEEP;
+            IDLE:     if (start_i)     state_d = CPU_INIT;
+            CPU_INIT: if (can_sleep_w) state_d = SLEEP;
             SLEEP:    if (irqc_wake_req_i) state_d = FEAT_ONLY;
-            FEAT_ONLY:if (feat_valid_i)                    state_d = ALL;
-            ALL:      if (ml_irq_i)                        state_d = CPU_FEAT;
+            FEAT_ONLY:if (feat_valid_i)    state_d = ALL;
+            ALL:      if (ml_irq_i)        state_d = CPU_FEAT;
             CPU_FEAT: begin
-                if (cpu_alarm_i)                               state_d = ALARM;
-                else if (can_sleep_w)                      state_d = FEAT_ONLY;
+                if (cpu_alarm_i)       state_d = ALARM;
+                else if (can_sleep_w)  state_d = SLEEP;
             end
-            ALARM:    if (start_i)                          state_d = SLEEP;
+            ALARM:    if (start_i)     state_d = SLEEP;
         endcase
 
         case (test_mode_i)
@@ -86,18 +89,18 @@ module top_fsm
             // 01001 is an observer mode for live sleep/IRQ state; do not
             // override the FSM or it cannot expose sleeping_o=1.
             4'b0111, 4'b1000, 4'b1010, 4'b1011: state_d = CPU_ONLY; //just cpu?
-            4'b0101, 4'b1100, 4'b1101: state_d = ALL; //all 
+            4'b0101, 4'b1100, 4'b1101: state_d = ALL; //all
         endcase
     end
 
 
     // Output enables (combinational from state)
     assign feat_en_o  = (state_q == FEAT_ONLY) || (state_q == ALL) || (state_q == CPU_FEAT) || (state_q == FEAT_ML);
-    assign ml_en_o    = (state_q == ALL) || (state_q == FEAT_ML) || (state_q == BOOT);
+    assign ml_en_o    = (state_q == ALL) || (state_q == FEAT_ML) || (state_q == BOOT) || (state_q == CPU_INIT);
     assign cpu_en_o   = cpu_clk_en_r;
     assign sleeping_o = (state_q == SLEEP);
     assign watchdog_o = (state_q == FEAT_ONLY) || (state_q == ALL) || (state_q == CPU_FEAT) || (state_q == FEAT_ML) || (state_q == SLEEP);
-    assign init_o     = (state_q != BOOT); 
+    assign init_o     = (state_q != BOOT);
     assign alarm_o    = (state_q == ALARM);
 
     always @(posedge clk_i) begin
@@ -115,10 +118,12 @@ module top_fsm
                 cpu_idle_seen_r <= cpu_idle_seen_r | (~mem_valid_i);
 
             // cpu_clk_en_r follows states where CPU should be active
-            cpu_clk_en_r <= (state_d == ALL) || (state_d == CPU_FEAT) || (state_d == CPU_ONLY);
+            cpu_clk_en_r <= (state_d == ALL) || (state_d == CPU_FEAT) ||
+                            (state_d == CPU_ONLY) || (state_d == CPU_INIT);
             // clear idle tracking when CPU powers on or system enters sleep
             if (state_d == SLEEP ||
-                    ((state_d == ALL || state_d == CPU_FEAT || state_d == CPU_ONLY) && !cpu_clk_en_r))
+                    ((state_d == ALL || state_d == CPU_FEAT ||
+                      state_d == CPU_ONLY || state_d == CPU_INIT) && !cpu_clk_en_r))
                 cpu_idle_seen_r <= 1'b0;
         end
     end

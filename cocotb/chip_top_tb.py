@@ -333,17 +333,19 @@ _FSM_STATES = {
     5: "CPU_FEAT",
     6: "FEAT_ML",
     7: "CPU_ONLY",
+    8: "ALARM",
+    9: "CPU_INIT",
 }
 
 
 @cocotb.test(skip=(hdl_toplevel != "chip_top_sim_wrap"))
 async def test_chip_top_normal_mode(dut):
     """Normal mode test: run chip normally, monitor CPU errors, FSM state, and alarm outputs."""
-    logger = logging.getLogger("chip_top_normal_mode")
+    logger = cocotb.log
 
-    # Normal mode (input_PAD = 0)
+    # Normal mode: test_mode=0, start bit (input_PAD[5]) = 1
     await set_defaults(dut)
-    dut.input_PAD.value = 0
+    dut.input_PAD.value = 0b100000  # bit 5 = start
     await start_clock(dut.clk_PAD)
     await reset(dut.rst_n_PAD)
 
@@ -371,6 +373,7 @@ async def test_chip_top_normal_mode(dut):
     # --- Phase 2: monitor CPU errors, FSM state, and alarm ---
     last_alarm = 0
     last_fsm_state = None
+    RUNTIME_TIMEOUT = 500_000
     for cycle in range(RUNTIME_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
 
@@ -398,16 +401,37 @@ async def test_chip_top_normal_mode(dut):
                 return
 
         # Log periodic status
-        if cycle % 100_000 == 0:
+        if cycle % 10_000 == 0:
             fsm_state_name = "?"
             try:
                 fsm_state = int(u_top.fsm.state_q.value)
                 fsm_state_name = _FSM_STATES.get(fsm_state, f"UNKNOWN({fsm_state})")
             except (AttributeError, ValueError, TypeError):
                 pass
-            logger.info(f"  cycle {cycle}: FSM={fsm_state_name} trap={core.pico_trap_w.value} alarm={dut.alarm_o.value}")
+            try:
+                tc = int(u_top.test_code.value)
+                pred_class  = (tc >> 31) & 1
+                alarm_bit   = (tc >> 30) & 1
+                streak      = (tc >> 16) & 0xFF
+                conf        = tc & 0xFFFF
+                tc_display  = f"class={pred_class} alarm_bit={alarm_bit} streak={streak} conf={conf}"
+            except (AttributeError, ValueError, TypeError):
+                tc_display = "?"
+            try:
+                inv = int(core.invalid_reason_w.value)
+                inv_bits = (
+                    f"overflow={inv&1} i2c_err={(inv>>1)&1} no_beats={(inv>>2)&1} "
+                    f"low_frac={(inv>>3)&1} double_bad={(inv>>4)&1} "
+                    f"missed_bad={(inv>>5)&1} motion_bad={(inv>>6)&1}"
+                )
+            except (AttributeError, ValueError, TypeError):
+                inv_bits = "?"
+            logger.info(
+                f"  cycle {cycle}: FSM={fsm_state_name} trap={core.pico_trap_w.value} "
+                f"alarm={dut.alarm_o.value} [{tc_display}] inv=[{inv_bits}]"
+            )
 
-    logger.info("Normal mode test completed — alarm never fired within timeout.")
+    raise AssertionError(f"Alarm never fired within {RUNTIME_TIMEOUT} cycles — test failed.")
 
 
 def chip_top_runner():
