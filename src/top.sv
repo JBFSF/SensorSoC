@@ -668,7 +668,9 @@ module top #(
     );
 
     //JF: Feat Pipline, sleep until watchdog
-    accel_reader u_accel_reader (
+    accel_reader #(
+        .RSP_TIMEOUT_TICKS(20_000)
+    ) u_accel_reader (
         .clk(clk_i),
         .rst_i(reset_i),
         .en_i(feat_en),
