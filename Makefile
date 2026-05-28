@@ -152,6 +152,10 @@ sim-gl-sensor-bridge-full: ## Run long gate-level sensor I2C debug-feature refer
 	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb GL=1 GL_SENSOR_I2C_FULL_FEATURES=1 CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env CHIP_NETLIST_TOP=$(TOP) FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=test_chip_top_gl_sensor_bridge COCOTB_TEST_FILTER=test_chip_top_gl_sensor_bridge_debug_features_match_python_reference $(PYTHON) chip_top_tb.py
 .PHONY: sim-gl-sensor-bridge-full
 
+sim-rtl-sensor-i2c-pads: ## Run RTL chip_top sensor I2C pad test with cocotbext-i2c
+	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb CHIP_TOP_PAD_I2C=1 CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=test_chip_top_i2c_pads COCOTB_TEST_FILTER=test_chip_top_i2c_pads_reach_cocotbext_sensor_models $(PYTHON) chip_top_tb.py
+.PHONY: sim-rtl-sensor-i2c-pads
+
 
 sim-view: ## View simulation waveforms in GTKWave
 	gtkwave cocotb/sim_build/chip_top.fst

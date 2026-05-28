@@ -18,6 +18,10 @@ module sim_chip_top_gl_sensor_bridge_env;
   wire         sensor_scl_sample;
   wire         sensor_sda_sample;
   logic        sensor_sda_drive_low = 1'b0;
+  logic        accel_sda_o = 1'b1;
+  logic        ppg_sda_o = 1'b1;
+  logic        accel_scl_o = 1'b1;
+  logic        ppg_scl_o = 1'b1;
   wire  [1:0]  analog_PAD;
 
   wire VDD = 1'b1;
@@ -34,7 +38,7 @@ module sim_chip_top_gl_sensor_bridge_env;
   generate
     for (i = 0; i < 40; i = i + 1) begin : tb_bidir_drive
       if (i == SENSOR_SDA_PAD) begin : sensor_sda_drive
-        assign bidir_PAD[i] = sensor_sda_drive_low ? 1'b0 :
+        assign bidir_PAD[i] = (sensor_sda_drive_low || !accel_sda_o || !ppg_sda_o) ? 1'b0 :
                               (bidir_oe[i] ? bidir_drv[i] : 1'bz);
       end else begin : external_drive
         assign bidir_PAD[i] = bidir_oe[i] ? bidir_drv[i] : 1'bz;

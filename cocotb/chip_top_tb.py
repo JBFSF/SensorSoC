@@ -20,6 +20,7 @@ scl        = os.getenv("SCL", "gf180mcu_fd_sc_mcu7t5v0")
 gl         = os.getenv("GL", False)
 slot       = os.getenv("SLOT", "1x1")
 test_module = os.getenv("COCOTB_TEST_MODULE", "chip_top_tb")
+pad_i2c_rtl = os.getenv("CHIP_TOP_PAD_I2C", "0") == "1"
 
 
 hdl_toplevel = os.getenv("CHIP_TOPLEVEL", "chip_top_sim_wrap")
@@ -411,8 +412,11 @@ def chip_top_runner():
     proj_path = Path(__file__).resolve().parent
 
     sources = []
-    # RTL builds use the SIM-only sensor bus; GL builds below intentionally do not.
-    defines = {f"SLOT_{slot.upper().replace('.', 'P')}": True, "SIM": True}
+    # Most RTL builds use the SIM-only sensor bus. Pad-level I2C RTL tests
+    # intentionally compile without SIM so i2c_master drives bidir_PAD[23:24].
+    defines = {f"SLOT_{slot.upper().replace('.', 'P')}": True}
+    if not pad_i2c_rtl:
+        defines["SIM"] = True
     includes = [proj_path / "../src/"]
 
     if gl:
@@ -450,7 +454,7 @@ def chip_top_runner():
         defines = {"FUNCTIONAL": True, "functional": True, "USE_POWER_PINS": True}
     else:
         src_dir = proj_path / "../src"
-        pad_level = hdl_toplevel in {"chip_top", "chip_top_sim_wrap"}
+        pad_level = hdl_toplevel in {"chip_top", "chip_top_sim_wrap", "sim_chip_top_gl_sensor_bridge_env"}
         skip = {"dummy_top.sv", "soc_top.v"}
         if pad_level:
             skip.add("gf180mcu_fd_ip_sram__sram512x8m8wm1.v")
@@ -466,9 +470,12 @@ def chip_top_runner():
         # Sim wrapper is only needed when it is the selected HDL toplevel.
         if hdl_toplevel == "chip_top_sim_wrap":
             sources.append(proj_path / "chip_top_sim_wrap.sv")
+        elif hdl_toplevel == "sim_chip_top_gl_sensor_bridge_env":
+            sources.append(proj_path / "sim/tb/sim_chip_top_gl_sensor_bridge_env.sv")
 
         # Pad-level builds need GF180 IO models. Direct chip_core RTL DFT does not.
         if pad_level:
+            defines["USE_POWER_PINS"] = True
             sources += [
                 Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_fd_io.v",
                 Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_ws_io.v",

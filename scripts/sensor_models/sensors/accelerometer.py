@@ -30,8 +30,12 @@ All sensor model parameters can be overridden at call time for flexibility.
 
 import numpy as np
 import os
-import matplotlib.pyplot as plt
 from pathlib import Path
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
 
 # Reference defaults — documented here for traceability but not used directly.
 # Pass overrides to process_accelerometer() as keyword arguments.
@@ -69,6 +73,9 @@ def _adc_quantize_lis2dw12(accel_g, sensitivity_mg):
 # Validation plot
 
 def _save_validation_plot(raw_g, digital, odr_hz, sensitivity_mg):
+    if plt is None:
+        return
+
     duration_s = 10
     n = duration_s * odr_hz
 
