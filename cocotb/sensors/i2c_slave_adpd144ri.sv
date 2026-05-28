@@ -7,10 +7,15 @@
 // Reads ppg_digital.csv and responds as a real ADPD144RI would.
 //
 // Register behavior:
-//   0x00 STATUS        : 2 bytes [0x00, 0x01] — FIFO count=1
-//   0x06 FIFO_THRESH   : 2 bytes [0x00, 0x08] — threshold=8
+//   0x00 STATUS        : 2 bytes — FIFO byte count (0 or WATERMARK_SAMPLES*2)
+//   0x06 FIFO_THRESH   : 2 bytes — threshold=WATERMARK_SAMPLES words
 //   0x5F FIFO_ACCESS_ENA: write accepted, no response
 //   0x60 FIFO_ACCESS   : streams one 16-bit PPG sample (red channel) per word
+//
+// Rate control: FIFO is only "full" (WATERMARK_SAMPLES samples ready) every
+// WATERMARK_SAMPLES * SAMPLE_PERIOD_CLKS clock cycles, matching the real
+// sensor's sample rate. This ensures the beat-detection filter sees samples
+// at the correct effective rate rather than as a continuous flood.
 //
 // CSV format: red_counts,ir_counts unsigned integers per row (14-bit)
 //
@@ -24,7 +29,12 @@ module i2c_slave_adpd144ri #(
     parameter [7:0]  REG_STATUS        = 8'h00,
     parameter [7:0]  REG_FIFO_THRESH   = 8'h06,
     parameter [7:0]  REG_FIFO_ENA      = 8'h5F,
-    parameter [7:0]  REG_FIFO_ACCESS   = 8'h60
+    parameter [7:0]  REG_FIFO_ACCESS   = 8'h60,
+    // Cycles between consecutive samples at the simulation clock rate.
+    // Default 10 matches 100 Hz sensor at CLK_HZ=1000 (1 cycle = 1 ms).
+    parameter integer SAMPLE_PERIOD_CLKS = 10,
+    // Number of samples that must accumulate before the FIFO is reported full.
+    parameter integer WATERMARK_SAMPLES   = 8
 )(
     input  wire        clk,
     input  wire        resetn,
@@ -42,6 +52,14 @@ module i2c_slave_adpd144ri #(
     output reg         sim_rlast,
     output reg         sim_err
 );
+
+    // Number of clock cycles needed to fill WATERMARK_SAMPLES samples
+    localparam integer FILL_CLKS       = WATERMARK_SAMPLES * SAMPLE_PERIOD_CLKS;
+    // FIFO threshold register value: WATERMARK_SAMPLES words (2 bytes each)
+    localparam [7:0]   THRESH_WORDS_BYTE = WATERMARK_SAMPLES;
+    // FIFO bytes available when full: WATERMARK_SAMPLES * 2 bytes (capped at 255)
+    localparam [7:0]   FIFO_BYTES_FULL   = (WATERMARK_SAMPLES * 2 > 255) ? 8'hFF
+                                            : WATERMARK_SAMPLES * 2;
 
     int    fd;
     int    r;
@@ -61,6 +79,11 @@ module i2c_slave_adpd144ri #(
     rsp_state_t rsp_state;
     reg [1:0]  byte_cnt;
     reg [7:0]  bytes_left;
+
+    // Fill counter: counts up each cycle; FIFO is "ready" when it reaches FILL_CLKS.
+    // Reset to 0 after each FIFO burst read so the next batch accumulates fresh.
+    integer fill_cnt_r;
+    wire    fifo_ready_w = (fill_cnt_r >= FILL_CLKS);
 
     initial begin
         if (!$value$plusargs("DATA_DIR=%s", data_dir))
@@ -98,11 +121,16 @@ module i2c_slave_adpd144ri #(
             rsp_state  <= RSP_IDLE;
             byte_cnt   <= 2'd0;
             bytes_left <= 8'd0;
+            fill_cnt_r <= 0;
         end else begin
             sim_ack    <= 1'b0;
             sim_rvalid <= 1'b0;
             sim_rlast  <= 1'b0;
             sim_err    <= 1'b0;
+
+            // Advance fill counter until it saturates at FILL_CLKS
+            if (fill_cnt_r < FILL_CLKS)
+                fill_cnt_r <= fill_cnt_r + 1;
 
             case (rsp_state)
                 RSP_IDLE: begin
@@ -134,10 +162,13 @@ module i2c_slave_adpd144ri #(
                 RSP_STATUS: begin
                     sim_rvalid <= 1'b1;
                     if (byte_cnt == 2'd0) begin
+                        // byte 0: bit 7 = overflow (always 0), bits[6:0] = reserved
                         sim_rdata <= 8'h00;
                         byte_cnt  <= 2'd1;
                     end else begin
-                        sim_rdata <= 8'h10;
+                        // byte 1: FIFO bytes available — only report data when fill
+                        // counter has accumulated a full watermark batch of samples
+                        sim_rdata <= fifo_ready_w ? FIFO_BYTES_FULL : 8'h00;
                         sim_rlast <= 1'b1;
                         byte_cnt  <= 2'd0;
                         rsp_state <= RSP_IDLE;
@@ -150,7 +181,8 @@ module i2c_slave_adpd144ri #(
                         sim_rdata <= 8'h00;
                         byte_cnt  <= 2'd1;
                     end else begin
-                        sim_rdata <= 8'h02;
+                        // byte 1 bits[13:8]: FIFO threshold in words (samples)
+                        sim_rdata <= THRESH_WORDS_BYTE;
                         sim_rlast <= 1'b1;
                         byte_cnt  <= 2'd0;
                         rsp_state <= RSP_IDLE;
@@ -166,9 +198,11 @@ module i2c_slave_adpd144ri #(
                     endcase
 
                     if (bytes_left <= 8'd1) begin
-                        sim_rlast <= 1'b1;
-                        rsp_state <= RSP_IDLE;
-                        byte_cnt  <= 2'd0;
+                        sim_rlast  <= 1'b1;
+                        rsp_state  <= RSP_IDLE;
+                        byte_cnt   <= 2'd0;
+                        // Reset fill counter so next batch must wait for FILL_CLKS cycles
+                        fill_cnt_r <= 0;
                     end else begin
                         byte_cnt   <= byte_cnt + 1'b1;
                         bytes_left <= bytes_left - 1;

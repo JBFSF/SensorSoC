@@ -3,6 +3,7 @@
 
     // Current pinout:
     // input_in[4:0] : test mode selector
+    // input_in[5]   : start button (FSM IDLE -> SLEEP)
     // bidir[0]      : alarm output
     // bidir[1]      : SPI flash clock output
     // bidir[2]      : SPI flash MOSI output
@@ -65,7 +66,8 @@ module chip_core #(
     parameter CFG_MIN_VALID_FRAC = 8'd96,
     parameter CFG_MOTION_HI_TH = 16'd2000,
     parameter CFG_MAX_MOTION_HI = 16'd3,
-    parameter CFG_Q_MIN_ACCEPT = 8'd10
+    parameter CFG_Q_MIN_ACCEPT = 8'd10,
+    parameter integer TIMER_RELOAD_DEFAULT = 5_000_000
 )(
     `ifdef USE_POWER_PINS
     inout  wire VDD,
@@ -168,6 +170,7 @@ module chip_core #(
     logic        test_force_irq_w;
     logic        test_force_wake_w;
     logic        ml_irq_w;
+    logic        start_w;
     logic        timer_event_w;
 
     `ifdef SIM
@@ -206,6 +209,7 @@ module chip_core #(
     assign bidir_pd = '0;
 
     assign test_mode_w = input_in[4:0];
+    assign start_w     = input_in[5];
     assign test_force_irq_w = bidir_in[TEST_FORCE_IRQ_PAD];
     assign test_force_wake_w = bidir_in[TEST_FORCE_WAKE_PAD];
 
@@ -448,7 +452,8 @@ module chip_core #(
         .CFG_MAX_MISSED(CFG_MAX_MISSED),
         .CFG_MOTION_HI_TH(CFG_MOTION_HI_TH),
         .CFG_MAX_MOTION_HI(CFG_MAX_MOTION_HI),
-        .MSSD_MIN_RR_COUNT(MSSD_MIN_RR_COUNT)
+        .MSSD_MIN_RR_COUNT(MSSD_MIN_RR_COUNT),
+        .TIMER_RELOAD_DEFAULT(TIMER_RELOAD_DEFAULT)
     ) u_top (
         `ifdef USE_POWER_PINS
         .VDD                   (VDD),
@@ -510,6 +515,7 @@ module chip_core #(
 
         .logit0                (logit0_w),
         .logit1                (logit1_w),
+        .start_i               (start_w),
         .test_mode_i           (test_mode_w[3:0]),
         
         .test_force_irq_i      (test_force_irq_w),
