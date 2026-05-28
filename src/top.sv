@@ -1033,7 +1033,7 @@ module top #(
         .BASE_ADDR (WEIGHT_BASE),
         .CLK_DIV   (8'd2),
         .FLASH_BASE(24'h00_1000)
-    ) u_weight_ram (
+    ) u_weight_flash (
         `ifdef USE_POWER_PINS
             .VDD   (VDD),
             .VSS   (VSS),

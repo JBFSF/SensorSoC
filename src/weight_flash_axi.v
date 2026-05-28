@@ -331,8 +331,13 @@ module weight_flash_axi #(
                             spi_clk <= ~spi_clk;
                             if (!spi_clk) begin  // going high = rising edge: sample MISO
                                 if (bit_cnt == 5'd0) begin
-                                    // 32nd bit received — word complete
-                                    saxi_rdata  <= {rx_sr[30:0], spi_miso};
+                                    // 32nd bit received — word complete.
+                                    // SPI sends LSB-byte first; left-shift accumulates
+                                    // byte0 in [31:24]. Byte-reverse to match AXI LE.
+                                    saxi_rdata  <= {rx_sr[6:0], spi_miso,
+                                                    rx_sr[14:7],
+                                                    rx_sr[22:15],
+                                                    rx_sr[30:23]};
                                     saxi_rvalid <= 1'b1;
                                 end else begin
                                     rx_sr   <= {rx_sr[30:0], spi_miso};

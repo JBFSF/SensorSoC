@@ -30,9 +30,13 @@ signal levels for wrist-worn PPG. All parameters can be overridden at call time.
 
 import numpy as np
 import os
-import matplotlib.pyplot as plt
 from pathlib import Path
 from scipy.interpolate import interp1d
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
 
 # Reference defaults -- documented here for traceability but not used directly.
 # Pass overrides to process_ppg() as keyword arguments.
@@ -91,6 +95,9 @@ def _apply_adpd144ri_model(ppg_wave, dc_red, dc_ir, ac_amplitude, gain_error, of
 # Validation plot
 
 def _save_validation_plot(t_hr, red, ir, bpm_hr, odr_hz):
+    if plt is None:
+        return
+
     duration_s = 5
     n = duration_s * odr_hz
     t = t_hr[:n]

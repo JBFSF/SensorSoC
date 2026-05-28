@@ -116,3 +116,4 @@ async def load_weights_and_infer_once(dut):
         out_bytes = axi_ram.read(out_addr, 4)
         log0, log1 = struct.unpack("<2h", out_bytes)
         print(f"logits int16: [{log0}, {log1}] (raw bytes={out_bytes.hex()})")
+        print(line)
