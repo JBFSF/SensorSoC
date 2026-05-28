@@ -27,10 +27,19 @@ Pass criteria:
     * at least one accelerometer data burst is read over pads
     * the PPG FIFO access-enable write is observed over pads
     * at least one PPG FIFO burst is read over pads
+    * the internal accel_reader emits accel_valid_w
+    * the internal ppg_fifo_reader emits ppg_sample_valid_w
 
 This intentionally does not prove full feature correctness or ML/logit behavior.
 It proves that real chip_top sensor-pad I2C traffic can reach sensor-like models
 and return model-generated accel/PPG samples into the RTL.
+
+Useful debug output:
+    * the first decoded I2C address bytes seen on the pads
+    * sensor-model transaction counters and last samples served
+    * optional internal top/i2c_master/reader signals, when visible
+
+Set I2C_PAD_VERBOSE=1 to print periodic snapshots while the test is running.
 """
 
 import logging
@@ -60,6 +69,7 @@ PPG_REG_STATUS = 0x00
 PPG_REG_FIFO_THRESH = 0x06
 PPG_REG_FIFO_ACCESS_ENA = 0x5F
 PPG_REG_FIFO_ACCESS = 0x60
+DEBUG_SNAPSHOT_PERIOD_CYCLES = 25_000
 
 ROOT = Path(__file__).resolve().parents[3]
 SENSOR_MODEL_DIR = ROOT / "scripts" / "sensor_models"
@@ -125,6 +135,236 @@ def _build_sensor_model_streams():
         red_counts, _ir_counts = ppg_model.process_ppg(bpm_t, bpm, tmp_path)
 
     return accel_counts.astype(np.int16), red_counts.astype(np.uint16)
+
+
+def _get_optional_handle(dut, path):
+    handle = dut
+    for name in path.split("."):
+        try:
+            handle = getattr(handle, name)
+        except (AttributeError, ValueError):
+            return None
+    return handle
+
+
+def _value_to_int(value):
+    try:
+        return value.to_unsigned()
+    except (AttributeError, ValueError):
+        try:
+            return value.to_signed()
+        except (AttributeError, ValueError):
+            return None
+
+
+def _format_signal(handle, width_hint=None):
+    if handle is None:
+        return "n/a"
+    value = handle.value
+    intval = _value_to_int(value)
+    if intval is None:
+        return str(value)
+    if width_hint is not None:
+        mask = (1 << width_hint) - 1
+        return f"0x{intval & mask:0{max(1, (width_hint + 3) // 4)}x}"
+    return str(intval)
+
+
+def _collect_debug_handles(dut):
+    """Collect optional internal handles that are useful when present in RTL."""
+
+    base = "u_chip.i_chip_core.u_top"
+    names = {
+        "core_clk": "u_chip.i_chip_core.core_clk_w",
+        "i2c_state": f"{base}.u_i2c_master.state_r",
+        "i2c_sda_i": f"{base}.u_i2c_master.sda_i",
+        "i2c_scl": f"{base}.u_i2c_master.scl_o",
+        "i2c_sda_oe": f"{base}.u_i2c_master.sda_oe",
+        "i2c_active_client": f"{base}.u_i2c_master.active_client",
+        "i2c_byte_phase": f"{base}.u_i2c_master.byte_phase_r",
+        "i2c_timer": f"{base}.u_i2c_master.timer_r",
+        "acc_reader_state": f"{base}.u_accel_reader.state_r",
+        "acc_reader_timeout": f"{base}.u_accel_reader.timeout_o",
+        "acc_reader_nack": f"{base}.u_accel_reader.nack_seen_o",
+        "acc_cmd_valid": f"{base}.acc_i2c_cmd_valid_w",
+        "acc_cmd_addr": f"{base}.acc_i2c_cmd_addr_w",
+        "acc_cmd_reg": f"{base}.acc_i2c_cmd_reg_w",
+        "acc_cmd_write": f"{base}.acc_i2c_cmd_write_w",
+        "acc_rsp_valid": f"{base}.acc_i2c_rsp_valid_w",
+        "acc_rsp_data": f"{base}.acc_i2c_rsp_data_w",
+        "acc_rsp_done": f"{base}.acc_i2c_rsp_done_w",
+        "acc_rsp_err": f"{base}.acc_i2c_rsp_error_w",
+        "accel_valid": f"{base}.accel_valid_w",
+        "ax": f"{base}.ax_w",
+        "ay": f"{base}.ay_w",
+        "az": f"{base}.az_w",
+        "accel_error": f"{base}.accel_error_w",
+        "ppg_cmd_valid": f"{base}.ppg_i2c_cmd_valid_w",
+        "ppg_reader_state": f"{base}.u_ppg_fifo_reader.state_r",
+        "ppg_reader_error": f"{base}.u_ppg_fifo_reader.i2c_error_flag",
+        "ppg_cmd_addr": f"{base}.ppg_i2c_cmd_addr_w",
+        "ppg_cmd_reg": f"{base}.ppg_i2c_cmd_reg_w",
+        "ppg_cmd_len": f"{base}.ppg_i2c_cmd_len_w",
+        "ppg_cmd_write": f"{base}.ppg_i2c_cmd_write_w",
+        "ppg_rsp_valid": f"{base}.ppg_i2c_rsp_valid_w",
+        "ppg_rsp_data": f"{base}.ppg_i2c_rsp_data_w",
+        "ppg_rsp_last": f"{base}.ppg_i2c_rsp_last_w",
+        "ppg_rsp_done": f"{base}.ppg_i2c_rsp_done_w",
+        "ppg_rsp_err": f"{base}.ppg_i2c_rsp_err_w",
+        "ppg_sample_valid": f"{base}.ppg_sample_valid_w",
+        "ppg_sample": f"{base}.ppg_sample_w",
+        "ppg_sample_time": f"{base}.ppg_sample_time_w",
+        "feat_valid": f"{base}.feat_valid_o",
+        "ml_update_gate": f"{base}.ml_update_gate_o",
+        "invalid_reason": f"{base}.invalid_reason_o",
+    }
+    return {name: _get_optional_handle(dut, path) for name, path in names.items()}
+
+
+def _signal_is_high(handle):
+    if handle is None:
+        return False
+    intval = _value_to_int(handle.value)
+    return bool(intval)
+
+
+def _sample_debug_values(handles):
+    return {
+        "i2c_state": _format_signal(handles["i2c_state"]),
+        "i2c_extra": (
+            _format_signal(handles["i2c_active_client"]),
+            _format_signal(handles["i2c_byte_phase"]),
+            _format_signal(handles["i2c_timer"]),
+            _format_signal(handles["i2c_sda_i"]),
+            _format_signal(handles["i2c_sda_oe"]),
+        ),
+        "reader_state": (
+            _format_signal(handles["acc_reader_state"]),
+            _format_signal(handles["acc_reader_timeout"]),
+            _format_signal(handles["acc_reader_nack"]),
+            _format_signal(handles["ppg_reader_state"]),
+            _format_signal(handles["ppg_reader_error"]),
+        ),
+        "acc_cmd": (
+            _format_signal(handles["acc_cmd_valid"]),
+            _format_signal(handles["acc_cmd_addr"], 7),
+            _format_signal(handles["acc_cmd_reg"], 8),
+            _format_signal(handles["acc_cmd_write"]),
+        ),
+        "acc_rsp": (
+            _format_signal(handles["acc_rsp_valid"]),
+            _format_signal(handles["acc_rsp_data"], 8),
+            _format_signal(handles["acc_rsp_done"]),
+            _format_signal(handles["acc_rsp_err"]),
+        ),
+        "accel": (
+            _format_signal(handles["accel_valid"]),
+            _format_signal(handles["ax"], 16),
+            _format_signal(handles["ay"], 16),
+            _format_signal(handles["az"], 16),
+            _format_signal(handles["accel_error"]),
+        ),
+        "ppg_cmd": (
+            _format_signal(handles["ppg_cmd_valid"]),
+            _format_signal(handles["ppg_cmd_addr"], 7),
+            _format_signal(handles["ppg_cmd_reg"], 8),
+            _format_signal(handles["ppg_cmd_len"], 8),
+            _format_signal(handles["ppg_cmd_write"]),
+        ),
+        "ppg_rsp": (
+            _format_signal(handles["ppg_rsp_valid"]),
+            _format_signal(handles["ppg_rsp_data"], 8),
+            _format_signal(handles["ppg_rsp_last"]),
+            _format_signal(handles["ppg_rsp_done"]),
+            _format_signal(handles["ppg_rsp_err"]),
+        ),
+        "ppg_sample": (
+            _format_signal(handles["ppg_sample_valid"]),
+            _format_signal(handles["ppg_sample"], 16),
+            _format_signal(handles["ppg_sample_time"], 32),
+        ),
+        "feature": (
+            _format_signal(handles["feat_valid"]),
+            _format_signal(handles["ml_update_gate"]),
+            _format_signal(handles["invalid_reason"], 8),
+        ),
+    }
+
+
+def _log_debug_summary(log, dut, accel, ppg, addr_monitor, handles, pulse_counts):
+    values = _sample_debug_values(handles)
+    log.info(
+        "pad summary: scl=%s sda=%s accel_sda_o=%s ppg_sda_o=%s addr_bytes=%s",
+        _format_signal(dut.sensor_scl_sample),
+        _format_signal(dut.sensor_sda_sample),
+        _format_signal(dut.accel_sda_o),
+        _format_signal(dut.ppg_sda_o),
+        [hex(b) for b in addr_monitor.addr_bytes[:16]],
+    )
+    log.info(
+        "sensor model summary: accel_ctrl_writes=%d accel_range_writes=%d accel_reads=%d "
+        "last_accel=%s ppg_fifo_en_writes=%d ppg_fifo_reads=%d ppg_samples=%d last_ppg=0x%04x",
+        accel.ctrl_writes,
+        accel.range_writes,
+        accel.sample_reads,
+        accel.last_sample,
+        ppg.fifo_en_writes,
+        ppg.fifo_reads,
+        ppg.index,
+        ppg.last_sample,
+    )
+    log.info(
+        "internal pulse counts: acc_rsp_valid=%d accel_valid=%d ppg_rsp_valid=%d "
+        "ppg_sample_valid=%d feat_valid=%d",
+        pulse_counts["acc_rsp_valid"],
+        pulse_counts["accel_valid"],
+        pulse_counts["ppg_rsp_valid"],
+        pulse_counts["ppg_sample_valid"],
+        pulse_counts["feat_valid"],
+    )
+    log.info(
+        "last internal snapshot: i2c_state=%s acc_cmd(valid,addr,reg,wr)=%s "
+        "acc_rsp(valid,data,done,err)=%s accel(valid,ax,ay,az,err)=%s",
+        values["i2c_state"],
+        values["acc_cmd"],
+        values["acc_rsp"],
+        values["accel"],
+    )
+    log.info(
+        "last internal snapshot: i2c_extra(active,phase,timer,sda_i,sda_oe)=%s "
+        "reader_state(acc,acc_timeout,acc_nack,ppg,ppg_err)=%s",
+        values["i2c_extra"],
+        values["reader_state"],
+    )
+    log.info(
+        "last internal snapshot: ppg_cmd(valid,addr,reg,len,wr)=%s "
+        "ppg_rsp(valid,data,last,done,err)=%s ppg_sample(valid,value,time)=%s "
+        "feature(valid,gate,invalid_reason)=%s",
+        values["ppg_cmd"],
+        values["ppg_rsp"],
+        values["ppg_sample"],
+        values["feature"],
+    )
+
+
+class PulseMonitor:
+    """Edge-triggered monitor for one-cycle RTL pulses."""
+
+    def __init__(self, handle, sample_fn=None):
+        self.handle = handle
+        self.sample_fn = sample_fn
+        self.count = 0
+        self.samples = []
+
+    async def run(self):
+        if self.handle is None:
+            return
+        while True:
+            await RisingEdge(self.handle)
+            await ReadOnly()
+            self.count += 1
+            if self.sample_fn is not None:
+                self.samples.append(self.sample_fn())
 
 
 class RegisterSensorDevice(I2cDevice):
@@ -224,7 +464,8 @@ class RegisterSensorDevice(I2cDevice):
 
     async def _send_byte(self, value):
         for bit in range(7, -1, -1):
-            await FallingEdge(self.scl)
+            if self._scl_is_high():
+                await FallingEdge(self.scl)
             self._set_sda((value >> bit) & 1)
             await RisingEdge(self.scl)
         await FallingEdge(self.scl)
@@ -339,6 +580,7 @@ class Lis2dw12Device(RegisterSensorDevice):
         self.ctrl_writes = 0
         self.range_writes = 0
         self.sample_reads = 0
+        self.last_sample = None
         super().__init__(*args, addr=ACC_ADDR, **kwargs)
 
     def handle_reg_write(self, reg, data):
@@ -361,6 +603,7 @@ class Lis2dw12Device(RegisterSensorDevice):
             sample = self.samples[self.index]
             self.index += 1
             self.sample_reads += 1
+            self.last_sample = tuple(int(v) for v in sample)
             ax = (int(sample[0]) << 2) & 0xFFFF
             ay = (int(sample[1]) << 2) & 0xFFFF
             az = (int(sample[2]) << 2) & 0xFFFF
@@ -377,6 +620,7 @@ class Adpd144riDevice(RegisterSensorDevice):
         self.fifo_en_writes = 0
         self.fifo_reads = 0
         self._last_sample = 0
+        self.last_sample = 0
         super().__init__(*args, addr=PPG_ADDR, **kwargs)
 
     def handle_reg_write(self, reg, data):
@@ -393,6 +637,7 @@ class Adpd144riDevice(RegisterSensorDevice):
             sample = int(self.samples[self.index]) & 0x3FFF
             self.index += 1
             self._last_sample = sample
+            self.last_sample = sample
             return sample & 0xFF
         return (self._last_sample >> 8) & 0xFF
 
@@ -418,7 +663,7 @@ async def test_chip_top_i2c_pads_reach_cocotbext_sensor_models(dut):
     sim bus signals or force feature outputs.
     """
 
-    log = logging.getLogger("chip_top_i2c_pads")
+    log = dut._log
     accel_samples, ppg_samples = _build_sensor_model_streams()
     await _startup(dut)
 
@@ -444,18 +689,67 @@ async def test_chip_top_i2c_pads_reach_cocotbext_sensor_models(dut):
     addr_monitor = PassiveI2CAddressMonitor(dut)
     cocotb.start_soon(addr_monitor.run())
 
+    debug_handles = _collect_debug_handles(dut)
+    verbose = os.getenv("I2C_PAD_VERBOSE", "0") == "1"
+    pulse_monitors = {
+        "acc_rsp_valid": PulseMonitor(
+            debug_handles["acc_rsp_valid"],
+            lambda: (
+                _format_signal(debug_handles["acc_rsp_data"], 8),
+                _format_signal(debug_handles["acc_rsp_done"]),
+                _format_signal(debug_handles["acc_rsp_err"]),
+            ),
+        ),
+        "accel_valid": PulseMonitor(
+            debug_handles["accel_valid"],
+            lambda: (
+                _format_signal(debug_handles["ax"], 16),
+                _format_signal(debug_handles["ay"], 16),
+                _format_signal(debug_handles["az"], 16),
+            ),
+        ),
+        "ppg_rsp_valid": PulseMonitor(
+            debug_handles["ppg_rsp_valid"],
+            lambda: (
+                _format_signal(debug_handles["ppg_rsp_data"], 8),
+                _format_signal(debug_handles["ppg_rsp_last"]),
+                _format_signal(debug_handles["ppg_rsp_err"]),
+            ),
+        ),
+        "ppg_sample_valid": PulseMonitor(
+            debug_handles["ppg_sample_valid"],
+            lambda: (
+                _format_signal(debug_handles["ppg_sample"], 16),
+                _format_signal(debug_handles["ppg_sample_time"], 32),
+            ),
+        ),
+        "feat_valid": PulseMonitor(debug_handles["feat_valid"]),
+    }
+    for monitor in pulse_monitors.values():
+        cocotb.start_soon(monitor.run())
+
+    def pulse_counts():
+        return {name: monitor.count for name, monitor in pulse_monitors.items()}
+
     saw_scl_toggle = False
     last_scl = str(dut.sensor_scl_sample.value)
     max_cycles = int(os.getenv("I2C_PAD_MAX_CYCLES", "250000"))
+    post_observe_cycles = int(os.getenv("I2C_PAD_POST_OBSERVE_CYCLES", "10000"))
+    reached_models_cycle = None
+    sample_clock = debug_handles["core_clk"] if debug_handles["core_clk"] is not None else dut.clk_drv
 
     for cycle in range(max_cycles):
-        await RisingEdge(dut.clk_drv)
+        await RisingEdge(sample_clock)
         await ReadOnly()
         scl = str(dut.sensor_scl_sample.value)
         saw_scl_toggle = saw_scl_toggle or (scl != last_scl)
         last_scl = scl
 
-        if accel.sample_reads > 0 and ppg.fifo_reads > 0:
+        if verbose and cycle and cycle % DEBUG_SNAPSHOT_PERIOD_CYCLES == 0:
+            _log_debug_summary(log, dut, accel, ppg, addr_monitor, debug_handles, pulse_counts())
+
+        if accel.sample_reads > 0 and ppg.fifo_reads > 0 and reached_models_cycle is None:
+            reached_models_cycle = cycle
             log.info(
                 "pad I2C reached both models at cycle %d: accel_samples=%d ppg_fifo_reads=%d ppg_samples=%d",
                 cycle,
@@ -463,8 +757,14 @@ async def test_chip_top_i2c_pads_reach_cocotbext_sensor_models(dut):
                 ppg.fifo_reads,
                 ppg.index,
             )
+
+        readers_consumed = (
+            pulse_monitors["accel_valid"].count > 0 and pulse_monitors["ppg_sample_valid"].count > 0
+        )
+        if reached_models_cycle is not None and readers_consumed and cycle - reached_models_cycle >= post_observe_cycles:
             break
     else:
+        _log_debug_summary(log, dut, accel, ppg, addr_monitor, debug_handles, pulse_counts())
         # The extra counters separate "no pad clocks", "wrong address",
         # "init never completed", and "data FIFO never reached" failures.
         raise AssertionError(
@@ -479,9 +779,20 @@ async def test_chip_top_i2c_pads_reach_cocotbext_sensor_models(dut):
             f"addr_bytes={[hex(b) for b in addr_monitor.addr_bytes[:16]]}"
         )
 
+    _log_debug_summary(log, dut, accel, ppg, addr_monitor, debug_handles, pulse_counts())
+    log.info(
+        "internal pulse samples: acc_rsp=%s accel_valid=%s ppg_rsp=%s ppg_sample=%s",
+        pulse_monitors["acc_rsp_valid"].samples[:12],
+        pulse_monitors["accel_valid"].samples[:4],
+        pulse_monitors["ppg_rsp_valid"].samples[:20],
+        pulse_monitors["ppg_sample_valid"].samples[:8],
+    )
+
     assert saw_scl_toggle, "sensor SCL pad did not toggle"
     assert accel.ctrl_writes > 0, "accelerometer CTRL1 init write was not observed"
     assert accel.range_writes > 0, "accelerometer range init write was not observed"
     assert accel.sample_reads > 0, "accelerometer data was not read through pads"
     assert ppg.fifo_en_writes > 0, "PPG FIFO access enable write was not observed"
     assert ppg.fifo_reads > 0, "PPG FIFO data was not read through pads"
+    assert pulse_monitors["accel_valid"].count > 0, "accelerometer reader did not emit accel_valid_w"
+    assert pulse_monitors["ppg_sample_valid"].count > 0, "PPG FIFO reader did not emit ppg_sample_valid_w"
