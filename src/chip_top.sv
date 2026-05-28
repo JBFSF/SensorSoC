@@ -25,7 +25,9 @@ module chip_top #(
     parameter integer ACC_POLL_PERIOD_TICKS = 50_000,
     parameter integer PPG_POLL_PERIOD_TICKS = 100,
     parameter integer PPG_WATERMARK         = 8,
-    parameter integer PPG_MAX_BURST_SAMPLES = 32
+    parameter integer PPG_MAX_BURST_SAMPLES = 32,
+    parameter [15:0]  CFG_MOTION_HI_TH      = 16'd2000,
+    parameter [15:0]  CFG_MAX_MOTION_HI     = 16'd3
     )(
     `ifdef USE_POWER_PINS
     inout  wire VDD,
@@ -208,7 +210,9 @@ module chip_top #(
         .ACC_POLL_PERIOD_TICKS  (ACC_POLL_PERIOD_TICKS),
         .PPG_POLL_PERIOD_TICKS  (PPG_POLL_PERIOD_TICKS),
         .PPG_WATERMARK          (PPG_WATERMARK),
-        .PPG_MAX_BURST_SAMPLES  (PPG_MAX_BURST_SAMPLES)
+        .PPG_MAX_BURST_SAMPLES  (PPG_MAX_BURST_SAMPLES),
+        .CFG_MOTION_HI_TH       (CFG_MOTION_HI_TH),
+        .CFG_MAX_MOTION_HI      (CFG_MAX_MOTION_HI)
     ) i_chip_core (
         `ifdef USE_POWER_PINS
         .VDD        (VDD),

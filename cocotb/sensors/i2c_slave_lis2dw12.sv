@@ -73,8 +73,12 @@ module i2c_slave_lis2dw12 #(
             ay16 = {raw_ay[13:0], 2'b00};
             az16 = {raw_az[13:0], 2'b00};
         end else begin
-            ax16 = 16'h0; ay16 = 16'h0; az16 = 16'h0;
-            $display("i2c_slave_lis2dw12: EOF at time %0t", $time);
+            $display("i2c_slave_lis2dw12: EOF at time %0t — rewinding", $time);
+            $rewind(fd);
+            r = $fscanf(fd, "%d,%d,%d\n", raw_ax, raw_ay, raw_az);
+            ax16 = {raw_ax[13:0], 2'b00};
+            ay16 = {raw_ay[13:0], 2'b00};
+            az16 = {raw_az[13:0], 2'b00};
         end
     endtask
 

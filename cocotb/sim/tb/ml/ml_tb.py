@@ -149,3 +149,5 @@ async def load_weights_and_infer_once(dut):
         elif (pred == False and int(feats[4]) == 0):
             true_n += 1
         print(f"Conf matrix: true_n: {true_n}, false_n: {false_n}, false_p: {false_p}, true_p: {true_p}")
+        print(f"features: [{feats[0]}, {feats[1]}, {feats[2]}, {feats[3]}]")
+        print(line)

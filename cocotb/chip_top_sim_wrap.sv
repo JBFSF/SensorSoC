@@ -72,7 +72,9 @@ module chip_top_sim_wrap #(
         .ACC_POLL_PERIOD_TICKS  (8),
         .PPG_POLL_PERIOD_TICKS  (2),
         .PPG_WATERMARK          (8),
-        .PPG_MAX_BURST_SAMPLES  (32)
+        .PPG_MAX_BURST_SAMPLES  (32),
+        .CFG_MOTION_HI_TH       (16'hFFFF),
+        .CFG_MAX_MOTION_HI      (16'hFFFF)
     )
     `endif
     u_chip_top (

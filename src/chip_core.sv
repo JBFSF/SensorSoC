@@ -473,6 +473,11 @@ module chip_core #(
             .sim_len_o    (sim_len_w),
             .sim_write_o  (sim_write_w),
             .sim_wdata_o  (sim_wdata_w),
+            .sim_ack_i    (sim_ack_i),
+            .sim_rdata_i  (sim_rdata_i),
+            .sim_rvalid_i (sim_rvalid_i),
+            .sim_rlast_i  (sim_rlast_i),
+            .sim_err_i    (sim_err_i),
         `endif
         .feat_valid_o          (feat_valid_w),
         .time_feat_o           (time_feat_top_w),
