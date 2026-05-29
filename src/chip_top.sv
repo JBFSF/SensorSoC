@@ -251,6 +251,8 @@ module chip_top #(
             .sim_err_i    (sim_err_i),
         `endif
 
+        .test_irq_src_i           (3'b000),
+
         .debug_stim_override_en_i (1'b0),
         .debug_stim_mssd_i        (16'h0000),
         .debug_stim_delta_hr_i    (16'h0000),

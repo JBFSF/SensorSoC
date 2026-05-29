@@ -94,6 +94,7 @@ def _set_defaults(dut) -> None:
     dut.sim_rvalid_i.value = 0
     dut.sim_rlast_i.value = 0
     dut.sim_err_i.value = 0
+    dut.test_irq_src_i.value = 0
     dut.debug_stim_override_en_i.value = 0
     dut.debug_stim_mssd_i.value = 0
     dut.debug_stim_delta_hr_i.value = 0

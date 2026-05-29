@@ -104,6 +104,8 @@ module chip_core #(
         input  wire       sim_err_i,
     `endif
 
+    input  logic [2:0] test_irq_src_i,
+
     input  wire        debug_stim_override_en_i,
     input  wire [15:0] debug_stim_mssd_i,
     input  wire [15:0] debug_stim_delta_hr_i,
@@ -520,7 +522,7 @@ module chip_core #(
         
         .test_force_irq_i      (test_force_irq_w),
         .test_force_wake_i     (test_force_wake_w),
-        .test_irq_src_i        (3'b000),
+        .test_irq_src_i        (test_irq_src_i),
         .irq_eoi_o             (),
         .boot_done_o           (),
         .pico_trap_o           (pico_trap_w),

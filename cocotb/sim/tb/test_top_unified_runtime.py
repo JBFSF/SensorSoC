@@ -289,6 +289,8 @@ async def test_prod_main_alarm_after_five_light_sleep_predictions(dut):
     ml_start_writes = 0
     ml_irq_pulse_cycles = 0
     ml_irq_asserted = False
+    timer_irq_delay_cycles = 0
+    timer_irq_pulse_cycles = 0
 
     await NextTimeStep()
     _force_prod_policy_clocks(dut)
@@ -340,7 +342,14 @@ async def test_prod_main_alarm_after_five_light_sleep_predictions(dut):
 
             # We sampled bus activity in ReadOnly above. Any Force updates must
             # happen after advancing to a writable scheduler phase.
-            if pending_feature_time is not None or ml_irq_pulse_cycles > 0 or ml_irq_asserted:
+            needs_update = (
+                pending_feature_time is not None
+                or ml_irq_pulse_cycles > 0
+                or ml_irq_asserted
+                or timer_irq_delay_cycles > 0
+                or timer_irq_pulse_cycles > 0
+            )
+            if needs_update:
                 await NextTimeStep()
                 if ml_irq_pulse_cycles > 0:
                     _force_ml_irq(dut, True)
@@ -349,6 +358,19 @@ async def test_prod_main_alarm_after_five_light_sleep_predictions(dut):
                 elif ml_irq_asserted:
                     _force_ml_irq(dut, False)
                     ml_irq_asserted = False
+                    # Firmware will call sleep_until_next_epoch() after
+                    # processing ML result — pulse timer IRQ to wake it.
+                    timer_irq_delay_cycles = 50
+
+                if timer_irq_delay_cycles > 0:
+                    timer_irq_delay_cycles -= 1
+                    if timer_irq_delay_cycles == 0:
+                        timer_irq_pulse_cycles = 4
+                if timer_irq_pulse_cycles > 0:
+                    dut.test_irq_src.value = 0b001
+                    timer_irq_pulse_cycles -= 1
+                    if timer_irq_pulse_cycles == 0:
+                        dut.test_irq_src.value = 0
 
                 if pending_feature_time is not None:
                     _force_prod_features(dut, pending_feature_time)
