@@ -33,7 +33,7 @@
 
 #define OUT0_SENTINEL 0xA5A55A5Au
 
-#define N_LOGITS 10
+#define N_LOGITS 30
 
 #define WAKE_CLASS        1u
 #define WAKE_STREAK_REQ   1u
