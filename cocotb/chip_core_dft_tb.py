@@ -38,6 +38,25 @@ PICO_TIMER_WRITE_PROGRAM = (
     0x0000006F,
 )
 
+# Tiny RV32I program that enables the DFT wake source, then requests sleep
+# through the real IRQC and pwrctrl MMIO paths:
+#   lui  x1, 0x03005      ; x1 = 0x0300_5000 (IRQC base)
+#   addi x2, x0, 15       ; x2 = wake_en bits [3:0]
+#   sw   x2, 8(x1)        ; write IRQC_WAKE_EN = 0x0000_000f
+#   lui  x1, 0x03001      ; x1 = 0x0300_1000 (PWR_CTRL)
+#   addi x2, x0, 1        ; x2 = 0x0000_0001
+#   sw   x2, 0(x1)        ; write PWR_CTRL.sleep_req = 1
+#   jal  x0, 0            ; spin forever
+PICO_SLEEP_REQUEST_PROGRAM = (
+    0x030050B7,
+    0x00F00113,
+    0x0020A423,
+    0x030010B7,
+    0x00100113,
+    0x0020A023,
+    0x0000006F,
+)
+
 # Tiny RV32I program for richer Pico-state visibility:
 #   addi x1, x0, 64       ; x1 = SRAM data address 0x40
 #   lw   x2, 0(x1)        ; real SRAM load
@@ -324,6 +343,44 @@ def _assert_sleep_irq_summary(dut, *, trap: str, sleeping: str, cpu_clk_en: str,
     got = _debug_bus_str(dut)
     assert got == expected, f"mode 01001 summary mismatch: expected {expected}, got {got}"
     assert got == packed, f"mode 01001 did not mirror internal signals: expected {packed}, got {got}"
+
+
+async def _wait_for_pico_sleeping(dut, timeout_cycles: int = 200) -> None:
+    for _ in range(timeout_cycles):
+        await RisingEdge(dut.clk)
+        if int(dut.u_top.pico_sleeping_o.value) == 1:
+            return
+    raise AssertionError(
+        "timed out waiting for Pico sleep state: "
+        f"state_q={dut.u_top.fsm.state_q.value}, "
+        f"sleep_req={dut.u_top.sleep_req.value}, "
+        f"cpu_idle_seen={dut.u_top.fsm.cpu_idle_seen_r.value}, "
+        f"cpu_clk_en={dut.u_top.cpu_clk_en.value}, "
+        f"cpu_clk_en_lat={dut.u_top.cpu_clk_en_lat.value}, "
+        f"mem_valid={dut.u_top.mem_valid.value}, "
+        f"mem_addr={dut.u_top.mem_addr.value}, "
+        f"mem_wstrb={dut.u_top.mem_wstrb.value}, "
+        f"mem_wdata={dut.u_top.mem_wdata.value}, "
+        f"pwr_ready={dut.u_top.pwr_ready.value}, "
+        f"trap={dut.u_top.trap.value}"
+    )
+
+
+async def _wait_for_pico_awake(dut, timeout_cycles: int = 50) -> None:
+    for _ in range(timeout_cycles):
+        await RisingEdge(dut.clk)
+        if int(dut.u_top.pico_sleeping_o.value) == 0:
+            return
+    raise AssertionError(
+        "timed out waiting for Pico wake state: "
+        f"state_q={dut.u_top.fsm.state_q.value}, "
+        f"irq_sources={dut.u_top.irq_sources.value}, "
+        f"irqc_wake_req={dut.u_top.irqc_wake_req.value}, "
+        f"wake_en={dut.u_top.u_irqc.wake_en.value}, "
+        f"pending={dut.u_top.u_irqc.pending.value}, "
+        f"force_wake={dut.u_top.test_force_wake_i.value}, "
+        f"sleeping={dut.u_top.pico_sleeping_o.value}"
+    )
 
 
 async def _assert_feature_view_mode(
@@ -627,15 +684,18 @@ async def test_mode_01001_pico_sleep_irq_summary_tracks_sleep_irq_cpu_and_trap(d
     a neighboring CPU-only DFT mode to prove the CPU-clock summary bit.
     """
     _set_defaults(dut)
-    cocotb.start_soon(Clock(dut.clk, 20, unit="ns").start())
-
+    dut.rst_n.value = 1
+    await Timer(1, unit="ns")
     dut.rst_n.value = 0
+    _preload_sram_words(dut, PICO_SLEEP_REQUEST_PROGRAM)
     dut.u_top.boot_done.value = Force(1)
     dut.u_top.start_i.value = Force(1)
     _set_test_mode(dut, 0b01001)
+    cocotb.start_soon(Clock(dut.clk, 20, unit="ns").start())
     await Timer(200, unit="ns")
     dut.rst_n.value = 1
-    await ClockCycles(dut.clk, 6)
+    await _wait_for_pico_sleeping(dut)
+    await ClockCycles(dut.clk, 2)
 
     assert _debug_oe(dut) == 0xFFFF, f"expected debug OE enabled, got 0x{_debug_oe(dut):04x}"
     _assert_sleep_irq_summary(dut, trap="0", sleeping="1", cpu_clk_en="0", irq="0")
@@ -650,7 +710,8 @@ async def test_mode_01001_pico_sleep_irq_summary_tracks_sleep_irq_cpu_and_trap(d
     _assert_sleep_irq_summary(dut, trap="0", sleeping="1", cpu_clk_en="0", irq="0")
 
     _drive_bidir_input(dut, FORCE_WAKE_PAD, 1)
-    await ClockCycles(dut.clk, 2)
+    await _wait_for_pico_awake(dut)
+    await ClockCycles(dut.clk, 1)
     _assert_sleep_irq_summary(dut, trap="0", sleeping="0", cpu_clk_en="0", irq="0")
 
     _drive_bidir_input(dut, FORCE_WAKE_PAD, 0)
