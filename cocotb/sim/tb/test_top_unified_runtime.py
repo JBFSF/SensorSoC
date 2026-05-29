@@ -92,13 +92,13 @@ def _force_light_sleep_logits(dut) -> None:
     word packs logit0 in [15:0] and logit1 in [31:16], so this value makes
     logit1 > logit0 with a confidence of 100.
     """
-    dut.u_dut.u_weight_ram.logit_reg_0.value = Force(LIGHT_SLEEP_LOGIT_WORD)
-    dut.u_dut.u_weight_ram.logit_reg_1.value = Force(0)
+    dut.u_dut.u_weight_flash.logit_reg_0.value = Force(LIGHT_SLEEP_LOGIT_WORD)
+    dut.u_dut.u_weight_flash.logit_reg_1.value = Force(0)
 
 
 def _release_light_sleep_logits(dut) -> None:
-    dut.u_dut.u_weight_ram.logit_reg_0.value = Release()
-    dut.u_dut.u_weight_ram.logit_reg_1.value = Release()
+    dut.u_dut.u_weight_flash.logit_reg_0.value = Release()
+    dut.u_dut.u_weight_flash.logit_reg_1.value = Release()
 
 
 def _force_fast_ml_control_path(dut) -> None:

@@ -481,7 +481,7 @@ initial begin
         end
 
         if (dut.test_status == 32'hCAFE_BABE) begin
-            sampled_logit_word = dut.u_weight_ram.logit_reg_0;
+            sampled_logit_word = dut.u_weight_flash.logit_reg_0;
             raw_logit_word = sampled_logit_word;
             log0_s = $signed(sampled_logit_word[15:0]);
             log1_s = $signed(sampled_logit_word[31:16]);

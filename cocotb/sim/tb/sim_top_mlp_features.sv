@@ -190,8 +190,8 @@ module sim_top_mlp_features;
     .sim_err(ppg_sim_err)
   );
 
-  assign mlp_word0 = u_dut.u_weight_ram.feat_reg_0;
-  assign mlp_word1 = u_dut.u_weight_ram.feat_reg_1;
+  assign mlp_word0 = u_dut.u_weight_flash.feat_reg_0;
+  assign mlp_word1 = u_dut.u_weight_flash.feat_reg_1;
   assign tk_ar_fire = u_dut.wram_arvalid && u_dut.wram_arready;
   assign tk_araddr = u_dut.wram_araddr;
 

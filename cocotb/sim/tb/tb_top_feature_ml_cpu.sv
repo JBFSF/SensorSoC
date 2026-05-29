@@ -356,14 +356,14 @@ initial begin
             end
             // The shared input buffer should match the feature vector that was
             // published through the MMIO-visible latch bank.
-            if (dut.u_weight_ram.feat_reg_0 !== {first_time_feat[15:0], first_motion_feat[15:0]}) begin
+            if (dut.u_weight_flash.feat_reg_0 !== {first_time_feat[15:0], first_motion_feat[15:0]}) begin
                 $display("FAIL: weight RAM word0 mismatch expected={time,motion}=0x%04x_%04x got=0x%08x",
-                         first_time_feat[15:0], first_motion_feat[15:0], dut.u_weight_ram.feat_reg_0);
+                         first_time_feat[15:0], first_motion_feat[15:0], dut.u_weight_flash.feat_reg_0);
                 failures = failures + 1;
             end
-            if (dut.u_weight_ram.feat_reg_1 !== {first_mssd_feat[15:0], first_delta_hr_feat[15:0]}) begin
+            if (dut.u_weight_flash.feat_reg_1 !== {first_mssd_feat[15:0], first_delta_hr_feat[15:0]}) begin
                 $display("FAIL: weight RAM word1 mismatch expected={mssd,dhr}=0x%04x_%04x got=0x%08x",
-                         first_mssd_feat[15:0], first_delta_hr_feat[15:0], dut.u_weight_ram.feat_reg_1);
+                         first_mssd_feat[15:0], first_delta_hr_feat[15:0], dut.u_weight_flash.feat_reg_1);
                 failures = failures + 1;
             end
             if (!saw_global_base_write) begin

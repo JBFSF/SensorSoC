@@ -291,12 +291,12 @@ always @(posedge clk) begin
                      $time,
                      dut.wram_awvalid,
                      dut.wram_awaddr,
-                     dut.u_weight_ram.eff_waddr,
-                     dut.u_weight_ram.eff_woff,
+                     dut.u_weight_flash.eff_waddr,
+                     dut.u_weight_flash.eff_woff,
                      dut.wram_wdata,
                      dut.wram_wlast);
-            if ((dut.u_weight_ram.eff_woff == 32'd5504) ||
-                (dut.u_weight_ram.eff_woff == 32'd5508)) begin
+            if ((dut.u_weight_flash.eff_woff == 32'd5504) ||
+                (dut.u_weight_flash.eff_woff == 32'd5508)) begin
                 $display("[%0t] TB: FINAL OUT detail maxi_wdata=0x%08x sb=0x%08x packed=0x%08x ram_lo=0x%04x ram_hi=0x%04x sink_waddr=%0d sink_wdata=0x%04x read_fsm=%0d write_size_buf=%0d",
                          $time,
                          dut.wram_wdata,

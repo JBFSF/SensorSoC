@@ -70,7 +70,7 @@ timeout "${regression_timeout}" make sim-dft-smoke
 timeout "${regression_timeout}" bash -c \
     "source '${TOOLS_DIR}/_common.sh'; run_make test-irq-states"
 timeout "${regression_timeout}" bash -c \
-    "source '${TOOLS_DIR}/_common.sh'; run_make sim-top-feature-ml-prod-main-host-i2c"
+    "source '${TOOLS_DIR}/_common.sh'; run_make test-top-unified-runtime"
 
 echo
 echo "Reproducible firmware flow passed."

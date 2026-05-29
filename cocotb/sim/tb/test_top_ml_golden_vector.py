@@ -92,8 +92,8 @@ async def test_unified_top_canonical_v1(dut):
     assert observed_x_word0 is not None, "never observed CPU write of canonical input word0"
     assert observed_x_word1 is not None, "never observed CPU write of canonical input word1"
 
-    observed_logit_word = _u(dut.u_dut.u_weight_ram.logit_reg_0)
-    observed_logit_word_1 = _u(dut.u_dut.u_weight_ram.logit_reg_1)
+    observed_logit_word = _u(dut.u_dut.u_weight_flash.logit_reg_0)
+    observed_logit_word_1 = _u(dut.u_dut.u_weight_flash.logit_reg_1)
     observed_logits = unpack_int16_pair(observed_logit_word)
 
     assert observed_x_word0 == expected_x_word0, (
