@@ -266,7 +266,7 @@ initial begin
             sampled_logit_word = {logit1[15:0], logit0[15:0]};
             $display("FAIL: firmware code=0x%08x visible_logits=0x%08x weight_logit_regs=0x%08x_0x%08x",
                      dut.test_code, sampled_logit_word,
-                     dut.u_weight_ram.logit_reg_1, dut.u_weight_ram.logit_reg_0);
+                     dut.u_weight_flash.logit_reg_1, dut.u_weight_flash.logit_reg_0);
             $display("FAIL: firmware FAIL code=0x%08x", dut.test_code);
             $fatal(1);
         end
