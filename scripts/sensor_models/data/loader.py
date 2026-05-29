@@ -24,20 +24,41 @@ BASE_URL    = "https://physionet.org/files/sleep-accel/1.0.0"
 # A small representative sample of subject IDs (31 total in the dataset)
 SUBJECT_IDS = ["2598705", "4018081", "5498603"]
 
-MAX_SAMPLES = 10_000
+MAX_SAMPLES = 200_000
+START_TIME_S = 2790   # skip to where N3 sleep first appears in the primary subject block
 
 
 def _fetch_txt_partial(url: str, max_lines: int, delimiter=None) -> np.ndarray:
-    """
-    Stream a .txt file from `url`, downloading only the first `max_lines`
-    rows. The connection is closed immediately after, so only the needed
-    bytes are transferred.
-    """
-    with requests.get(url, stream=True, timeout=30) as resp:
+    """Stream up to max_lines rows from url, starting from the beginning."""
+    with requests.get(url, stream=True, timeout=(10, 300)) as resp:
         resp.raise_for_status()
         lines = list(itertools.islice(resp.iter_lines(), max_lines))
     text = "\n".join(line.decode() for line in lines)
     return np.loadtxt(io.StringIO(text), delimiter=delimiter)
+
+
+def _fetch_motion_from_time(url: str, start_time_s: float, take_rows: int) -> np.ndarray:
+    """
+    Stream a PhysioNet motion file, skip rows until timestamp >= start_time_s,
+    then collect take_rows rows. Parses timestamps on the fly so no wasted
+    memory or timeout waiting for skipped rows to decode.
+    """
+    collected = []
+    with requests.get(url, stream=True, timeout=(10, 300)) as resp:
+        resp.raise_for_status()
+        for raw in resp.iter_lines():
+            if not raw:
+                continue
+            parts = raw.split()
+            if float(parts[0]) < start_time_s:
+                continue
+            collected.append(b" ".join(parts))
+            if len(collected) >= take_rows:
+                break
+    if not collected:
+        return np.empty((0, 4))
+    text = b"\n".join(collected).decode()
+    return np.loadtxt(io.StringIO(text))
 
 
 def load_motion() -> np.ndarray:
@@ -49,16 +70,14 @@ def load_motion() -> np.ndarray:
     """
     print("Streaming motion data from PhysioNet...")
     all_data = []
-    # Each subject contributes up to MAX_SAMPLES rows before downsampling;
-    # after 2x downsample we need 2× that many raw rows to hit the cap.
-    rows_per_subject = (MAX_SAMPLES * 2) // len(SUBJECT_IDS)
+    rows_per_subject = (MAX_SAMPLES * 2) // len(SUBJECT_IDS)  # rows needed at 50 Hz
     for subject in SUBJECT_IDS:
         url = f"{BASE_URL}/motion/{subject}_acceleration.txt"
         try:
-            data = _fetch_txt_partial(url, rows_per_subject)
+            data = _fetch_motion_from_time(url, START_TIME_S, rows_per_subject)
             xyz  = data[:, 1:4]   # drop timestamp, keep x/y/z
             all_data.append(xyz)
-            print(f"  Streamed subject {subject}: {len(xyz)} samples")
+            print(f"  Streamed subject {subject}: {len(xyz)} samples (t >= {START_TIME_S}s)")
         except Exception as e:
             print(f"  Warning: could not stream subject {subject}: {e}")
 

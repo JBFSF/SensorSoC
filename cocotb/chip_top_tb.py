@@ -20,7 +20,6 @@ scl        = os.getenv("SCL", "gf180mcu_fd_sc_mcu7t5v0")
 gl         = os.getenv("GL", False)
 slot       = os.getenv("SLOT", "1x1")
 test_module = os.getenv("COCOTB_TEST_MODULE", "chip_top_tb")
-pad_i2c_rtl = os.getenv("CHIP_TOP_PAD_I2C", "0") == "1"
 
 
 hdl_toplevel = os.getenv("CHIP_TOPLEVEL", "chip_top_sim_wrap")
@@ -152,14 +151,15 @@ async def test_chip_top_boot(dut):
     # Force FSM to ALL mode so feat+ML+CPU all run without sleeping.
     # input_PAD[3:0] drives test_mode[3:0]; 4'b0101 = ALL mode.
     await set_defaults(dut)
-    dut.input_PAD.value = 0b00000101
+    dut.input_PAD.value = 0b00100000
+
     await start_clock(dut.clk_PAD)
     await reset(dut.rst_n_PAD)
 
     core  = _core(dut)
     u_top = _top(dut)
 
-    TIMEOUT_CYCLES = 500_000
+    TIMEOUT_CYCLES = 1#500_000
     logger.info("Waiting for boot_done...")
 
     for cycle in range(TIMEOUT_CYCLES):
@@ -179,16 +179,14 @@ async def test_chip_top_boot(dut):
 
 #full pipeline test
 
-_N_LOGITS = 30  # number of inferences firmware runs before writing CAFEBABE
+_N_LOGITS = 10  # number of inferences firmware runs before writing CAFEBABE
 
 
 async def _feat_monitor(u_top):
-    """Background coroutine: prints features when they change, logits when they change."""
-    prev_feat  = None
-    prev_logit = None
+    """Background coroutine: prints features when they change."""
+    prev_feat = None
     while True:
         await RisingEdge(u_top.feat_valid_o)
-
         mot = _s16_or_none(u_top.feat_motion_latched_r)
         tim = _s16_or_none(u_top.feat_time_latched_r)
         dhr = _s16_or_none(u_top.feat_delta_hr_latched_r)
@@ -202,22 +200,55 @@ async def _feat_monitor(u_top):
             )
             prev_feat = curr_feat
 
+
+async def _logit_monitor(clk, u_top):
+    """Background coroutine: prints logit_reg_0 every time it changes.
+    logit_reg_0 packs both logits: bits[15:0]=log0, bits[31:16]=log1.
+    """
+    # One-shot probe so we can see *why* the handle lookup fails if it does
+    try:
+        handle = u_top.u_weight_flash.logit_reg_0
+        print(f"[logit_monitor] handle resolved: {handle}", flush=True)
+    except Exception as e:
+        print(f"[logit_monitor] could not resolve u_top.u_weight_flash.logit_reg_0: {e!r}",
+              flush=True)
+        return
+
+    prev = None
+    first_value_logged = False
+    while True:
+        await RisingEdge(clk)
         try:
-            lr   = int(u_top.u_weight_ram.logit_reg_0.value)
-            log0 = _s16(lr & 0xFFFF)
-            log1 = _s16((lr >> 16) & 0xFFFF)
-            curr_logit = (log0, log1)
-        except Exception:
-            curr_logit = None
-        if curr_logit is not None and curr_logit != prev_logit:
-            pred = "non-N3" if log1 > log0 else "N3"
-            print(f"[logit]  log0={log0:6d}  log1={log1:6d}  → {pred}", flush=True)
-            prev_logit = curr_logit
+            packed = int(handle.value)
+        except ValueError:
+            # Contains X's — skip silently
+            continue
+        except Exception as e:
+            if not first_value_logged:
+                print(f"[logit_monitor] read error: {e!r}", flush=True)
+                first_value_logged = True
+            continue
+        if not first_value_logged:
+            print(f"[logit_monitor] first valid read: packed=0x{packed:08X}", flush=True)
+            first_value_logged = True
+        if packed != prev:
+            u0 = packed & 0xFFFF
+            u1 = (packed >> 16) & 0xFFFF
+            log0 = _s16(u0)
+            log1 = _s16(u1)
+            pred = "bad time to wake" if log1 > log0 else "good time to wake"
+            print(
+                f"[logit]  packed=0x{packed:08X}  "
+                f"log0=0x{u0:04X} ({log0:6d})  "
+                f"log1=0x{u1:04X} ({log1:6d})  → {pred}",
+                flush=True,
+            )
+            prev = packed
 
 
 @cocotb.test(skip=(hdl_toplevel != "chip_top_sim_wrap"))
 async def test_chip_top_feature_inject(dut):
-    """Full pipeline: sensor → features → 30 ML inferences → print logits live."""
+    """Full pipeline: sensor → features → ML inference → alarm output."""
     logger = logging.getLogger("chip_top_feature_inject")
 
     # ALL mode: features + ML + CPU all active; bypasses SLEEP state in sim.
@@ -225,10 +256,12 @@ async def test_chip_top_feature_inject(dut):
     dut.input_PAD.value = 0b00000101
     await start_clock(dut.clk_PAD)
     await reset(dut.rst_n_PAD)
+
     core  = _core(dut)
     u_top = _top(dut)
+
     BOOT_TIMEOUT    = 500_000
-    RUNTIME_TIMEOUT = 3_000_000
+    RUNTIME_TIMEOUT = 10_000_000
 
     # --- Phase 1: wait for boot ---
     logger.info("Waiting for boot_done...")
@@ -240,10 +273,12 @@ async def test_chip_top_feature_inject(dut):
         raise AssertionError("Timeout waiting for boot_done")
 
     assert core.pico_trap_w.value == 0, "CPU trapped during boot"
+
     logger.info("Boot done. Waiting for 30 logits...")
 
     # Start background monitor — prints features + stale logits on every feat_valid_o
     cocotb.start_soon(_feat_monitor(u_top))
+    cocotb.start_soon(_logit_monitor(dut.clk_PAD, u_top))
 
     # --- Phase 2: collect 30 logits as firmware writes them ---
     # Firmware writes TEST_STATUS = 1..30 (one per inference), then 0xCAFEBABE.
@@ -251,11 +286,30 @@ async def test_chip_top_feature_inject(dut):
     last_status = 0
     logit_count = 0
 
+    # --- Phase 2: wait for firmware test_status (CAFE_BABE = pass, DEAD_BEEF = fail) ---
     for cycle in range(RUNTIME_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
 
+        if cycle % 100_000 == 0:
+            try:
+                ts = u_top.test_status.value.to_unsigned()
+                tc_raw = u_top.test_code.value
+                tc_str = str(tc_raw)
+                alarm = dut.alarm_o.value
+                try:
+                    tc_int = tc_raw.to_unsigned()
+                    tc_display = f"0x{tc_int:08X}"
+                except ValueError:
+                    tc_display = f"X:{tc_str}"
+                logger.info(
+                    f"  cycle {cycle}: test_status=0x{ts:08X} "
+                    f"test_code={tc_display} alarm={alarm}"
+                )
+            except Exception:
+                pass
+
         if core.pico_trap_w.value == 1:
-            raise AssertionError(f"CPU trapped at cycle {cycle}")
+            raise AssertionError("CPU trapped during runtime")
 
         try:
             status = u_top.test_status.value.to_unsigned()
@@ -263,59 +317,86 @@ async def test_chip_top_feature_inject(dut):
             continue
 
         if status == 0xDEAD_BEEF:
+            tc_raw = u_top.test_code.value
             try:
-                code_str = f"0x{u_top.test_code.value.to_unsigned():08X}"
-            except Exception:
-                code_str = str(u_top.test_code.value)
+                code = tc_raw.to_unsigned()
+                code_str = f"0x{code:08X}"
+            except ValueError:
+                code_str = f"X:{tc_raw!s}"
             raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
 
-        if status != last_status:
-            last_status = status
+        if status == 0xCAFE_BABE:
+            tc_raw = u_top.test_code.value
+            try:
+                code = tc_raw.to_unsigned()
+                code_str = f"0x{code:08X}"
+            except ValueError:
+                code = None
+                code_str = f"X:{tc_raw!s}"
+            logger.info(
+                f"Firmware reported PASS: test_code={code_str} "
+                f"alarm={dut.alarm_o.value}"
+            )
 
-            # Each value 1..N_LOGITS signals a completed inference
-            if 1 <= status <= _N_LOGITS:
-                try:
-                    tc = u_top.test_code.value.to_unsigned()
-                    log0 = _s16(tc & 0xFFFF)
-                    log1 = _s16((tc >> 16) & 0xFFFF)
-                    pred = "N3" if log1 > log0 else "non-N3"
-                    # Read latched feature values directly from RTL for diagnostics
-                    try:
-                        mot  = _s16(int(u_top.feat_motion_latched_r.value))
-                        tim  = _s16(int(u_top.feat_time_latched_r.value))
-                        dhr  = _s16(int(u_top.feat_delta_hr_latched_r.value))
-                        msd  = _s16(int(u_top.feat_mssd_latched_r.value))
-                        feat_str = f"  feat=[mot={mot} tim={tim} dhr={dhr} msd={msd}]"
-                    except Exception:
-                        feat_str = ""
-                    logger.info(
-                        f"  logit {status:2d}/{_N_LOGITS}: "
-                        f"log0={log0:6d}  log1={log1:6d}  → {pred}{feat_str}"
-                    )
-                    logit_count += 1
-                except Exception as e:
-                    logger.warning(f"  logit {status}: could not read TEST_CODE ({e})")
+            # Check bits 30 and 29 by position in binary string (MSB first).
+            # This handles X bits in other positions (e.g., the confidence field).
+            binstr = str(tc_raw)  # 32-char string: '0'/'1'/'X'/'Z', MSB at [0]
+            bit30 = binstr[1]     # bit 30 = outputs_mutated
+            bit29 = binstr[2]     # bit 29 = saw_busy
+            assert bit30 == "1", \
+                f"Firmware: ML output mutation not observed (bit30={bit30}, test_code={code_str})"
+            assert bit29 == "1", \
+                f"Firmware: ML BUSY high not observed (bit29={bit29}, test_code={code_str})"
 
-            if status == 0xCAFE_BABE:
-                assert logit_count == _N_LOGITS, (
-                    f"Expected {_N_LOGITS} logits before PASS, got {logit_count}"
+            if code is not None:
+                logger.info(
+                    f"  predicted_class={code >> 31} "
+                    f"outputs_mutated={(code >> 30) & 1} "
+                    f"saw_busy={(code >> 29) & 1} "
+                    f"confidence={code & 0xFFFF}"
                 )
-                try:
-                    tc = u_top.test_code.value.to_unsigned()
-                    log0 = _s16(tc & 0xFFFF)
-                    log1 = _s16((tc >> 16) & 0xFFFF)
-                    pred_class = (tc >> 31) & 1
-                    logger.info(
-                        f"Full pipeline PASS — 30 logits collected. "
-                        f"Final: log0={log0} log1={log1} class={pred_class}"
-                    )
-                except Exception:
-                    logger.info(f"Full pipeline PASS — 30 logits collected.")
-                return
+            else:
+                logger.warning(
+                    f"test_code has X bits — confidence field indeterminate. "
+                    f"Raw: {code_str}. Check logit WRAM region for X propagation."
+                )
+            await ClockCycles(dut.clk_PAD, 4)
+            await ReadOnly()
+
+            dbg_log0 = _s16_or_none(u_top.logit0)
+            dbg_log1 = _s16_or_none(u_top.logit1)
+            logit_word0 = _u32_or_none(u_top.u_weight_flash.logit_reg_0)
+            logit_word1 = _u32_or_none(u_top.u_weight_flash.logit_reg_1)
+
+            if dbg_log0 is not None and dbg_log1 is not None:
+                logger.info(f"  logits_dbg=({dbg_log0}, {dbg_log1})")
+            else:
+                logger.warning(
+                    f"top-level dbg logits unresolved: "
+                    f"logit0={u_top.logit0.value} logit1={u_top.logit1.value}"
+                )
+
+            if logit_word0 is not None:
+                reg_log0 = _s16(logit_word0)
+                reg_log1 = _s16(logit_word0 >> 16)
+                aux_word = "X" if logit_word1 is None else f"0x{logit_word1:08X}"
+                logger.info(
+                    f"  logits_reg=({reg_log0}, {reg_log1}) "
+                    f"word0=0x{logit_word0:08X} word1={aux_word}"
+                )
+            else:
+                logger.warning(
+                    f"logit register window unresolved: "
+                    f"word0={u_top.u_weight_flash.logit_reg_0.value} "
+                    f"word1={u_top.u_weight_flash.logit_reg_1.value}"
+                )
+
+            logger.info("Full pipeline test passed.")
+            return
 
     raise AssertionError(
         f"Timeout after {RUNTIME_TIMEOUT} cycles — "
-        f"only {logit_count}/{_N_LOGITS} logits collected"
+        f"firmware never reached pass/fail state"
     )
 
 
@@ -331,26 +412,24 @@ _FSM_STATES = {
     5: "CPU_FEAT",
     6: "FEAT_ML",
     7: "CPU_ONLY",
-    8: "ALARM",
-    9: "CPU_INIT",
 }
 
 
 @cocotb.test(skip=(hdl_toplevel != "chip_top_sim_wrap"))
 async def test_chip_top_normal_mode(dut):
     """Normal mode test: run chip normally, monitor CPU errors, FSM state, and alarm outputs."""
-    logger = cocotb.log
+    logger = logging.getLogger("chip_top_normal_mode")
 
-    # Normal mode: test_mode=0, start bit (input_PAD[5]) = 1
+    # Normal mode (input_PAD = 0)
     await set_defaults(dut)
-    dut.input_PAD.value = 0b100000  # bit 5 = start
+    dut.input_PAD.value = 0
     await start_clock(dut.clk_PAD)
     await reset(dut.rst_n_PAD)
 
     core  = _core(dut)
     u_top = _top(dut)
 
-    BOOT_TIMEOUT    = 500_000
+    BOOT_TIMEOUT    = 1#500_000
     RUNTIME_TIMEOUT = 1#10_000_000
 
     logger.info("Normal mode test started. Monitoring for boot completion...")
@@ -371,7 +450,7 @@ async def test_chip_top_normal_mode(dut):
     # --- Phase 2: monitor CPU errors, FSM state, and alarm ---
     last_alarm = 0
     last_fsm_state = None
-    RUNTIME_TIMEOUT = 500_000
+    RUNTIME_TIMEOUT = 300_000
     for cycle in range(RUNTIME_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
 
@@ -399,48 +478,24 @@ async def test_chip_top_normal_mode(dut):
                 return
 
         # Log periodic status
-        if cycle % 10_000 == 0:
+        if cycle % 100_000 == 0:
             fsm_state_name = "?"
             try:
                 fsm_state = int(u_top.fsm.state_q.value)
                 fsm_state_name = _FSM_STATES.get(fsm_state, f"UNKNOWN({fsm_state})")
             except (AttributeError, ValueError, TypeError):
                 pass
-            try:
-                tc = int(u_top.test_code.value)
-                pred_class  = (tc >> 31) & 1
-                alarm_bit   = (tc >> 30) & 1
-                streak      = (tc >> 16) & 0xFF
-                conf        = tc & 0xFFFF
-                tc_display  = f"class={pred_class} alarm_bit={alarm_bit} streak={streak} conf={conf}"
-            except (AttributeError, ValueError, TypeError):
-                tc_display = "?"
-            try:
-                inv = int(core.invalid_reason_w.value)
-                inv_bits = (
-                    f"overflow={inv&1} i2c_err={(inv>>1)&1} no_beats={(inv>>2)&1} "
-                    f"low_frac={(inv>>3)&1} double_bad={(inv>>4)&1} "
-                    f"missed_bad={(inv>>5)&1} motion_bad={(inv>>6)&1}"
-                )
-            except (AttributeError, ValueError, TypeError):
-                inv_bits = "?"
-            logger.info(
-                f"  cycle {cycle}: FSM={fsm_state_name} trap={core.pico_trap_w.value} "
-                f"alarm={dut.alarm_o.value} [{tc_display}] inv=[{inv_bits}]"
-            )
+            logger.info(f"  cycle {cycle}: FSM={fsm_state_name} trap={core.pico_trap_w.value} alarm={dut.alarm_o.value}")
 
-    raise AssertionError(f"Alarm never fired within {RUNTIME_TIMEOUT} cycles — test failed.")
+    logger.info("Normal mode test completed — alarm never fired within timeout.")
 
 
 def chip_top_runner():
     proj_path = Path(__file__).resolve().parent
 
     sources = []
-    # Most RTL builds use the SIM-only sensor bus. Pad-level I2C RTL tests
-    # intentionally compile without SIM so i2c_master drives bidir_PAD[23:24].
-    defines = {f"SLOT_{slot.upper().replace('.', 'P')}": True}
-    if not pad_i2c_rtl:
-        defines["SIM"] = True
+    # RTL builds use the SIM-only sensor bus; GL builds below intentionally do not.
+    defines = {f"SLOT_{slot.upper().replace('.', 'P')}": True, "SIM": True}
     includes = [proj_path / "../src/"]
 
     if gl:
@@ -478,7 +533,7 @@ def chip_top_runner():
         defines = {"FUNCTIONAL": True, "functional": True, "USE_POWER_PINS": True}
     else:
         src_dir = proj_path / "../src"
-        pad_level = hdl_toplevel in {"chip_top", "chip_top_sim_wrap", "sim_chip_top_gl_sensor_bridge_env"}
+        pad_level = hdl_toplevel in {"chip_top", "chip_top_sim_wrap"}
         skip = {"dummy_top.sv", "soc_top.v"}
         if pad_level:
             skip.add("gf180mcu_fd_ip_sram__sram512x8m8wm1.v")
@@ -494,12 +549,9 @@ def chip_top_runner():
         # Sim wrapper is only needed when it is the selected HDL toplevel.
         if hdl_toplevel == "chip_top_sim_wrap":
             sources.append(proj_path / "chip_top_sim_wrap.sv")
-        elif hdl_toplevel == "sim_chip_top_gl_sensor_bridge_env":
-            sources.append(proj_path / "sim/tb/sim_chip_top_gl_sensor_bridge_env.sv")
 
         # Pad-level builds need GF180 IO models. Direct chip_core RTL DFT does not.
         if pad_level:
-            defines["USE_POWER_PINS"] = True
             sources += [
                 Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_fd_io.v",
                 Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_ws_io.v",

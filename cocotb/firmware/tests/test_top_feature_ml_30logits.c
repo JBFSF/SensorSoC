@@ -4,6 +4,7 @@
 #define ML_BASE       0x03003000u
 #define WEIGHT_BASE   0x03006000u
 #define TEST_BASE     0x0300F000u
+#define TIMER_BASE    0x03002000u
 
 #define TEST_STATUS   (*(volatile uint32_t*)(TEST_BASE + 0x00u))
 #define TEST_CODE     (*(volatile uint32_t*)(TEST_BASE + 0x04u))
@@ -28,20 +29,60 @@
 #define ALARM_BASE    0x03000000u
 #define ALARM_CTRL    (*(volatile uint32_t*)(ALARM_BASE + 0x00u))
 
+#define PWR_CTRL         (*(volatile uint32_t*)0x03001000u)
+#define PWR_WAKE_STATUS  (*(volatile uint32_t*)0x03001004u)
+
+#define TIMER_CTRL       (*(volatile uint32_t*)(TIMER_BASE + 0x00u))
+#define TIMER_RELOAD     (*(volatile uint32_t*)(TIMER_BASE + 0x04u))
+#define TIMER_COUNT      (*(volatile uint32_t*)(TIMER_BASE + 0x08u))
+
+#define IRQC_PENDING     (*(volatile uint32_t*)0x03005000u)
+#define IRQC_MASK        (*(volatile uint32_t*)0x03005004u)
+#define IRQC_WAKE_EN     (*(volatile uint32_t*)0x03005008u)
+#define IRQC_CLAIM       (*(volatile uint32_t*)0x03005014u)
+#define IRQC_COMPLETE    (*(volatile uint32_t*)0x03005018u)
+
+#define IRQ_TIMER_BIT    (1u << 0)
+#define IRQ_ML_BIT       (1u << 1)
+
+/* Matches TIMER_RELOAD_DEFAULT in the sim wrapper (chip_top_sim_wrap.sv). */
+#define EPOCH_TIMER_CYCLES 1000u
+
 #define TEST_PASS 0xCAFEBABEu
 #define TEST_FAIL 0xDEADBEEFu
 
 #define OUT0_SENTINEL 0xA5A55A5Au
 
-#define N_LOGITS 30
+#define N_LOGITS 10
 
-#define WAKE_CLASS        1u
-#define WAKE_STREAK_REQ   1u
+#define WAKE_CLASS        0u
+#define WAKE_STREAK_REQ   5u
 
 static void fail(uint32_t code) {
     TEST_CODE   = code;
     TEST_STATUS = TEST_FAIL;
     for (;;) {}
+}
+
+static inline void cpu_irq_unmask_all(void) {
+    __asm__ volatile (".word 0x0600000b" ::: "memory");
+}
+
+static inline uint32_t cpu_waitirq(void) {
+    uint32_t pending;
+    __asm__ volatile (".word 0x0800000b" : "=r"(pending) :: "memory");
+    return pending;
+}
+
+static void service_irqs(void) {
+    uint32_t guard = 16u;
+    while (guard--) {
+        uint32_t claim = IRQC_CLAIM;
+        if (claim == 0u || claim > 32u) break;
+        uint32_t bit = 1u << (claim - 1u);
+        IRQC_PENDING = bit;
+        IRQC_COMPLETE = claim;
+    }
 }
 
 static int wait_feature_valid(uint32_t timeout, uint32_t *status_out) {
@@ -74,6 +115,21 @@ void main(void) {
     ML_SCORE    = 0u;
     ALARM_CTRL  = 0u;
     log0 = 0; log1 = 0; predicted_class = 0u; wake_streak = 0u;
+
+    /* Signal CPU_INIT done: program epoch timer, enable IRQ wake, then sleep.
+     * FSM: CPU_INIT -> SLEEP -> FEAT_ONLY -> ALL; CPU resumes with features ready. */
+    PWR_CTRL     = 0u;
+    PWR_WAKE_STATUS = 0xFFFFFFFFu;
+    IRQC_PENDING = 0xFFFFFFFFu;
+    TIMER_RELOAD = EPOCH_TIMER_CYCLES;
+    TIMER_COUNT  = EPOCH_TIMER_CYCLES;
+    TIMER_CTRL   = 0x3u;           /* enable=1, periodic=1 */
+    IRQC_WAKE_EN = IRQ_TIMER_BIT;
+    cpu_irq_unmask_all();
+    IRQC_MASK    = IRQ_TIMER_BIT;
+    PWR_CTRL     = 1u;             /* sleep_req -> can_sleep_w -> CPU_INIT done */
+    (void)cpu_waitirq();
+    service_irqs();
 
     /* One-time ML register setup */
     ML_REG(0x80u) = WEIGHT_BASE;
