@@ -159,7 +159,7 @@ async def test_chip_top_boot(dut):
     core  = _core(dut)
     u_top = _top(dut)
 
-    TIMEOUT_CYCLES = 1#500_000
+    TIMEOUT_CYCLES = 500_000
     logger.info("Waiting for boot_done...")
 
     for cycle in range(TIMEOUT_CYCLES):
@@ -429,8 +429,8 @@ async def test_chip_top_normal_mode(dut):
     core  = _core(dut)
     u_top = _top(dut)
 
-    BOOT_TIMEOUT    = 1#500_000
-    RUNTIME_TIMEOUT = 1#10_000_000
+    BOOT_TIMEOUT    = 500_000
+    RUNTIME_TIMEOUT = 10_000_000
 
     logger.info("Normal mode test started. Monitoring for boot completion...")
 
