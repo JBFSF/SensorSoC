@@ -27,7 +27,7 @@ chip_netlist_top = os.getenv("CHIP_NETLIST_TOP", "chip_top")
 
 
 _PROJ = Path(__file__).resolve().parent
-_FIRMWARE_NAME = os.getenv("FIRMWARE_NAME", "test_top_feature_ml_cpu_spi_flash")
+_FIRMWARE_NAME = os.getenv("FIRMWARE_NAME", "test_top_feature_ml_30logits")
 _FIRMWARE_HEX = str(_PROJ / "firmware" / "build" / _FIRMWARE_NAME / "firmware.hex")
 _WEIGHT_HEX = str(_PROJ / "firmware" / "build" / "generated" / "taketwo_params.hex")
 
@@ -365,8 +365,8 @@ async def test_chip_top_feature_inject(dut):
 
             dbg_log0 = _s16_or_none(u_top.logit0)
             dbg_log1 = _s16_or_none(u_top.logit1)
-            logit_word0 = _u32_or_none(u_top.u_weight_ram.logit_reg_0)
-            logit_word1 = _u32_or_none(u_top.u_weight_ram.logit_reg_1)
+            logit_word0 = _u32_or_none(u_top.u_weight_flash.logit_reg_0)
+            logit_word1 = _u32_or_none(u_top.u_weight_flash.logit_reg_1)
 
             if dbg_log0 is not None and dbg_log1 is not None:
                 logger.info(f"  logits_dbg=({dbg_log0}, {dbg_log1})")
@@ -387,8 +387,8 @@ async def test_chip_top_feature_inject(dut):
             else:
                 logger.warning(
                     f"logit register window unresolved: "
-                    f"word0={u_top.u_weight_ram.logit_reg_0.value} "
-                    f"word1={u_top.u_weight_ram.logit_reg_1.value}"
+                    f"word0={u_top.u_weight_flash.logit_reg_0.value} "
+                    f"word1={u_top.u_weight_flash.logit_reg_1.value}"
                 )
 
             logger.info("Full pipeline test passed.")
@@ -450,6 +450,7 @@ async def test_chip_top_normal_mode(dut):
     # --- Phase 2: monitor CPU errors, FSM state, and alarm ---
     last_alarm = 0
     last_fsm_state = None
+    RUNTIME_TIMEOUT = 300_000
     for cycle in range(RUNTIME_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
 

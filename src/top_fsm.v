@@ -78,7 +78,8 @@ module top_fsm
             ALL:      if (ml_irq_i)        state_d = CPU_FEAT;
             CPU_FEAT: begin
                 if (cpu_alarm_i)       state_d = ALARM;
-                else if (can_sleep_w)  state_d = SLEEP;
+                else if (feat_valid_i) state_d = ALL;
+                else if (can_sleep_w)  state_d = FEAT_ONLY;
             end
             ALARM:    if (start_i)     state_d = SLEEP;
         endcase
@@ -96,7 +97,7 @@ module top_fsm
 
     // Output enables (combinational from state)
     assign feat_en_o  = (state_q == FEAT_ONLY) || (state_q == ALL) || (state_q == CPU_FEAT) || (state_q == FEAT_ML);
-    assign ml_en_o    = (state_q == ALL) || (state_q == FEAT_ML) || (state_q == BOOT) || (state_q == CPU_INIT);
+    assign ml_en_o    = (state_q == ALL) || (state_q == FEAT_ML) || (state_q == BOOT) || (state_q == CPU_INIT) || (state_q == CPU_FEAT);
     assign cpu_en_o   = cpu_clk_en_r;
     assign sleeping_o = (state_q == SLEEP);
     assign watchdog_o = (state_q == FEAT_ONLY) || (state_q == ALL) || (state_q == CPU_FEAT) || (state_q == FEAT_ML) || (state_q == SLEEP);
