@@ -834,7 +834,7 @@ module top #(
         .seconds_valid_i(1'b1),                 // time feature treated as always valid here
         .time_value_i(time_value_w),            // raw time feature input
         .motion_valid_i(motion_epoch_w),        // strobe: motion epoch energy is ready
-        .motion_energy_epoch_i(motion_energy_w[15:0]), // motion energy (truncated to 16-bit feature)
+        .motion_energy_epoch_i(motion_energy_w[31:16]), // motion energy (upper 16 bits of 48-bit accumulator)
         .delta_hr_valid_i(rr_valid_w),          // strobe: delta HR feature should update
         .delta_hr_i(delta_hr_w[15:0]),          // delta HR (truncated to 16-bit feature)
         .mssd_valid_i(mssd_valid_w),          // strobe: MSSD feature should update
