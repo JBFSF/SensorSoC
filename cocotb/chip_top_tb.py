@@ -277,8 +277,10 @@ async def test_chip_top_feature_inject(dut):
     logger.info("Boot done. Waiting for 30 logits...")
 
     # Start background monitor — prints features + stale logits on every feat_valid_o
-    cocotb.start_soon(_feat_monitor(u_top))
-    cocotb.start_soon(_logit_monitor(dut.clk_PAD, u_top))
+    # Skip in GL mode: feat_valid_o and logit_reg_0 are RTL-only signals
+    if not gl:
+        cocotb.start_soon(_feat_monitor(u_top))
+        cocotb.start_soon(_logit_monitor(dut.clk_PAD, u_top))
 
     # --- Phase 2: collect 30 logits as firmware writes them ---
     # Firmware writes TEST_STATUS = 1..30 (one per inference), then 0xCAFEBABE.
