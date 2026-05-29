@@ -28,6 +28,7 @@ module chip_top #(
     parameter integer PPG_MAX_BURST_SAMPLES = 32,
     parameter [15:0]  CFG_MOTION_HI_TH      = 16'd2000,
     parameter [15:0]  CFG_MAX_MOTION_HI     = 16'd3
+    parameter integer TIMER_RELOAD_DEFAULT  = 5_000_000
     )(
     `ifdef USE_POWER_PINS
     inout  wire VDD,
@@ -213,6 +214,7 @@ module chip_top #(
         .PPG_MAX_BURST_SAMPLES  (PPG_MAX_BURST_SAMPLES),
         .CFG_MOTION_HI_TH       (CFG_MOTION_HI_TH),
         .CFG_MAX_MOTION_HI      (CFG_MAX_MOTION_HI)
+        .TIMER_RELOAD_DEFAULT   (TIMER_RELOAD_DEFAULT)
     ) i_chip_core (
         `ifdef USE_POWER_PINS
         .VDD        (VDD),

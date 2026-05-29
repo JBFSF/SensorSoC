@@ -18,6 +18,7 @@ module top #(
 
     parameter integer CLK_HZ = 10_000_000,
     parameter integer GT_CLK_HZ = 10_000_000,
+    parameter integer TIMER_RELOAD_DEFAULT = 5_000_000,
     parameter integer GT_EPOCH_HZ = 100,
     parameter integer GT_EPOCH_COUNT_MAX = 1000,
 
@@ -667,7 +668,9 @@ module top #(
     );
 
     //JF: Feat Pipline, sleep until watchdog
-    accel_reader u_accel_reader (
+    accel_reader #(
+        .RSP_TIMEOUT_TICKS(20_000)
+    ) u_accel_reader (
         .clk(clk_i),
         .rst_i(reset_i),
         .en_i(feat_en),
@@ -901,7 +904,7 @@ module top #(
 
     // Always-on watchdog timer used by firmware for wake/scheduling.
     //JF: This is watchdog, look for timer event(?)
-    timer_mmio #(.BASE_ADDR(TIMER_BASE)) u_timer (
+    timer_mmio #(.BASE_ADDR(TIMER_BASE), .TIMER_RELOAD_DEFAULT(TIMER_RELOAD_DEFAULT)) u_timer (
         .clk      (clk_i),
         .resetn   (~reset_i),
         .watchdog_en_i(watchdog_w),

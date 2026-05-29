@@ -45,7 +45,8 @@
 `timescale 1ns/1ps
 
 module timer_mmio #(
-    parameter BASE_ADDR = 32'h0300_2000
+    parameter BASE_ADDR            = 32'h0300_2000,
+    parameter TIMER_RELOAD_DEFAULT = 32'd5_000_000
 )(
     input  wire        clk,
     input  wire        resetn,
@@ -87,10 +88,10 @@ module timer_mmio #(
     always @(posedge clk) begin
         if (!resetn) begin
             // timer regs
-            enable        <= 1'b0;
+            enable        <= 1'b1;
             periodic      <= 1'b1;
-            reload        <= 32'd5_000_000;
-            count         <= 32'd5_000_000;
+            reload        <= TIMER_RELOAD_DEFAULT;
+            count         <= TIMER_RELOAD_DEFAULT;
             event_latched <= 1'b0;
 
             // bus regs

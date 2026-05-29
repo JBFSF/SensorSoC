@@ -75,6 +75,7 @@ module chip_top_sim_wrap #(
         .PPG_MAX_BURST_SAMPLES  (32),
         .CFG_MOTION_HI_TH       (16'hFFFF),
         .CFG_MAX_MOTION_HI      (16'hFFFF)
+        .TIMER_RELOAD_DEFAULT   (1000)
     )
     `endif
     u_chip_top (
