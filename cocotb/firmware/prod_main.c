@@ -80,7 +80,7 @@
 #ifdef PROD_MAIN_FAST_WAKE_WINDOW
 #define WAKE_WINDOW_START_SEC  5u
 #define WAKE_WINDOW_END_SEC    15u
-#define LIGHT_SLEEP_CLASS      1u
+#define LIGHT_SLEEP_CLASS      0u
 #define LIGHT_SLEEP_STREAK_REQ 5u
 #define EPOCH_TIMER_CYCLES     1000u   /* matches sim TIMER_RELOAD_DEFAULT=1000 */
 #else
