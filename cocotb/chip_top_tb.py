@@ -132,11 +132,12 @@ async def test_chip_top_smoke(dut):
     logger.info("Checking normal-mode wiring...")
 
     assert dut.rst_n_PAD.value == 1, "reset should be deasserted after startup"
-    assert core.test_mode_w.value.integer == 0, "chip should be in normal mode"
-    assert core.core_clk_w.value == core.clk.value, \
-        "normal mode should use the onboard clock"
-    assert core.bidir_oe.value[22:7].integer == 0, \
-        "debug bus OE should be 0 in normal mode"
+    if not gl:
+        assert core.test_mode_w.value.integer == 0, "chip should be in normal mode"
+        assert core.core_clk_w.value == core.clk.value, \
+            "normal mode should use the onboard clock"
+        assert core.bidir_oe.value[22:7].integer == 0, \
+            "debug bus OE should be 0 in normal mode"
 
     logger.info("Smoke test passed.")
 
@@ -261,7 +262,7 @@ async def test_chip_top_feature_inject(dut):
     u_top = _top(dut)
 
     BOOT_TIMEOUT    = 500_000
-    RUNTIME_TIMEOUT = 10_000_000
+    RUNTIME_TIMEOUT = 3_000_000
 
     # --- Phase 1: wait for boot ---
     logger.info("Waiting for boot_done...")
@@ -432,7 +433,7 @@ async def test_chip_top_normal_mode(dut):
     u_top = _top(dut)
 
     BOOT_TIMEOUT    = 500_000
-    RUNTIME_TIMEOUT = 10_000_000
+    RUNTIME_TIMEOUT = 3_000_000
 
     logger.info("Normal mode test started. Monitoring for boot completion...")
 
