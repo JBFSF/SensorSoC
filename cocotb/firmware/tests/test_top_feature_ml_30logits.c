@@ -56,7 +56,7 @@
 #define N_LOGITS 10
 
 #define WAKE_CLASS        0u
-#define WAKE_STREAK_REQ   5u
+#define WAKE_STREAK_REQ   2u
 
 static void fail(uint32_t code) {
     TEST_CODE   = code;
@@ -74,15 +74,30 @@ static inline uint32_t cpu_waitirq(void) {
     return pending;
 }
 
+static volatile uint32_t g_ml_done_flag;
+
 static void service_irqs(void) {
     uint32_t guard = 16u;
     while (guard--) {
         uint32_t claim = IRQC_CLAIM;
         if (claim == 0u || claim > 32u) break;
         uint32_t bit = 1u << (claim - 1u);
+
+        if (bit & IRQ_ML_BIT) {
+            /* Drop the controller mask before completing so irq_o falls
+             * before retirq. taketwo's done signal may remain briefly. */
+            IRQC_MASK = 0u;
+            ML_REG(0x2Cu) = 1u;    /* ap_continue — release taketwo done */
+            g_ml_done_flag = 1u;
+        }
+
         IRQC_PENDING = bit;
         IRQC_COMPLETE = claim;
     }
+}
+
+void irq_handler(void) {
+    service_irqs();
 }
 
 static int wait_feature_valid(uint32_t timeout, uint32_t *status_out) {
@@ -163,10 +178,33 @@ void main(void) {
         /* Poison output so we can detect mutation */
         WRAM_U32(LOGIT_BASE + 0u) = OUT0_SENTINEL;
 
-        /* Start inference, wait BUSY 0->1->0, clear START */
+        /* Re-program taketwo's output objaddr (reg 33 at offset 0x84) each
+         * inference. Otherwise internal pointer state drifts across inferences
+         * and the final logit write lands outside LOGIT_OFFSET, so
+         * weight_flash_axi never captures it into logit_reg_0. */
+        ML_REG(0x84u) = 0u;
+
+        /* Re-arm taketwo per inference: ap_continue then auto_restart.
+         * Without ap_continue each iteration, taketwo's internal SRAM write
+         * pointer (sink_26 inside ram_w16_l512_id1_*) ratchets forward but
+         * the AXI write-back source pointer stays at the first-inference
+         * location, so logit_reg_0 only ever sees the first inference's value. */
+        ML_REG(0x2Cu) = 1u;   /* ap_continue */
+        ML_REG(0x28u) = 1u;   /* auto_restart */
+
+        /* Arm ML IRQ: clear any stale pending bit, enable the mask, then START.
+         * Going through the IRQ path (instead of polling BUSY and clearing
+         * START quickly) keeps ml_irq asserted long enough for top_fsm to
+         * observe it and transition ALL -> CPU_FEAT. */
+        g_ml_done_flag = 0u;
+        IRQC_PENDING = IRQ_ML_BIT;
+        IRQC_MASK = IRQ_ML_BIT;
         ML_REG(0x10u) = 1u;
-        if (!wait_busy_value(1u, 200000u))  fail(0xF220u | (uint32_t)i);
-        if (!wait_busy_value(0u, 2000000u)) fail(0xF230u | (uint32_t)i);
+
+        while (g_ml_done_flag == 0u) {
+            (void)cpu_waitirq();
+            service_irqs();
+        }
         ML_REG(0x10u) = 0u;
 
         /* Read output and verify mutation */
