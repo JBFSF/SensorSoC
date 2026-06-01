@@ -158,9 +158,14 @@ void main(void) {
     ML_REG(0x28u) = 1u;
     ML_REG(0x2Cu) = 1u;
 
-    for (i = 0; i < N_LOGITS; i++) {
+    /* Production loop: continuously read features, run inference, drive alarm.
+     * No exit condition — the chip runs forever responding to live sensor data.
+     * ALARM_CTRL is held high while the wake streak threshold is met and
+     * automatically de-asserts when a non-wake prediction breaks the streak. */
+    i = 0;
+    for (;;) {
         /* Wait for the feature engine to produce a new valid epoch */
-        if (!wait_feature_valid(5000000u, &feature_status)) fail(0xF210u | (uint32_t)i);
+        if (!wait_feature_valid(5000000u, &feature_status)) fail(0xF210u | ((uint32_t)i & 0xFFu));
 
         /* Latch features then consume (clear valid so next epoch can be produced) */
         time_feat     = (int16_t)(FEATURE_TIME   & 0xFFFFu);
@@ -216,14 +221,17 @@ void main(void) {
         conf = (log1 > log0) ? (uint16_t)(log1 - log0) : (uint16_t)(log0 - log1);
         predicted_class = (log1 > log0) ? 1u : 0u;
 
-        /* Streak: 5 consecutive wake predictions trips the alarm */
-        if (predicted_class == WAKE_CLASS)
-            wake_streak++;
-        else
+        /* Wake-streak alarm policy.
+         * Class == WAKE_CLASS → tick streak; assert alarm at threshold.
+         * Any other class → reset streak AND de-assert alarm so the FSM can
+         * leave ALARM (via start_i) and cycle back through inference. */
+        if (predicted_class == WAKE_CLASS) {
+            if (wake_streak < 0xFFFFFFFFu) wake_streak++;
+            if (wake_streak >= WAKE_STREAK_REQ) ALARM_CTRL = 1u;
+        } else {
             wake_streak = 0u;
-
-        if (wake_streak >= WAKE_STREAK_REQ)
-            ALARM_CTRL = 1u;
+            ALARM_CTRL  = 0u;
+        }
 
         ML_SCORE = conf;
 
@@ -232,14 +240,14 @@ void main(void) {
                       ((uint32_t)(uint16_t)log1 << 16) |
                       ((uint32_t)(uint16_t)log0);
         TEST_STATUS = (uint32_t)(i + 1);
+        i++;
+
+        /* Re-arm sleep_req every iteration. pwrctrl_mmio auto-clears
+         * sleep_req_o on wake, so we must rewrite it for the FSM to
+         * accept the CPU_INIT -> SLEEP (and CPU_FEAT -> FEAT_ONLY)
+         * transitions. Required for the post-alarm loopback path:
+         *   ALARM -(start_i)-> IDLE -(start_i)-> CPU_INIT
+         *   CPU_INIT -(can_sleep_w)-> SLEEP -(timer)-> ... */
+        PWR_CTRL = 1u;
     }
-
-    /* Final: write last logit info + PASS */
-    ML_SCORE  = (uint32_t)(log1 > log0 ? (log1 - log0) : (log0 - log1));
-    TEST_CODE = ((predicted_class & 1u) << 31) |
-                ((uint32_t)(uint16_t)log1 << 16) |
-                ((uint32_t)(uint16_t)log0);
-    TEST_STATUS = TEST_PASS;
-
-    for (;;) {}
 }

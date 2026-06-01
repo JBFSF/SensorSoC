@@ -243,6 +243,55 @@ async def _axi_write_monitor(clk, u_top):
             continue
 
 
+_FSM_LABELS = {
+    0: "BOOT", 1: "IDLE", 2: "SLEEP", 3: "FEAT_ONLY",
+    4: "ALL", 5: "CPU_FEAT", 6: "FEAT_ML", 7: "CPU_ONLY",
+    8: "ALARM", 9: "CPU_INIT",
+}
+
+
+async def _can_sleep_monitor(clk, u_top, core):
+    """Print FSM state on every transition + can_sleep_w inputs."""
+    try:
+        fsm = u_top.fsm
+    except AttributeError:
+        print("[sleep_mon] could not find fsm instance", flush=True)
+        return
+    prev = None
+    while True:
+        await RisingEdge(clk)
+        raw = str(fsm.state_q.value)
+        if raw == prev:
+            continue
+        prev = raw
+        try:
+            st_int = int(fsm.state_q.value)
+            label = _FSM_LABELS.get(st_int, f"?({st_int})")
+        except ValueError:
+            label = "X-BITS"
+        try:
+            sr = int(u_top.sleep_req.value)
+        except ValueError:
+            sr = "X"
+        try:
+            wr = int(u_top.irqc_wake_req.value)
+        except ValueError:
+            wr = "X"
+        try:
+            ids = int(fsm.cpu_idle_seen_r.value)
+        except ValueError:
+            ids = "X"
+        try:
+            bd = int(u_top.boot_done.value)
+        except ValueError:
+            bd = "X"
+        print(
+            f"[sleep_mon] state_q={raw} ({label})  "
+            f"sleep_req={sr}  idle={ids}  wake_req={wr}  boot_done={bd}",
+            flush=True,
+        )
+
+
 async def _logit_monitor(clk, u_top):
     """Background coroutine: prints logit_reg_0 every time it changes.
     logit_reg_0 packs both logits: bits[15:0]=log0, bits[31:16]=log1.
@@ -250,7 +299,7 @@ async def _logit_monitor(clk, u_top):
     # One-shot probe so we can see *why* the handle lookup fails if it does
     try:
         handle = u_top.u_weight_flash.logit_reg_0
-        print(f"[logit_monitor] handle resolved: {handle}", flush=True)
+        print(f"[logit_monitor] handle resolved: {handle._path}", flush=True)
     except Exception as e:
         print(f"[logit_monitor] could not resolve u_top.u_weight_flash.logit_reg_0: {e!r}",
               flush=True)
@@ -324,6 +373,7 @@ async def test_chip_top_normal(dut):
         cocotb.start_soon(_feat_monitor(u_top))
         cocotb.start_soon(_logit_monitor(dut.clk_PAD, u_top))
         cocotb.start_soon(_axi_write_monitor(dut.clk_PAD, u_top))
+        cocotb.start_soon(_can_sleep_monitor(dut.clk_PAD, u_top, core))
 
     # --- Phase 2: wait for alarm_o to assert (test passes on rising edge) ---
     # The firmware runs inferences and writes ALARM_CTRL=1 once the wake streak
@@ -408,6 +458,7 @@ async def test_chip_top_normal_full(dut):
         cocotb.start_soon(_feat_monitor(u_top))
         cocotb.start_soon(_logit_monitor(dut.clk_PAD, u_top))
         cocotb.start_soon(_axi_write_monitor(dut.clk_PAD, u_top))
+        cocotb.start_soon(_can_sleep_monitor(dut.clk_PAD, u_top, core))
 
     # --- Phase 2: wait for alarm_o to assert (test passes on rising edge) ---
     # The firmware runs inferences and writes ALARM_CTRL=1 once the wake streak
