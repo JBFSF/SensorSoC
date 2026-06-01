@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Standalone testbench for capturing RTL feature vectors to CSV.
-# Run with: COCOTB_TEST_MODULE=chip_top_rtl_features_tb FIRMWARE_NAME=test_top_feature_ml_30logits
+# Run with: COCOTB_TEST_MODULE=chip_top_rtl_features_tb FIRMWARE_NAME=test_top_normal
 
 import csv
 import os
@@ -29,7 +29,7 @@ hdl_toplevel     = os.getenv("CHIP_TOPLEVEL", "chip_top_sim_wrap")
 chip_netlist_top = os.getenv("CHIP_NETLIST_TOP", "chip_top")
 
 _PROJ = Path(__file__).resolve().parent
-_FIRMWARE_NAME = os.getenv("FIRMWARE_NAME", "test_top_feature_ml_30logits")
+_FIRMWARE_NAME = os.getenv("FIRMWARE_NAME", "test_top_normal")
 _FIRMWARE_HEX = str(_PROJ / "firmware" / "build" / _FIRMWARE_NAME / "firmware.hex")
 _WEIGHT_HEX   = str(_PROJ / "firmware" / "build" / "generated" / "taketwo_params.hex")
 
@@ -119,9 +119,9 @@ async def _feat_monitor(u_top, csv_writer=None, csv_file=None):
 
 
 @cocotb.test(skip=(hdl_toplevel != "chip_top_sim_wrap"))
-async def test_chip_top_feature_inject(dut):
+async def test_chip_top_normal(dut):
     """Full pipeline: sensor → features → 30 ML inferences → write RTL features to CSV."""
-    logger = logging.getLogger("chip_top_feature_inject")
+    logger = logging.getLogger("chip_top_normal")
 
     await _set_defaults(dut)
     dut.input_PAD.value = 0b00000101

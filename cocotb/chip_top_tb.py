@@ -27,7 +27,7 @@ chip_netlist_top = os.getenv("CHIP_NETLIST_TOP", "chip_top")
 
 
 _PROJ = Path(__file__).resolve().parent
-_FIRMWARE_NAME = os.getenv("FIRMWARE_NAME", "test_top_feature_ml_30logits")
+_FIRMWARE_NAME = os.getenv("FIRMWARE_NAME", "test_top_normal")
 _FIRMWARE_HEX = str(_PROJ / "firmware" / "build" / _FIRMWARE_NAME / "firmware.hex")
 _WEIGHT_HEX = str(_PROJ / "firmware" / "build" / "generated" / "taketwo_params.hex")
 
@@ -283,9 +283,9 @@ async def _logit_monitor(clk, u_top):
 
 
 @cocotb.test(skip=(hdl_toplevel != "chip_top_sim_wrap"))
-async def test_chip_top_feature_inject(dut):
+async def test_chip_top_normal(dut):
     """Full pipeline: sensor → features → ML inference → alarm output."""
-    logger = logging.getLogger("chip_top_feature_inject")
+    logger = logging.getLogger("chip_top_normal")
 
     # ALL mode: features + ML + CPU all active; bypasses SLEEP state in sim.
     await set_defaults(dut)
@@ -368,96 +368,6 @@ async def test_chip_top_feature_inject(dut):
     raise AssertionError(
         f"Timeout after {RUNTIME_TIMEOUT} cycles — alarm_o never asserted"
     )
-
-
-# Normal mode test with custom firmware
-
-# FSM state names for logging
-_FSM_STATES = {
-    0: "BOOT",
-    1: "IDLE",
-    2: "SLEEP",
-    3: "FEAT_ONLY",
-    4: "ALL",
-    5: "CPU_FEAT",
-    6: "FEAT_ML",
-    7: "CPU_ONLY",
-}
-
-
-@cocotb.test(skip=(hdl_toplevel != "chip_top_sim_wrap"))
-async def test_chip_top_normal_mode(dut):
-    """Normal mode test: run chip normally, monitor CPU errors, FSM state, and alarm outputs."""
-    logger = logging.getLogger("chip_top_normal_mode")
-
-    # Normal mode (input_PAD = 0)
-    await set_defaults(dut)
-    dut.input_PAD.value = 0
-    await start_clock(dut.clk_PAD)
-    await reset(dut.rst_n_PAD)
-
-    core  = _core(dut)
-    u_top = _top(dut)
-
-    BOOT_TIMEOUT    = 1#500_000
-    RUNTIME_TIMEOUT = 1#3_000_000
-
-    logger.info("Normal mode test started. Monitoring for boot completion...")
-
-    # --- Phase 1: wait for boot ---
-    for cycle in range(BOOT_TIMEOUT):
-        await RisingEdge(dut.clk_PAD)
-        if u_top.boot_done.value == 1:
-            break
-    else:
-        raise AssertionError("Timeout waiting for boot_done")
-
-    if core.pico_trap_w.value == 1:
-        raise AssertionError("CPU trapped during boot")
-
-    logger.info("Boot complete. Running in normal mode...")
-
-    # --- Phase 2: monitor CPU errors, FSM state, and alarm ---
-    last_alarm = 0
-    last_fsm_state = None
-    RUNTIME_TIMEOUT = 300_000
-    for cycle in range(RUNTIME_TIMEOUT):
-        await RisingEdge(dut.clk_PAD)
-
-        # Check for CPU trap/error
-        if core.pico_trap_w.value == 1:
-            raise AssertionError(f"CPU trap detected at cycle {cycle}")
-
-        # Check FSM state for changes
-        try:
-            current_fsm_state = int(u_top.fsm.state_q.value)
-            if current_fsm_state != last_fsm_state:
-                state_name = _FSM_STATES.get(current_fsm_state, f"UNKNOWN({current_fsm_state})")
-                logger.info(f"  cycle {cycle}: FSM state changed to {state_name}")
-                last_fsm_state = current_fsm_state
-        except (AttributeError, ValueError, TypeError):
-            pass
-
-        # Check alarm output for changes
-        current_alarm = dut.alarm_o.value
-        if current_alarm != last_alarm:
-            logger.info(f"  cycle {cycle}: alarm changed to {current_alarm}")
-            last_alarm = current_alarm
-            if int(current_alarm) == 1:
-                logger.info("Alarm asserted — test passed.")
-                return
-
-        # Log periodic status
-        if cycle % 100_000 == 0:
-            fsm_state_name = "?"
-            try:
-                fsm_state = int(u_top.fsm.state_q.value)
-                fsm_state_name = _FSM_STATES.get(fsm_state, f"UNKNOWN({fsm_state})")
-            except (AttributeError, ValueError, TypeError):
-                pass
-            logger.info(f"  cycle {cycle}: FSM={fsm_state_name} trap={core.pico_trap_w.value} alarm={dut.alarm_o.value}")
-
-    logger.info("Normal mode test completed — alarm never fired within timeout.")
 
 
 def chip_top_runner():

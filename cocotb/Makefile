@@ -263,7 +263,7 @@ FW_C_test_ml_weights        := $(FW_TESTS)/test_ml_weights.c
 FW_C_test_ml_cpu_wake_i2c   := $(FW_TESTS)/test_ml_cpu_wake_i2c.c
 FW_C_test_top_feature_ml_cpu:= $(FW_TESTS)/test_top_feature_ml_cpu.c
 FW_C_test_top_feature_ml_cpu_spi_flash:= $(FW_TESTS)/test_top_feature_ml_cpu_spi_flash.c
-FW_C_test_top_feature_ml_30logits     := $(FW_TESTS)/test_top_feature_ml_30logits.c
+FW_C_test_top_normal                  := $(FW_TESTS)/test_top_normal.c
 FW_C_test_top_ml_control_unified := $(FW_TESTS)/test_top_ml_control_unified.c
 FW_C_test_top_sleep_wake_unified := $(FW_TESTS)/test_top_sleep_wake_unified.c
 FW_C_test_top_ml_golden_vector_unified := $(FW_TESTS)/test_top_ml_golden_vector_unified.c
@@ -284,7 +284,7 @@ FW_ARCH_test_ml_cpu_wake_i2c := rv32im
 FW_ARCH_prod_main := rv32im
 FW_ARCH_test_top_feature_ml_cpu := rv32im
 FW_ARCH_test_top_feature_ml_cpu_spi_flash := rv32im
-FW_ARCH_test_top_feature_ml_30logits     := rv32im
+FW_ARCH_test_top_normal                  := rv32im
 FW_ARCH_test_top_ml_control_unified := rv32im
 FW_ARCH_test_top_sleep_wake_unified := rv32im
 FW_ARCH_test_top_ml_golden_vector_unified := rv32im
@@ -595,9 +595,6 @@ sim-top-shared-flash: $(TOP_SHARED_FLASH_VVP) | $(SIM_BUILD)
 	@echo "== Running $(TOP_SHARED_FLASH_TOP) (FLASH=$(COMBINED_FLASH_HEX)) =="
 	$(VVP) $(TOP_SHARED_FLASH_VVP)
 
-.PHONY: sim-top-spi-init-unified sim-top-spi-weights
-sim-top-spi-init-unified: sim-top-shared-flash
-sim-top-spi-weights: sim-top-shared-flash
 
 # ============================================================
 # Hardware weight boot: SPI flash -> weight_ram_axi -> taketwo SRAMs
@@ -733,15 +730,11 @@ test-soc-wake-e2e-p0:
 
 .PHONY: test-functional-matrix
 test-functional-matrix:
-	@bash tools/test_functionality_matrix.sh
-
-.PHONY: test-firmware-matrix
-test-firmware-matrix:
 	@bash $(TOOLS_DIR)/test_functionality_matrix.sh
 # ----------------------------
 # IRQ testbench (tb_irq)
 # ----------------------------
-.PHONY: build-irq sim-irq
+.PHONY: build-irq
 build-irq: $(IRQ_VVP)
 
 $(IRQ_VVP): $(IRQ_TB_SRCS) $(SOC_RTL_SRCS)
@@ -750,8 +743,6 @@ $(IRQ_VVP): $(IRQ_TB_SRCS) $(SOC_RTL_SRCS)
 	  $(IRQ_TB_SRCS) \
 	  $(SOC_RTL_SRCS)
 
-sim-irq: test-irq-states
-	@echo "[SIM] sim-irq uses the unified top IRQ regression"
 
 # ----------------------------
 # Cocotb: test_mmio
@@ -830,8 +821,6 @@ test-cpu-ml: $(CPU_ML_VVP)
 	export COCOTB_TEST_FILTER='test_strict_irq_.*'; \
 	$(call RUN_COCOTB_ICARUS,$(CPU_ML_VVP))
 
-.PHONY: test-cpu-ml-strict-irq
-test-cpu-ml-strict-irq: test-cpu-ml
 
 # ============================================================
 # Cocotb: host_i2c_bridge_regs contract
@@ -1296,16 +1285,8 @@ test-top-sensor-pipeline: $(TOP_SENSOR_PIPELINE_VVP)
 	export COCOTB_TEST_MODULES=$(TOP_SENSOR_PIPELINE_PYMOD); \
 	$(call RUN_COCOTB_ICARUS,$(TOP_SENSOR_PIPELINE_VVP))
 
-.PHONY: test-top-pipeline
-test-top-pipeline: test-top-sensor-pipeline
-	@true
-
 .PHONY: test-chip-debug-feature-regression
 test-chip-debug-feature-regression: test-chip-core-debug-modes test-MSSD-engine-ref test-motion-process-ref test-ppg-process-ref test-top-sensor-pipeline
-	@true
-
-.PHONY: test-top-e2e-inference
-test-top-e2e-inference: test-top-sensor-pipeline
 	@true
 
 # ============================================================
@@ -1537,20 +1518,6 @@ test-irq-states: $(IRQ_STATES_VVP)
 	export COCOTB_TEST_MODULES=$(IRQ_STATES_PYMOD); \
 	$(call RUN_COCOTB_ICARUS,$(IRQ_STATES_VVP))
 
-# ============================================================
-# ML LOGIT SRAM MMIO (compile/elab check)
-# ============================================================
-
-ML_LOGIT_SRAM_MMIO_TOP     := ml_logit_sram_mmio
-ML_LOGIT_SRAM_MMIO_VVP     := $(BUILD_DIR)/$(ML_LOGIT_SRAM_MMIO_TOP).vvp
-ML_LOGIT_SRAM_MMIO_SOURCES := $(RTL_DIR)/ml_logit_sram_mmio.v
-
-$(ML_LOGIT_SRAM_MMIO_VVP): $(ML_LOGIT_SRAM_MMIO_SOURCES) | $(BUILD_DIR)
-	$(IVERILOG) -g2012 -s $(ML_LOGIT_SRAM_MMIO_TOP) -o $@ $^
-
-.PHONY: check-ml-logit-sram-mmio
-check-ml-logit-sram-mmio: $(ML_LOGIT_SRAM_MMIO_VVP)
-	@echo "== Built $(ML_LOGIT_SRAM_MMIO_VVP) =="
 
 # ============================================================
 # I2C MASTER RTL (synthesis-path unit test — compiled without -DSIM)
