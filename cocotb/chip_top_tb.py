@@ -53,6 +53,12 @@ def _s16_or_none(handle):
 async def set_defaults(dut):
     dut.input_PAD.value = 0
 
+async def set_start(dut, cycles):
+    cocotb.log.info("Start bit set high")
+    dut.input_PAD.value = 0b00100000
+    await ClockCycles(dut.clk_PAD, cycles)
+    dut.input_PAD.value = 0b00000000
+    cocotb.log.info("Start bit set low")
 
 async def start_clock(clock, freq_mhz: float = 50.0):
     """Start the clock at freq_mhz MHz."""
@@ -311,9 +317,7 @@ async def test_chip_top_normal(dut):
     assert core.pico_trap_w.value == 0, "CPU trapped during boot"
 
     logger.info("Boot done. Waiting for 30 logits...")
-    dut.input_PAD.value = 0b00100000
-    await ClockCycles(dut.clk_PAD, 10)
-    dut.input_PAD.value = 0b00000000    
+    await set_start(dut, 10)
     # Start background monitor — prints features + stale logits on every feat_valid_o
     # Skip in GL mode: feat_valid_o and logit_reg_0 are RTL-only signals
     if not gl:
@@ -359,8 +363,7 @@ async def test_chip_top_normal(dut):
             if int(dut.alarm_o.value) == 1:
                 await ClockCycles(dut.clk_PAD, 10)
                 if int(dut.alarm_o.value) == 1:
-                    logger.info(f"alarm_o asserted at cycle {cycle} — test passed.")
-                    await ClockCycles(dut.clk_PAD, 1000)
+                    cocotb.log.info(f"alarm_o asserted at cycle {cycle} — test passed.")
                     return
         except ValueError:
             continue
@@ -369,6 +372,94 @@ async def test_chip_top_normal(dut):
         f"Timeout after {RUNTIME_TIMEOUT} cycles — alarm_o never asserted"
     )
 
+@cocotb.test(skip=(hdl_toplevel != "chip_top_sim_wrap"))
+async def test_chip_top_normal_full(dut):
+    """Full pipeline: sensor → features → ML inference → alarm output."""
+    logger = logging.getLogger("chip_top_full")
+
+    # ALL mode: features + ML + CPU all active; bypasses SLEEP state in sim.
+    await set_defaults(dut)
+    #dut.input_PAD.value = 0b00100000 #0b00000101
+    await start_clock(dut.clk_PAD)
+    await reset(dut.rst_n_PAD)
+
+    core  = _core(dut)
+    u_top = _top(dut)
+
+    BOOT_TIMEOUT    = 500_000
+    RUNTIME_TIMEOUT = 500_000#3_000_000
+
+    # --- Phase 1: wait for boot ---
+    logger.info("Waiting for boot_done...")
+    for cycle in range(BOOT_TIMEOUT):
+        await RisingEdge(dut.clk_PAD)
+        if u_top.boot_done.value == 1:
+            break
+    else:
+        raise AssertionError("Timeout waiting for boot_done")
+
+    assert core.pico_trap_w.value == 0, "CPU trapped during boot"
+
+    logger.info("Boot done. Waiting for 30 logits...")
+    await set_start(dut, 10)
+    # Start background monitor — prints features + stale logits on every feat_valid_o
+    # Skip in GL mode: feat_valid_o and logit_reg_0 are RTL-only signals
+    if not gl:
+        cocotb.start_soon(_feat_monitor(u_top))
+        cocotb.start_soon(_logit_monitor(dut.clk_PAD, u_top))
+        cocotb.start_soon(_axi_write_monitor(dut.clk_PAD, u_top))
+
+    # --- Phase 2: wait for alarm_o to assert (test passes on rising edge) ---
+    # The firmware runs inferences and writes ALARM_CTRL=1 once the wake streak
+    # threshold is hit; that drives the FSM to ALARM state which asserts alarm_o.
+    # A firmware-side DEAD_BEEF in TEST_STATUS still fails fast.
+    for cycle in range(RUNTIME_TIMEOUT):
+        await RisingEdge(dut.clk_PAD)
+
+        if cycle % 100_000 == 0:
+            try:
+                ts = u_top.test_status.value.to_unsigned()
+                alarm = dut.alarm_o.value
+                logger.info(
+                    f"  cycle {cycle}: test_status=0x{ts:08X} alarm={alarm}"
+                )
+            except Exception:
+                pass
+
+        if core.pico_trap_w.value == 1:
+            raise AssertionError("CPU trapped during runtime")
+
+        # Fast-fail on firmware-reported error
+        try:
+            status = u_top.test_status.value.to_unsigned()
+            if status == 0xDEAD_BEEF:
+                tc_raw = u_top.test_code.value
+                try:
+                    code_str = f"0x{tc_raw.to_unsigned():08X}"
+                except ValueError:
+                    code_str = f"X:{tc_raw!s}"
+                raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
+        except ValueError:
+            pass
+
+        # Pass condition: alarm_o rose
+        try:
+            if int(dut.alarm_o.value) == 1:
+                await ClockCycles(dut.clk_PAD, 10)
+                if int(dut.alarm_o.value) == 1:
+                    cocotb.log.info(f"alarm_o asserted at cycle {cycle} — test passed.")
+                    await ClockCycles(dut.clk_PAD, 1000)
+                    await set_start(dut, 10)
+                    await ClockCycles(dut.clk_PAD, 10)
+                    await set_start(dut, 10)
+                    await ClockCycles(dut.clk_PAD, 10000)
+                    return
+        except ValueError:
+            continue
+
+    raise AssertionError(
+        f"Timeout after {RUNTIME_TIMEOUT} cycles — alarm_o never asserted"
+    )
 
 def chip_top_runner():
     proj_path = Path(__file__).resolve().parent

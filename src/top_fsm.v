@@ -81,7 +81,7 @@ module top_fsm
                 else if (feat_valid_i) state_d = ALL;
                 else if (can_sleep_w)  state_d = FEAT_ONLY;
             end
-            ALARM:    if (start_i)     state_d = SLEEP;
+            ALARM:    if (start_i)     state_d = IDLE;
         endcase
 
         case (test_mode_i)
