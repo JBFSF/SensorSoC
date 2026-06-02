@@ -95,18 +95,35 @@ CLOCK_NET: clk_pad/Y
 CLOCK_PERIOD: 200 # 5 MHz
 
 # Fix hold violations
-PL_RESIZER_HOLD_SLACK_MARGIN: 0.5
-GRT_RESIZER_HOLD_SLACK_MARGIN: 0.5
+PL_RESIZER_HOLD_SLACK_MARGIN: 0.35
+GRT_RESIZER_HOLD_SLACK_MARGIN: 0.3
 
 # legalize design after repairs and having to insert one million buffers :(
 # these values control how far detailed placement can move cells when attempting to inserting hella buffers
 # 1200 / 250
 PL_MAX_DISPLACEMENT_X: 2000
 PL_MAX_DISPLACEMENT_Y: 1200
+# Repair tighter transition/cap/fanout constraints before and after global route
+DESIGN_REPAIR_MAX_SLEW_PCT: 30
+DESIGN_REPAIR_MAX_CAP_PCT: 60
+GRT_DESIGN_REPAIR_MAX_SLEW_PCT: 20
+GRT_DESIGN_REPAIR_MAX_CAP_PCT: 40
+DESIGN_REPAIR_MAX_WIRE_LENGTH: 250
+GRT_DESIGN_REPAIR_MAX_WIRE_LENGTH: 200
+RUN_POST_GRT_DESIGN_REPAIR: true
+RUN_POST_GRT_RESIZER_TIMING: true
+MAX_FANOUT_CONSTRAINT: 12
+
+# Keep CTS clusters smaller so clock leaf buffers do not pick up as much load
+CTS_SINK_CLUSTERING_SIZE: 12
+CTS_SINK_CLUSTERING_MAX_DIAMETER: 25
+CTS_CLK_MAX_WIRE_LENGTH: 450
+CTS_SINK_BUFFER_MAX_CAP_DERATE_PCT: 25
+CTS_APPLY_NDR: none
 
 # Increase for more logic
 # on your die
-PL_TARGET_DENSITY_PCT: 25
+PL_TARGET_DENSITY_PCT: 35
 GRT_ALLOW_CONGESTION: true
 
 # Fix antenna violations after DRT
@@ -114,7 +131,7 @@ DRT_ANTENNA_REPAIR_ITERS: 10
 DRT_ANTENNA_REPAIR_MARGIN: 10 # %
 # Insert diodes before routed antenna repair so the late repair step has less
 # local placement pressure around the SRAM cluster.
-RUN_HEURISTIC_DIODE_INSERTION: true
+RUN_HEURISTIC_DIODE_INSERTION: false
 HEURISTIC_ANTENNA_THRESHOLD: 90
 DIODE_ON_PORTS: in
 
