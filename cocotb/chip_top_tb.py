@@ -503,7 +503,7 @@ async def test_chip_top_normal_full(dut):
                     await set_start(dut, 10)
                     await ClockCycles(dut.clk_PAD, 10)
                     await set_start(dut, 10)
-                    await ClockCycles(dut.clk_PAD, 10000)
+                    await ClockCycles(dut.clk_PAD, 300_000)
                     return
         except ValueError:
             continue

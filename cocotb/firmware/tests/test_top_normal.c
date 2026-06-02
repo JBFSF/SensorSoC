@@ -35,6 +35,7 @@
 #define TIMER_CTRL       (*(volatile uint32_t*)(TIMER_BASE + 0x00u))
 #define TIMER_RELOAD     (*(volatile uint32_t*)(TIMER_BASE + 0x04u))
 #define TIMER_COUNT      (*(volatile uint32_t*)(TIMER_BASE + 0x08u))
+#define TIMER_EVENT      (*(volatile uint32_t*)(TIMER_BASE + 0x0Cu))
 
 #define IRQC_PENDING     (*(volatile uint32_t*)0x03005000u)
 #define IRQC_MASK        (*(volatile uint32_t*)0x03005004u)
@@ -242,12 +243,21 @@ void main(void) {
         TEST_STATUS = (uint32_t)(i + 1);
         i++;
 
-        /* Re-arm sleep_req every iteration. pwrctrl_mmio auto-clears
-         * sleep_req_o on wake, so we must rewrite it for the FSM to
-         * accept the CPU_INIT -> SLEEP (and CPU_FEAT -> FEAT_ONLY)
-         * transitions. Required for the post-alarm loopback path:
-         *   ALARM -(start_i)-> IDLE -(start_i)-> CPU_INIT
-         *   CPU_INIT -(can_sleep_w)-> SLEEP -(timer)-> ... */
-        PWR_CTRL = 1u;
+        /* Re-arm sleep request and reset wake plumbing every iteration so the
+         * FSM can re-enter SLEEP after each alarm cycle.
+         *
+         * can_sleep_w = sleep_req && cpu_idle_seen_r && !irqc_wake_req
+         *
+         * (a) Clear timer_event (W1C). It is sticky and only rising edges into
+         *     IRQC become new pending bits; without this, the next tick won't
+         *     generate a fresh rising edge and SLEEP can never wake.
+         * (b) Clear stale IRQC pending bits so irqc_wake_req=0 when we attempt
+         *     to sleep.
+         * (c) pwrctrl_mmio auto-clears sleep_req_o on each wake transition,
+         *     so we must rewrite PWR_CTRL=1 every iteration. */
+        TIMER_EVENT     = 1u;             /* (a) */
+        IRQC_PENDING    = 0xFFFFFFFFu;   /* (b) */
+        PWR_WAKE_STATUS = 0xFFFFFFFFu;
+        PWR_CTRL        = 1u;             /* (c) */
     }
 }
