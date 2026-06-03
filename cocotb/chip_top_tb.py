@@ -292,6 +292,46 @@ async def _can_sleep_monitor(clk, u_top, core):
         )
 
 
+async def _gl_heartbeat(dut):
+    """GL-friendly progress beat — only watches pads, which survive flattening.
+    Tracks SPI activity (toggle count on bidir[1] = boot_spi_clk) and alarm.
+    """
+    cycles = 0
+    spi_clk_toggles = 0
+    last_spi_clk = None
+    last_alarm = None
+    while True:
+        await ClockCycles(dut.clk_PAD, 1)
+        cycles += 1
+        # Sample SPI clock and alarm
+        try:
+            bpad = dut.bidir_PAD.value
+            # bidir_PAD[1] is boot SPI clock pre-boot_done; weight SPI after
+            spi_clk_now = int(bpad[1])
+            alarm_now   = int(bpad[0])
+        except Exception:
+            spi_clk_now = None
+            alarm_now   = None
+
+        if last_spi_clk is not None and spi_clk_now != last_spi_clk:
+            spi_clk_toggles += 1
+        last_spi_clk = spi_clk_now
+
+        # Print alarm transitions immediately
+        if alarm_now is not None and alarm_now != last_alarm:
+            print(f"[gl_hb @{cycles:8d}] alarm_o transition: {last_alarm} -> {alarm_now}",
+                  flush=True)
+            last_alarm = alarm_now
+
+        # Heartbeat every 25k cycles with rolling counts
+        if cycles % 25_000 == 0:
+            print(
+                f"[gl_hb @{cycles:8d}]  alarm_o={alarm_now}  "
+                f"spi_clk_toggles_so_far={spi_clk_toggles}",
+                flush=True,
+            )
+
+
 async def _logit_monitor(clk, u_top):
     """Background coroutine: prints logit_reg_0 every time it changes.
     logit_reg_0 packs both logits: bits[15:0]=log0, bits[31:16]=log1.
@@ -353,20 +393,22 @@ async def test_chip_top_normal(dut):
 
     BOOT_TIMEOUT    = 500_000
     RUNTIME_TIMEOUT = 500_000#3_000_000
-
+    print("1")
     # --- Phase 1: wait for boot ---
     logger.info("Waiting for boot_done...")
     for cycle in range(BOOT_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
         if u_top.boot_done.value == 1:
             break
+        print("2")
     else:
         raise AssertionError("Timeout waiting for boot_done")
-
+    print("3")
     assert core.pico_trap_w.value == 0, "CPU trapped during boot"
 
     logger.info("Boot done. Waiting for 30 logits...")
     await set_start(dut, 10)
+    logger.info(f"[gl={bool(gl)}] start_i pulsed; entering main loop")
     # Start background monitor — prints features + stale logits on every feat_valid_o
     # Skip in GL mode: feat_valid_o and logit_reg_0 are RTL-only signals
     if not gl:
@@ -374,6 +416,9 @@ async def test_chip_top_normal(dut):
         cocotb.start_soon(_logit_monitor(dut.clk_PAD, u_top))
         cocotb.start_soon(_axi_write_monitor(dut.clk_PAD, u_top))
         cocotb.start_soon(_can_sleep_monitor(dut.clk_PAD, u_top, core))
+    else:
+        # GL mode — internal signals are flattened away. Only pads are observable.
+        cocotb.start_soon(_gl_heartbeat(dut))
 
     # --- Phase 2: wait for alarm_o to assert (test passes on rising edge) ---
     # The firmware runs inferences and writes ALARM_CTRL=1 once the wake streak
@@ -383,19 +428,31 @@ async def test_chip_top_normal(dut):
         await RisingEdge(dut.clk_PAD)
 
         if cycle % 100_000 == 0:
+            # Pad signals always work; internal signals only work in RTL
+            alarm_str = "?"
             try:
-                ts = u_top.test_status.value.to_unsigned()
-                alarm = dut.alarm_o.value
-                logger.info(
-                    f"  cycle {cycle}: test_status=0x{ts:08X} alarm={alarm}"
-                )
+                alarm_str = str(int(dut.alarm_o.value))
             except Exception:
                 pass
+            ts_str = "n/a"
+            try:
+                ts_str = f"0x{u_top.test_status.value.to_unsigned():08X}"
+            except Exception:
+                pass
+            logger.info(
+                f"  cycle {cycle:7d}: alarm_o={alarm_str}  test_status={ts_str}"
+            )
 
-        if core.pico_trap_w.value == 1:
-            raise AssertionError("CPU trapped during runtime")
+        # CPU trap check (RTL-only — pico_trap_w doesn't survive synthesis flattening)
+        if not gl:
+            try:
+                if core.pico_trap_w.value == 1:
+                    raise AssertionError("CPU trapped during runtime")
+            except AttributeError:
+                pass
 
-        # Fast-fail on firmware-reported error
+        # Fast-fail on firmware-reported error. test_status is an internal MMIO
+        # register; it's not observable in GL (synthesis flattens it out).
         try:
             status = u_top.test_status.value.to_unsigned()
             if status == 0xDEAD_BEEF:
@@ -405,10 +462,10 @@ async def test_chip_top_normal(dut):
                 except ValueError:
                     code_str = f"X:{tc_raw!s}"
                 raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
-        except ValueError:
+        except (ValueError, AttributeError):
             pass
 
-        # Pass condition: alarm_o rose
+        # Pass condition: alarm_o rose (output pad is always observable, even in GL)
         try:
             if int(dut.alarm_o.value) == 1:
                 await ClockCycles(dut.clk_PAD, 10)
@@ -452,6 +509,7 @@ async def test_chip_top_normal_full(dut):
 
     logger.info("Boot done. Waiting for 30 logits...")
     await set_start(dut, 10)
+    logger.info(f"[gl={bool(gl)}] start_i pulsed; entering main loop")
     # Start background monitor — prints features + stale logits on every feat_valid_o
     # Skip in GL mode: feat_valid_o and logit_reg_0 are RTL-only signals
     if not gl:
@@ -459,6 +517,8 @@ async def test_chip_top_normal_full(dut):
         cocotb.start_soon(_logit_monitor(dut.clk_PAD, u_top))
         cocotb.start_soon(_axi_write_monitor(dut.clk_PAD, u_top))
         cocotb.start_soon(_can_sleep_monitor(dut.clk_PAD, u_top, core))
+    else:
+        cocotb.start_soon(_gl_heartbeat(dut))
 
     # --- Phase 2: wait for alarm_o to assert (test passes on rising edge) ---
     # The firmware runs inferences and writes ALARM_CTRL=1 once the wake streak
@@ -468,19 +528,30 @@ async def test_chip_top_normal_full(dut):
         await RisingEdge(dut.clk_PAD)
 
         if cycle % 100_000 == 0:
+            alarm_str = "?"
             try:
-                ts = u_top.test_status.value.to_unsigned()
-                alarm = dut.alarm_o.value
-                logger.info(
-                    f"  cycle {cycle}: test_status=0x{ts:08X} alarm={alarm}"
-                )
+                alarm_str = str(int(dut.alarm_o.value))
             except Exception:
                 pass
+            ts_str = "n/a"
+            try:
+                ts_str = f"0x{u_top.test_status.value.to_unsigned():08X}"
+            except Exception:
+                pass
+            logger.info(
+                f"  cycle {cycle:7d}: alarm_o={alarm_str}  test_status={ts_str}"
+            )
 
-        if core.pico_trap_w.value == 1:
-            raise AssertionError("CPU trapped during runtime")
+        # CPU trap check (RTL-only — pico_trap_w doesn't survive synthesis flattening)
+        if not gl:
+            try:
+                if core.pico_trap_w.value == 1:
+                    raise AssertionError("CPU trapped during runtime")
+            except AttributeError:
+                pass
 
-        # Fast-fail on firmware-reported error
+        # Fast-fail on firmware-reported error. test_status is an internal MMIO
+        # register; it's not observable in GL.
         try:
             status = u_top.test_status.value.to_unsigned()
             if status == 0xDEAD_BEEF:
@@ -490,10 +561,10 @@ async def test_chip_top_normal_full(dut):
                 except ValueError:
                     code_str = f"X:{tc_raw!s}"
                 raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
-        except ValueError:
+        except (ValueError, AttributeError):
             pass
 
-        # Pass condition: alarm_o rose
+        # Pass condition: alarm_o rose (output pad is always observable)
         try:
             if int(dut.alarm_o.value) == 1:
                 await ClockCycles(dut.clk_PAD, 10)
@@ -503,7 +574,10 @@ async def test_chip_top_normal_full(dut):
                     await set_start(dut, 10)
                     await ClockCycles(dut.clk_PAD, 10)
                     await set_start(dut, 10)
-                    await ClockCycles(dut.clk_PAD, 300_000)
+                    await reset(dut.rst_n_PAD)
+                    await ClockCycles(dut.clk_PAD, 10_000)
+                    await set_start(dut, 10)
+
                     return
         except ValueError:
             continue
