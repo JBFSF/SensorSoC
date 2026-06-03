@@ -38,8 +38,9 @@ if { [info exists ::env(MAX_TRANSITION_CONSTRAINT)] } {
 if { [info exists ::env(MAX_CAPACITANCE_CONSTRAINT)] } {
     set_max_capacitance $::env(MAX_CAPACITANCE_CONSTRAINT) [current_design]
     # I/O pad cells are designed to drive off-chip loads and inherently exceed the
-    # standard-cell max_cap limit; remove the constraint from all pad ports.
-    set_max_capacitance -reset [get_ports {bidir_PAD[*] input_PAD[*] rst_n_PAD clk_PAD}]
+    # standard-cell max_cap limit. Override with a large value on pad ports so the
+    # global constraint does not flag them as violations.
+    set_max_capacitance 100 [get_ports {bidir_PAD[*] input_PAD[*] rst_n_PAD clk_PAD}]
 }
 
 set clocks [get_clocks $clock_port]
