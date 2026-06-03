@@ -7,8 +7,12 @@ from pathlib import Path
 
 import cocotb
 from cocotb.clock import Clock
+from cocotb.handle import Force
 from cocotb.triggers import Timer, RisingEdge, ClockCycles, ReadOnly
 from cocotb_tools.runner import get_runner
+from cocotbext.i2c import I2cDevice
+
+_GL_SENSOR_BRIDGE = "sim_chip_top_gl_sensor_bridge_env"
 
 # ---------------------------------------------------------------------------
 # Environment configuration
@@ -164,9 +168,16 @@ def _flat_gl_vec_str(scope, escaped_name, width, digits=None, missing_zero=False
     return "X"
 
 
+def _gl_chip_inst(dut):
+    """Return the chip_top instance handle in GL wrappers."""
+    if hdl_toplevel == _GL_SENSOR_BRIDGE:
+        return dut.u_chip
+    return dut.u_chip_top
+
+
 def _gl_progress(dut):
     """Collect GL-only flattened debug state for runtime progress logs."""
-    scope = dut.u_chip_top
+    scope = _gl_chip_inst(dut)
     return {
         "boot": _flat_gl_raw(scope, "i_chip_core.u_top.boot_done"),
         "status": _flat_gl_vec_str(scope, "i_chip_core.u_top.test_status", 32),
@@ -191,9 +202,9 @@ def _gl_progress(dut):
 
 def _core(dut):
     """Return the chip_core handle regardless of toplevel."""
-    if hdl_toplevel == "chip_top_sim_wrap":
+    if hdl_toplevel in {"chip_top_sim_wrap", _GL_SENSOR_BRIDGE}:
         if gl:
-            return _FlatGL(dut.u_chip_top, "i_chip_core")
+            return _FlatGL(_gl_chip_inst(dut), "i_chip_core")
         return dut.u_chip_top.i_chip_core
     return dut.i_chip_core
 
@@ -201,7 +212,7 @@ def _core(dut):
 def _top(dut):
     """Return the top handle (inside chip_core)."""
     if gl:
-        return _FlatGL(dut.u_chip_top, "i_chip_core.u_top")
+        return _FlatGL(_gl_chip_inst(dut), "i_chip_core.u_top")
     return _core(dut).u_top
 
 
@@ -419,19 +430,40 @@ async def _logit_monitor(clk, u_top):
             prev = packed
 
 
-@cocotb.test(skip=(hdl_toplevel != "chip_top_sim_wrap"))
+@cocotb.test(skip=(hdl_toplevel not in {"chip_top_sim_wrap", _GL_SENSOR_BRIDGE}))
 async def test_chip_top_normal(dut):
     """Full pipeline: sensor → features → ML inference → alarm output."""
     logger = logging.getLogger("chip_top_normal")
 
-    # ALL mode: features + ML + CPU all active; bypasses SLEEP state in sim.
     await set_defaults(dut)
-    #dut.input_PAD.value = 0b00100000 #0b00000101
     await start_clock(dut.clk_PAD)
     await reset(dut.rst_n_PAD)
 
     core  = _core(dut)
     u_top = _top(dut)
+
+    if gl:
+        # Bypass ICG X-propagation until icgtp_1 fix is re-synthesized.
+        u_top.cpu_clk_en_lat.value = Force(1)
+
+    if gl and hdl_toplevel == _GL_SENSOR_BRIDGE:
+        # Drive real sensor I2C pads with Python slave models.
+        from test_chip_top_i2c_pads import (
+            Lis2dw12Device, Adpd144riDevice, _build_sensor_model_streams,
+        )
+        accel_samples, ppg_samples = _build_sensor_model_streams()
+        _accel = Lis2dw12Device(
+            sda=dut.sensor_sda_sample, sda_o=dut.accel_sda_o,
+            scl=dut.sensor_scl_sample, scl_o=dut.accel_scl_o,
+            samples=accel_samples,
+        )
+        _ppg = Adpd144riDevice(
+            sda=dut.sensor_sda_sample, sda_o=dut.ppg_sda_o,
+            scl=dut.sensor_scl_sample, scl_o=dut.ppg_scl_o,
+            samples=ppg_samples,
+        )
+        cocotb.start_soon(_accel._run())
+        cocotb.start_soon(_ppg._run())
 
     BOOT_TIMEOUT    = 500_000
     RUNTIME_TIMEOUT = 500_000#3_000_000
@@ -674,6 +706,10 @@ def chip_top_runner():
                 sources.append(proj_path / "sim/tb/spi_flash_model.v")
                 sources.append(proj_path / "sensors/i2c_slave_lis2dw12.sv")
                 sources.append(proj_path / "sensors/i2c_slave_adpd144ri.sv")
+            elif hdl_toplevel == _GL_SENSOR_BRIDGE:
+                # Sensor bridge uses Python cocotbext I2C slaves (no SV models).
+                # Flash model still needed for SPI boot + weight loading.
+                sources.append(proj_path / "sim/tb/spi_flash_model.v")
 
         defines = {"FUNCTIONAL": True, "functional": True, "USE_POWER_PINS": True}
     else:

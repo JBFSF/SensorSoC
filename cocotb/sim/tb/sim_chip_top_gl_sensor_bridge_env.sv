@@ -49,6 +49,10 @@ module sim_chip_top_gl_sensor_bridge_env;
   pullup host_sda_pullup (bidir_PAD[HOST_SDA_PAD]);
   pullup sensor_sda_pullup (bidir_PAD[SENSOR_SDA_PAD]);
 
+  // Alarm output exposed so chip_top_tb.py can poll dut.alarm_o directly.
+  wire alarm_o;
+  assign alarm_o = bidir_PAD[0];
+
   chip_top u_chip (
     .VDD(VDD),
     .VSS(VSS),
@@ -58,4 +62,33 @@ module sim_chip_top_gl_sensor_bridge_env;
     .bidir_PAD(bidir_PAD),
     .analog_PAD(analog_PAD)
   );
+
+  // Shared SPI flash: words [0:1023] firmware, [1024:3071] ML weights.
+  localparam integer FLASH_WORDS = 3072;
+  localparam integer WEIGHT_FLASH_OFFSET_WORDS = 1024;
+
+  spi_flash_model #(
+      .FLASH_WORDS    (FLASH_WORDS),
+      .FLASH_INIT_HEX ("")
+  ) u_boot_flash (
+      .spi_clk  (bidir_PAD[1]),
+      .spi_cs_n (bidir_PAD[3]),
+      .spi_mosi (bidir_PAD[2]),
+      .spi_miso (bidir_PAD[4])
+  );
+
+  string fw_hex, wt_hex;
+  initial begin
+      if (!$value$plusargs("FIRMWARE_HEX=%s", fw_hex))
+          $fatal(1, "sim_chip_top_gl_sensor_bridge_env: no FIRMWARE_HEX — pass +FIRMWARE_HEX=<abs_path>");
+      $readmemh(fw_hex, u_boot_flash.mem, 0, WEIGHT_FLASH_OFFSET_WORDS - 1);
+      $display("sim_chip_top_gl_sensor_bridge_env: boot flash loaded from %s", fw_hex);
+
+      if (!$value$plusargs("WEIGHT_HEX=%s", wt_hex))
+          $fatal(1, "sim_chip_top_gl_sensor_bridge_env: no WEIGHT_HEX — pass +WEIGHT_HEX=<abs_path>");
+      $readmemh(wt_hex, u_boot_flash.mem, WEIGHT_FLASH_OFFSET_WORDS, FLASH_WORDS - 1);
+      $display("sim_chip_top_gl_sensor_bridge_env: weights loaded at word offset %0d from %s",
+               WEIGHT_FLASH_OFFSET_WORDS, wt_hex);
+  end
+
 endmodule
