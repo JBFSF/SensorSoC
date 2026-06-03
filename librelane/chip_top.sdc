@@ -37,6 +37,21 @@ if { [info exists ::env(MAX_TRANSITION_CONSTRAINT)] } {
 }
 if { [info exists ::env(MAX_CAPACITANCE_CONSTRAINT)] } {
     set_max_capacitance $::env(MAX_CAPACITANCE_CONSTRAINT) [current_design]
+    # Bond pad capacitance (~3.4pF) is a physical property of the I/O cell,
+    # not fixable by buffering. Override at both port and cell-instance pin level.
+    set_max_capacitance 100 [get_ports {bidir_PAD[*] input_PAD[*] rst_n_PAD clk_PAD}]
+    set bidir_count [llength [get_ports {bidir_PAD[*]}]]
+    set input_count [llength [get_ports {input_PAD[*]}]]
+    set pad_pin_list {}
+    for {set i 0} {$i < $bidir_count} {incr i} {
+        lappend pad_pin_list "bidir\[${i}\].pad/PAD"
+    }
+    for {set i 0} {$i < $input_count} {incr i} {
+        lappend pad_pin_list "inputs\[${i}\].pad/PAD"
+    }
+    lappend pad_pin_list "clk_pad/PAD"
+    lappend pad_pin_list "rst_n_pad/PAD"
+    set_max_capacitance 100 [get_pins $pad_pin_list]
 }
 
 set clocks [get_clocks $clock_port]
