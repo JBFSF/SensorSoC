@@ -573,7 +573,6 @@ async def test_chip_top_normal(dut):
 
     BOOT_TIMEOUT    = 500_000
     RUNTIME_TIMEOUT = 500_000#3_000_000
-    print("1")
     # --- Phase 1: wait for boot ---
     logger.info("Waiting for boot_done...")
     for cycle in range(BOOT_TIMEOUT):
@@ -582,7 +581,6 @@ async def test_chip_top_normal(dut):
             break
     else:
         raise AssertionError("Timeout waiting for boot_done")
-    print("3")
     assert core.pico_trap_w.value == 0, "CPU trapped during boot"
 
     cocotb.log.info("Boot done. Waiting for alarm_o...")
@@ -606,7 +604,11 @@ async def test_chip_top_normal(dut):
     for cycle in range(RUNTIME_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
 
+<<<<<<< HEAD
         if cycle % 10_000 == 0:
+=======
+        if cycle % 100_000 == 0:
+>>>>>>> a7a90025da03fa71b1d93924be9b9bc10babba6e
             if gl:
                 p = _gl_progress(dut)
                 cocotb.log.info(f"==== cycle {cycle} GL snapshot ====")
@@ -764,7 +766,11 @@ async def test_chip_top_normal_full(dut):
     for cycle in range(RUNTIME_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
 
+<<<<<<< HEAD
         if cycle % 10_000 == 0:
+=======
+        if cycle % 100_000 == 0:
+>>>>>>> a7a90025da03fa71b1d93924be9b9bc10babba6e
             if gl:
                 p = _gl_progress(dut)
                 cocotb.log.info(
