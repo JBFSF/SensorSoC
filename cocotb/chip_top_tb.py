@@ -17,12 +17,20 @@ _GL_SENSOR_BRIDGE = "sim_chip_top_gl_sensor_bridge_env"
 # ---------------------------------------------------------------------------
 # Environment configuration
 # ---------------------------------------------------------------------------
-sim        = os.getenv("SIM", "icarus")
-pdk_root   = os.getenv("PDK_ROOT", Path("~/.ciel").expanduser())
-pdk        = os.getenv("PDK", "gf180mcuD")
-scl        = os.getenv("SCL", "gf180mcu_fd_sc_mcu7t5v0")
-gl         = os.getenv("GL", False)
-slot       = os.getenv("SLOT", "1x1")
+def _env_flag(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"", "0", "false", "no", "off"}
+
+
+sim         = os.getenv("SIM", "icarus")
+pdk_root    = os.getenv("PDK_ROOT", Path("~/.ciel").expanduser())
+pdk         = os.getenv("PDK", "gf180mcuD")
+scl         = os.getenv("SCL", "gf180mcu_fd_sc_mcu7t5v0")
+gl          = _env_flag("GL")
+waves       = _env_flag("WAVES", True)
+slot        = os.getenv("SLOT", "1x1")
 test_module = os.getenv("COCOTB_TEST_MODULE", "chip_top_tb")
 
 
@@ -937,7 +945,7 @@ def chip_top_runner():
         always=True,
         includes=includes,
         build_args=build_args,
-        waves=True,
+        waves=waves,
     )
 
     # Absolute paths — VVP runs from sim_build/, so relative paths fail.
@@ -951,7 +959,7 @@ def chip_top_runner():
         hdl_toplevel=hdl_toplevel,
         test_module=test_module,
         plusargs=plusargs,
-        waves=True,
+        waves=waves,
     )
 
 
