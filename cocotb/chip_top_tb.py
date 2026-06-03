@@ -176,27 +176,93 @@ def _gl_chip_inst(dut):
 
 
 def _gl_progress(dut):
-    """Collect GL-only flattened debug state for runtime progress logs."""
+    """Collect GL-only flattened debug state for runtime progress logs.
+
+    Probes are grouped by subsystem; signals that didn't survive synthesis
+    return "MISSING" — useful info itself (tells you what got optimized).
+    """
     scope = _gl_chip_inst(dut)
     return {
-        "boot": _flat_gl_raw(scope, "i_chip_core.u_top.boot_done"),
-        "status": _flat_gl_vec_str(scope, "i_chip_core.u_top.test_status", 32),
-        "code": _flat_gl_vec_str(scope, "i_chip_core.u_top.test_code", 32),
-        "fsm": _flat_gl_vec_str(scope, "i_chip_core.u_top.fsm.state_q", 10, digits=3, missing_zero=True),
-        "cpu_clk": _flat_gl_raw(scope, "i_chip_core.pico_cpu_clk_en_w"),
-        "sleep": _flat_gl_raw(scope, "i_chip_core.pico_sleeping_w"),
-        "trap": _flat_gl_raw(scope, "i_chip_core.pico_trap_w"),
-        "mem_v": _flat_gl_raw(scope, "i_chip_core.pico_mem_valid_w"),
-        "mem_i": _flat_gl_raw(scope, "i_chip_core.pico_mem_instr_w"),
-        "mem_addr": _flat_gl_vec_str(scope, "i_chip_core.pico_mem_addr_w", 32, missing_zero=True),
-        "feat_valid": _flat_gl_raw(scope, "i_chip_core.feat_valid_w"),
+        # ---------- reset / clock health (start here if FSM stuck) ----------
+        "rst_n":        _flat_gl_raw(scope, "i_chip_core.rst_n"),
+        "reset_i":      _flat_gl_raw(scope, "i_chip_core.u_top.reset_i"),
+        "fsm_rstn":     _flat_gl_raw(scope, "i_chip_core.u_top.fsm.resetn_i"),
+        "fsm_clk":      _flat_gl_raw(scope, "i_chip_core.u_top.fsm.clk_i"),
+        "core_clk":     _flat_gl_raw(scope, "i_chip_core.core_clk_w"),
+        "cpu_clk":      _flat_gl_raw(scope, "i_chip_core.pico_cpu_clk_en_w"),
+        "cpu_clk_lat":  _flat_gl_raw(scope, "i_chip_core.u_top.cpu_clk_en_lat"),
+
+        # ---------- top FSM ----------
+        "boot":         _flat_gl_raw(scope, "i_chip_core.u_top.boot_done"),
+        "fsm":          _flat_gl_vec_str(scope, "i_chip_core.u_top.fsm.state_q", 4, digits=1, missing_zero=True),
+        "fsm_d":        _flat_gl_vec_str(scope, "i_chip_core.u_top.fsm.state_d", 4, digits=1, missing_zero=True),
+        # FSM transition inputs — tells you why FSM isn't moving
+        "fsm_bdi":      _flat_gl_raw(scope, "i_chip_core.u_top.fsm.boot_done_i"),
+        "fsm_starti":   _flat_gl_raw(scope, "i_chip_core.u_top.fsm.start_i"),
+        "fsm_sleepi":   _flat_gl_raw(scope, "i_chip_core.u_top.fsm.sleep_req_i"),
+        "fsm_featvi":   _flat_gl_raw(scope, "i_chip_core.u_top.fsm.feat_valid_i"),
+        "fsm_mlirq":    _flat_gl_raw(scope, "i_chip_core.u_top.fsm.ml_irq_i"),
+        "fsm_cpualm":   _flat_gl_raw(scope, "i_chip_core.u_top.fsm.cpu_alarm_i"),
+        "fsm_wakerq":   _flat_gl_raw(scope, "i_chip_core.u_top.fsm.irqc_wake_req_i"),
+        "fsm_memv":     _flat_gl_raw(scope, "i_chip_core.u_top.fsm.mem_valid_i"),
+        "fsm_idleR":    _flat_gl_raw(scope, "i_chip_core.u_top.fsm.cpu_idle_seen_r"),
+        "fsm_tmode":    _flat_gl_vec_str(scope, "i_chip_core.u_top.fsm.test_mode_i", 4, digits=1, missing_zero=True),
+        # FSM outputs
+        "feat_en":      _flat_gl_raw(scope, "i_chip_core.u_top.fsm.feat_en_o"),
+        "ml_en":        _flat_gl_raw(scope, "i_chip_core.u_top.fsm.ml_en_o"),
+        "cpu_en":       _flat_gl_raw(scope, "i_chip_core.u_top.fsm.cpu_en_o"),
+
+        # ---------- CPU activity ----------
+        "sleep":        _flat_gl_raw(scope, "i_chip_core.pico_sleeping_w"),
+        "trap":         _flat_gl_raw(scope, "i_chip_core.pico_trap_w"),
+        "mem_v":        _flat_gl_raw(scope, "i_chip_core.pico_mem_valid_w"),
+        "mem_i":        _flat_gl_raw(scope, "i_chip_core.pico_mem_instr_w"),
+        "mem_rdy":      _flat_gl_raw(scope, "i_chip_core.u_top.mem_ready"),
+        "mem_addr":     _flat_gl_vec_str(scope, "i_chip_core.pico_mem_addr_w", 32, missing_zero=True),
+        "mem_wstrb":    _flat_gl_vec_str(scope, "i_chip_core.u_top.mem_wstrb", 4, digits=1, missing_zero=True),
+        "mem_wdata":    _flat_gl_vec_str(scope, "i_chip_core.u_top.mem_wdata", 32, missing_zero=True),
+
+        # ---------- Test/diag MMIO registers ----------
+        "status":       _flat_gl_vec_str(scope, "i_chip_core.u_top.test_status", 32),
+        "code":         _flat_gl_vec_str(scope, "i_chip_core.u_top.test_code", 32),
+
+        # ---------- Timer ----------
+        "tim_evt":      _flat_gl_raw(scope, "i_chip_core.u_top.u_timer.event_o"),
+        "tim_evt_lat":  _flat_gl_raw(scope, "i_chip_core.u_top.u_timer.event_latched"),
+        "tim_ctrl":     _flat_gl_vec_str(scope, "i_chip_core.u_top.u_timer.ctrl_r", 32),
+        "tim_count":    _flat_gl_vec_str(scope, "i_chip_core.u_top.u_timer.count_r", 32),
+
+        # ---------- IRQ controller ----------
+        "irq_pend":     _flat_gl_vec_str(scope, "i_chip_core.u_top.u_irqc.pending", 32),
+        "irq_mask":     _flat_gl_vec_str(scope, "i_chip_core.u_top.u_irqc.mask", 32),
+        "irq_wake_en":  _flat_gl_vec_str(scope, "i_chip_core.u_top.u_irqc.wake_en", 32),
+        "irq_wake_req": _flat_gl_raw(scope, "i_chip_core.u_top.u_irqc.wake_req_o"),
+        "irq_to_cpu":   _flat_gl_raw(scope, "i_chip_core.u_top.u_irqc.irq_o"),
+
+        # ---------- Power ----------
+        "pwr_sleep_req":_flat_gl_raw(scope, "i_chip_core.u_top.u_pwr.sleep_req_o"),
+        "pwr_wake_st":  _flat_gl_vec_str(scope, "i_chip_core.u_top.u_pwr.wake_status", 32),
+
+        # ---------- Sensor pipeline (post-I2C) ----------
+        "accel_v":      _flat_gl_raw(scope, "i_chip_core.u_top.accel_valid_w"),
+        "ppg_v":        _flat_gl_raw(scope, "i_chip_core.u_top.ppg_sample_valid_w"),
+        "epoch_end":    _flat_gl_raw(scope, "i_chip_core.u_top.epoch_end_w"),
+        "feat_valid":   _flat_gl_raw(scope, "i_chip_core.feat_valid_w"),
         "feat_latched": _flat_gl_raw(scope, "i_chip_core.u_top.feat_latched_valid_r"),
-        "feat_reason": _flat_gl_vec_str(scope, "i_chip_core.u_top.feat_invalid_reason_latched_r", 7, digits=2),
-        "ml_irq": _flat_gl_raw(scope, "i_chip_core.ml_irq_w"),
+        "feat_reason":  _flat_gl_vec_str(scope, "i_chip_core.u_top.feat_invalid_reason_latched_r", 7, digits=2),
+
+        # ---------- ML accelerator ----------
+        "ml_irq":       _flat_gl_raw(scope, "i_chip_core.ml_irq_w"),
+        "ml_en_w":      _flat_gl_raw(scope, "i_chip_core.u_top.ml_en"),
         "wflash_state": _flat_gl_vec_str(scope, "i_chip_core.u_top.u_weight_flash.state", 4, digits=1),
-        "logit0": _flat_gl_vec_str(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_0", 32),
-        "logit1": _flat_gl_vec_str(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", 32),
-        "cpu_alarm": _flat_gl_raw(scope, "i_chip_core.u_top.cpu_alarm_w"),
+        "logit0":       _flat_gl_vec_str(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_0", 32),
+        "logit1":       _flat_gl_vec_str(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", 32),
+        "dbg_logit0":   _flat_gl_vec_str(scope, "i_chip_core.u_top.logit0", 16),
+        "dbg_logit1":   _flat_gl_vec_str(scope, "i_chip_core.u_top.logit1", 16),
+
+        # ---------- Alarm ----------
+        "cpu_alarm":    _flat_gl_raw(scope, "i_chip_core.u_top.cpu_alarm_w"),
+        "fsm_alarm_o":  _flat_gl_raw(scope, "i_chip_core.u_top.fsm.alarm_o"),
     }
 
 
@@ -514,7 +580,6 @@ async def test_chip_top_normal(dut):
         await RisingEdge(dut.clk_PAD)
         if u_top.boot_done.value == 1:
             break
-        print("2")
     else:
         raise AssertionError("Timeout waiting for boot_done")
     print("3")
@@ -541,36 +606,67 @@ async def test_chip_top_normal(dut):
     for cycle in range(RUNTIME_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
 
-        if cycle % 100_000 == 0:
-<<<<<<< HEAD
-            # Pad signals always work; internal signals only work in RTL
-            alarm_str = "?"
-            try:
-                alarm_str = str(int(dut.alarm_o.value))
-            except Exception:
-                pass
-            ts_str = "n/a"
-            try:
-                ts_str = f"0x{u_top.test_status.value.to_unsigned():08X}"
-            except Exception:
-                pass
-            logger.info(
-                f"  cycle {cycle:7d}: alarm_o={alarm_str}  test_status={ts_str}"
-            )
-=======
+        if cycle % 10_000 == 0:
             if gl:
                 p = _gl_progress(dut)
+                cocotb.log.info(f"==== cycle {cycle} GL snapshot ====")
                 cocotb.log.info(
-                    f"  cycle {cycle}: "
-                    f"boot={p['boot']} status={p['status']} code={p['code']} "
-                    f"fsm={p['fsm']} cpu_clk={p['cpu_clk']} sleep={p['sleep']} "
-                    f"trap={p['trap']} mem_v={p['mem_v']} mem_i={p['mem_i']} "
-                    f"mem_addr={p['mem_addr']} feat={p['feat_valid']} "
-                    f"latched={p['feat_latched']} reason={p['feat_reason']} "
-                    f"ml_irq={p['ml_irq']} wf_state={p['wflash_state']} "
-                    f"logit0={p['logit0']} logit1={p['logit1']} "
-                    f"cpu_alarm={p['cpu_alarm']} "
-                    f"pad_alarm={dut.alarm_o.value}"
+                    f"  [rst/clk]  rst_n={p['rst_n']} reset_i={p['reset_i']} "
+                    f"fsm_rstn={p['fsm_rstn']} fsm_clk={p['fsm_clk']} "
+                    f"core_clk={p['core_clk']} cpu_clk={p['cpu_clk']} "
+                    f"cpu_clk_lat={p['cpu_clk_lat']}"
+                )
+                cocotb.log.info(
+                    f"  [fsm]      state_q={p['fsm']} state_d={p['fsm_d']} "
+                    f"boot={p['boot']} tmode={p['fsm_tmode']}"
+                )
+                cocotb.log.info(
+                    f"  [fsm_in]   bdi={p['fsm_bdi']} start={p['fsm_starti']} "
+                    f"sleep_req={p['fsm_sleepi']} feat_v={p['fsm_featvi']} "
+                    f"ml_irq={p['fsm_mlirq']} cpu_alm={p['fsm_cpualm']} "
+                    f"wake_req={p['fsm_wakerq']} mem_v={p['fsm_memv']} "
+                    f"idle_seen={p['fsm_idleR']}"
+                )
+                cocotb.log.info(
+                    f"  [fsm_out]  feat_en={p['feat_en']} ml_en={p['ml_en']} "
+                    f"cpu_en={p['cpu_en']} alarm_o={p['fsm_alarm_o']}"
+                )
+                cocotb.log.info(
+                    f"  [cpu]      sleep={p['sleep']} trap={p['trap']} "
+                    f"mem_v={p['mem_v']} mem_i={p['mem_i']} mem_rdy={p['mem_rdy']} "
+                    f"mem_addr={p['mem_addr']} mem_wstrb={p['mem_wstrb']} "
+                    f"mem_wdata={p['mem_wdata']}"
+                )
+                cocotb.log.info(
+                    f"  [test]     status={p['status']} code={p['code']}"
+                )
+                cocotb.log.info(
+                    f"  [timer]    evt={p['tim_evt']} evt_lat={p['tim_evt_lat']} "
+                    f"ctrl={p['tim_ctrl']} count={p['tim_count']}"
+                )
+                cocotb.log.info(
+                    f"  [irqc]     pend={p['irq_pend']} mask={p['irq_mask']} "
+                    f"wake_en={p['irq_wake_en']} wake_req={p['irq_wake_req']} "
+                    f"to_cpu={p['irq_to_cpu']}"
+                )
+                cocotb.log.info(
+                    f"  [pwr]      sleep_req={p['pwr_sleep_req']} "
+                    f"wake_st={p['pwr_wake_st']}"
+                )
+                cocotb.log.info(
+                    f"  [sensors]  accel_v={p['accel_v']} ppg_v={p['ppg_v']} "
+                    f"epoch={p['epoch_end']} feat_v={p['feat_valid']} "
+                    f"feat_latched={p['feat_latched']} feat_reason={p['feat_reason']}"
+                )
+                cocotb.log.info(
+                    f"  [ml]       ml_irq={p['ml_irq']} ml_en={p['ml_en_w']} "
+                    f"wf_state={p['wflash_state']} dbg_log0={p['dbg_logit0']} "
+                    f"dbg_log1={p['dbg_logit1']} logit_reg0={p['logit0']} "
+                    f"logit_reg1={p['logit1']}"
+                )
+                cocotb.log.info(
+                    f"  [alarm]    cpu_alarm={p['cpu_alarm']} "
+                    f"fsm_alarm_o={p['fsm_alarm_o']} pad={dut.alarm_o.value}"
                 )
             else:
                 try:
@@ -581,7 +677,6 @@ async def test_chip_top_normal(dut):
                     )
                 except Exception:
                     pass
->>>>>>> 10e1f4a0c525e47c9381c4f5c9bf7b94cdbf1a10
 
         # CPU trap check (RTL-only — pico_trap_w doesn't survive synthesis flattening)
         if not gl:
@@ -591,21 +686,6 @@ async def test_chip_top_normal(dut):
             except AttributeError:
                 pass
 
-<<<<<<< HEAD
-        # Fast-fail on firmware-reported error. test_status is an internal MMIO
-        # register; it's not observable in GL (synthesis flattens it out).
-        try:
-            status = u_top.test_status.value.to_unsigned()
-            if status == 0xDEAD_BEEF:
-                tc_raw = u_top.test_code.value
-                try:
-                    code_str = f"0x{tc_raw.to_unsigned():08X}"
-                except ValueError:
-                    code_str = f"X:{tc_raw!s}"
-                raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
-        except (ValueError, AttributeError):
-            pass
-=======
         # Fast-fail on firmware-reported error in RTL. In GL, these debug
         # mailbox vectors are flattened into per-bit escaped nets; keep the
         # GL pass/fail criterion focused on the real pad-level alarm output.
@@ -621,7 +701,6 @@ async def test_chip_top_normal(dut):
                     raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
             except ValueError:
                 pass
->>>>>>> 10e1f4a0c525e47c9381c4f5c9bf7b94cdbf1a10
 
         # Pass condition: alarm_o rose (output pad is always observable, even in GL)
         try:
@@ -685,22 +764,7 @@ async def test_chip_top_normal_full(dut):
     for cycle in range(RUNTIME_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
 
-        if cycle % 100_000 == 0:
-<<<<<<< HEAD
-            alarm_str = "?"
-            try:
-                alarm_str = str(int(dut.alarm_o.value))
-            except Exception:
-                pass
-            ts_str = "n/a"
-            try:
-                ts_str = f"0x{u_top.test_status.value.to_unsigned():08X}"
-            except Exception:
-                pass
-            logger.info(
-                f"  cycle {cycle:7d}: alarm_o={alarm_str}  test_status={ts_str}"
-            )
-=======
+        if cycle % 10_000 == 0:
             if gl:
                 p = _gl_progress(dut)
                 cocotb.log.info(
@@ -724,7 +788,6 @@ async def test_chip_top_normal_full(dut):
                     )
                 except Exception:
                     pass
->>>>>>> 10e1f4a0c525e47c9381c4f5c9bf7b94cdbf1a10
 
         # CPU trap check (RTL-only — pico_trap_w doesn't survive synthesis flattening)
         if not gl:
@@ -734,21 +797,6 @@ async def test_chip_top_normal_full(dut):
             except AttributeError:
                 pass
 
-<<<<<<< HEAD
-        # Fast-fail on firmware-reported error. test_status is an internal MMIO
-        # register; it's not observable in GL.
-        try:
-            status = u_top.test_status.value.to_unsigned()
-            if status == 0xDEAD_BEEF:
-                tc_raw = u_top.test_code.value
-                try:
-                    code_str = f"0x{tc_raw.to_unsigned():08X}"
-                except ValueError:
-                    code_str = f"X:{tc_raw!s}"
-                raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
-        except (ValueError, AttributeError):
-            pass
-=======
         # Fast-fail on firmware-reported error in RTL. In GL, these debug
         # mailbox vectors are flattened into per-bit escaped nets; keep the
         # GL pass/fail criterion focused on the real pad-level alarm output.
@@ -764,7 +812,6 @@ async def test_chip_top_normal_full(dut):
                     raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
             except ValueError:
                 pass
->>>>>>> 10e1f4a0c525e47c9381c4f5c9bf7b94cdbf1a10
 
         # Pass condition: alarm_o rose (output pad is always observable)
         try:
