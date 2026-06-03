@@ -175,6 +175,97 @@ def _gl_chip_inst(dut):
     return dut.u_chip_top
 
 
+def _gl_force_vector_zero(scope, escaped_base, width, name_for_log=None):
+    """Force every existing bit of a vector net to 0. Returns list of bit indices
+    that were actually found in the netlist (the rest were optimized away)."""
+    forced = []
+    for bit in range(width):
+        try:
+            h = _flat_gl_bit(scope, f"{escaped_base}[{bit}]")
+            h.value = Force(0)
+            forced.append(bit)
+        except AttributeError:
+            pass
+    if name_for_log:
+        cocotb.log.info(f"Forced {name_for_log}: {len(forced)}/{width} bits present (indices {forced})")
+    return forced
+
+
+def _gl_force_bit_zero(scope, escaped_name, name_for_log=None):
+    """Force a single net to 0. Returns True if found, False if missing."""
+    try:
+        h = _flat_gl_bit(scope, escaped_name)
+        h.value = Force(0)
+        if name_for_log:
+            cocotb.log.info(f"Forced {name_for_log}=0")
+        return True
+    except AttributeError:
+        if name_for_log:
+            cocotb.log.info(f"Skipped {name_for_log} (not in netlist)")
+        return False
+
+
+def _gl_release_vector(scope, escaped_base, bit_indices):
+    """Release Forces previously applied to a vector net."""
+    from cocotb.handle import Release
+    for bit in bit_indices:
+        try:
+            h = _flat_gl_bit(scope, f"{escaped_base}[{bit}]")
+            h.value = Release()
+        except AttributeError:
+            pass
+
+
+def _gl_release_bit(scope, escaped_name):
+    """Release a Force previously applied to a single-bit net."""
+    from cocotb.handle import Release
+    try:
+        h = _flat_gl_bit(scope, escaped_name)
+        h.value = Release()
+    except AttributeError:
+        pass
+
+
+_FSM_ONEHOT_NAMES = {
+    0: "BOOT", 1: "IDLE", 2: "SLEEP", 3: "FEAT_ONLY",
+    4: "ALL", 5: "CPU_FEAT", 6: "FEAT_ML", 7: "CPU_ONLY",
+    8: "ALARM", 9: "CPU_INIT",
+}
+
+
+def _gl_decode_fsm_state(scope):
+    """Read state_q as a one-hot vector and decode which state is active.
+
+    Yosys synthesized state_q as one-hot (each bit = one state). Bits 1 and 3
+    (IDLE/FEAT_ONLY) were optimized away — likely transient states that never
+    hold for a full clock. Returns a string like "ALL(4)" or "X-MULTI(0,9)" if
+    multiple bits set, or "X-NONE" if all 0 (could be IDLE/FEAT_ONLY).
+    """
+    active = []
+    has_x = False
+    bits_present = []
+    for state_num in range(10):
+        raw = _flat_gl_raw(scope, f"i_chip_core.u_top.fsm.state_q[{state_num}]")
+        if raw == "MISSING":
+            continue
+        bits_present.append(state_num)
+        if raw == "1":
+            active.append(state_num)
+        elif raw not in ("0",):
+            has_x = True
+
+    if has_x and not active:
+        return "X-BITS"
+    if len(active) == 0:
+        # Could be the optimized-away IDLE(1) or FEAT_ONLY(3)
+        return f"NONE-SET (transient? present_bits={bits_present})"
+    if len(active) == 1:
+        n = active[0]
+        return f"{_FSM_ONEHOT_NAMES.get(n, '?')}({n})"
+    names = ",".join(f"{_FSM_ONEHOT_NAMES.get(n, '?')}({n})" for n in active)
+    return f"MULTI[{names}]"
+
+
 def _gl_progress(dut):
     """Collect GL-only flattened debug state for runtime progress logs.
 
@@ -193,8 +284,12 @@ def _gl_progress(dut):
         "cpu_clk_lat":  _flat_gl_raw(scope, "i_chip_core.u_top.cpu_clk_en_lat"),
 
         # ---------- top FSM ----------
+        # In the synthesized netlist, state_q is one-hot encoded:
+        #   state_q[N] == 1 means FSM is in state N (BOOT=0, IDLE=1, SLEEP=2,
+        #   FEAT_ONLY=3, ALL=4, CPU_FEAT=5, FEAT_ML=6, CPU_ONLY=7, ALARM=8, CPU_INIT=9).
+        # Yosys optimized away bits for IDLE and FEAT_ONLY (likely pass-through states).
         "boot":         _flat_gl_raw(scope, "i_chip_core.u_top.boot_done"),
-        "fsm":          _flat_gl_vec_str(scope, "i_chip_core.u_top.fsm.state_q", 4, digits=1, missing_zero=True),
+        "fsm":          _gl_decode_fsm_state(scope),
         "fsm_d":        _flat_gl_vec_str(scope, "i_chip_core.u_top.fsm.state_d", 4, digits=1, missing_zero=True),
         # FSM transition inputs — tells you why FSM isn't moving
         "fsm_bdi":      _flat_gl_raw(scope, "i_chip_core.u_top.fsm.boot_done_i"),
@@ -543,14 +638,123 @@ async def test_chip_top_normal(dut):
 
     await set_defaults(dut)
     await start_clock(dut.clk_PAD)
-    await reset(dut.rst_n_PAD)
+
+    # Assert reset (active low) BEFORE forcing so we can latch FSM state in
+    # one-hot BOOT during the reset window.
+    cocotb.log.info("Reset asserted (pre-force)")
+    dut.rst_n_PAD.value = 0
+    await ClockCycles(dut.clk_PAD, 5)
 
     core  = _core(dut)
     u_top = _top(dut)
 
+    forced_fsm_bits = []
+    forced_irq_pend = []
+    forced_irq_mask = []
+    forced_irq_wake_en = []
+    forced_irq_src_d = []
+    forced_irq_active = []
+    forced_irq_wake_pd = []
+    forced_tim_ctrl = []
+    forced_tim_count = []
+    forced_pwr_wake_st = []
+    forced_pwr_wake_rsn = []
+    forced_wf_logit0 = []
+    forced_wf_logit1 = []
+    forced_wf_feat0 = []
+    forced_wf_feat1 = []
+    forced_wf_state = []
+
     if gl:
         # Bypass ICG X-propagation until icgtp_1 fix is re-synthesized.
         u_top.cpu_clk_en_lat.value = Force(1)
+
+        # Yosys mapped sync-reset RTL to plain dffq_1 cells (no reset port).
+        # In GL sim, flops power up to X and the sync-reset combo path computes
+        # D = f(X) = X, locking the X forever. Force critical control flops to
+        # their reset values during the reset window so they have a defined
+        # starting point; release after reset deasserts.
+        scope = _gl_chip_inst(dut)
+
+        # --- top_fsm: state_q is one-hot, force BOOT (bit 0 = 1, others = 0)
+        for n in range(10):
+            try:
+                h = _flat_gl_bit(scope, f"i_chip_core.u_top.fsm.state_q[{n}]")
+                h.value = Force(1 if n == 0 else 0)
+                forced_fsm_bits.append(n)
+            except AttributeError:
+                pass
+        cocotb.log.info(f"Forced state_q one-hot BOOT (bits present: {forced_fsm_bits})")
+        # FSM internal trackers
+        _gl_force_bit_zero(scope, "i_chip_core.u_top.fsm.cpu_idle_seen_r", "fsm.cpu_idle_seen_r")
+        _gl_force_bit_zero(scope, "i_chip_core.u_top.fsm.cpu_clk_en_r",    "fsm.cpu_clk_en_r")
+        _gl_force_bit_zero(scope, "i_chip_core.u_top.fsm.sleep_req_d_r",   "fsm.sleep_req_d_r")
+
+        # --- irq_ctrl_mmio: pending, mask, wake_en, src_d, active, wake_pending_d
+        forced_irq_pend    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.pending",        32, "irqc.pending")
+        forced_irq_mask    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.mask",           32, "irqc.mask")
+        forced_irq_wake_en = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.wake_en",        32, "irqc.wake_en")
+        forced_irq_src_d   = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.src_d",          32, "irqc.src_d")
+        forced_irq_active  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.active",         32, "irqc.active")
+        forced_irq_wake_pd = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.wake_pending_d", 32, "irqc.wake_pending_d")
+
+        # --- timer_mmio: control + counter + event-latched
+        forced_tim_ctrl  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_timer.ctrl_r",  32, "timer.ctrl_r")
+        forced_tim_count = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_timer.count_r", 32, "timer.count_r")
+        _gl_force_bit_zero(scope, "i_chip_core.u_top.u_timer.event_latched", "timer.event_latched")
+
+        # --- pwrctrl_mmio: sleep_req, wake_status, wake_reason, cpu_awake_d
+        _gl_force_bit_zero(scope, "i_chip_core.u_top.u_pwr.sleep_req_o", "pwr.sleep_req_o")
+        forced_pwr_wake_st  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_pwr.wake_status", 32, "pwr.wake_status")
+        forced_pwr_wake_rsn = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_pwr.wake_reason", 32, "pwr.wake_reason")
+        _gl_force_bit_zero(scope, "i_chip_core.u_top.u_pwr.cpu_awake_d", "pwr.cpu_awake_d")
+
+        # --- weight_flash_axi: state machine + captured logits + feature regs
+        forced_wf_state  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.state",       4,  "wflash.state")
+        forced_wf_logit0 = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_0", 32, "wflash.logit_reg_0")
+        forced_wf_logit1 = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", 32, "wflash.logit_reg_1")
+        forced_wf_feat0  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_0",  32, "wflash.feat_reg_0")
+        forced_wf_feat1  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_1",  32, "wflash.feat_reg_1")
+
+    # Hold reset asserted for a few more cycles so the forced values propagate
+    await ClockCycles(dut.clk_PAD, 5)
+
+    # Deassert reset (active low → high)
+    dut.rst_n_PAD.value = 1
+    await ClockCycles(dut.clk_PAD, 2)
+    cocotb.log.info("Reset deasserted")
+
+    if gl:
+        # Release all the forces so logic can run normally
+        for n in forced_fsm_bits:
+            _gl_release_bit(scope, f"i_chip_core.u_top.fsm.state_q[{n}]")
+        _gl_release_bit(scope, "i_chip_core.u_top.fsm.cpu_idle_seen_r")
+        _gl_release_bit(scope, "i_chip_core.u_top.fsm.cpu_clk_en_r")
+        _gl_release_bit(scope, "i_chip_core.u_top.fsm.sleep_req_d_r")
+
+        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.pending",        forced_irq_pend)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.mask",           forced_irq_mask)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.wake_en",        forced_irq_wake_en)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.src_d",          forced_irq_src_d)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.active",         forced_irq_active)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.wake_pending_d", forced_irq_wake_pd)
+
+        _gl_release_vector(scope, "i_chip_core.u_top.u_timer.ctrl_r",  forced_tim_ctrl)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_timer.count_r", forced_tim_count)
+        _gl_release_bit(scope, "i_chip_core.u_top.u_timer.event_latched")
+
+        _gl_release_bit(scope, "i_chip_core.u_top.u_pwr.sleep_req_o")
+        _gl_release_vector(scope, "i_chip_core.u_top.u_pwr.wake_status", forced_pwr_wake_st)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_pwr.wake_reason", forced_pwr_wake_rsn)
+        _gl_release_bit(scope, "i_chip_core.u_top.u_pwr.cpu_awake_d")
+
+        _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.state",       forced_wf_state)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_0", forced_wf_logit0)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", forced_wf_logit1)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_0",  forced_wf_feat0)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_1",  forced_wf_feat1)
+
+        cocotb.log.info("Released all force-init nets — chip should run with defined initial state")
 
     if gl and hdl_toplevel == _GL_SENSOR_BRIDGE:
         # Drive real sensor I2C pads with Python slave models.
@@ -604,11 +808,7 @@ async def test_chip_top_normal(dut):
     for cycle in range(RUNTIME_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
 
-<<<<<<< HEAD
         if cycle % 10_000 == 0:
-=======
-        if cycle % 100_000 == 0:
->>>>>>> a7a90025da03fa71b1d93924be9b9bc10babba6e
             if gl:
                 p = _gl_progress(dut)
                 cocotb.log.info(f"==== cycle {cycle} GL snapshot ====")
@@ -766,11 +966,7 @@ async def test_chip_top_normal_full(dut):
     for cycle in range(RUNTIME_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
 
-<<<<<<< HEAD
         if cycle % 10_000 == 0:
-=======
-        if cycle % 100_000 == 0:
->>>>>>> a7a90025da03fa71b1d93924be9b9bc10babba6e
             if gl:
                 p = _gl_progress(dut)
                 cocotb.log.info(
