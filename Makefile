@@ -26,6 +26,7 @@ DEFAULT_SLOT = 1x1
 # Slot can be any of AVAILABLE_SLOTS
 SLOT ?= $(DEFAULT_SLOT)
 GL_WAVES ?= $(if $(WAVES),$(WAVES),0)
+GL_CLK_FREQ_MHZ ?= $(if $(CLK_FREQ_MHZ),$(CLK_FREQ_MHZ),10.0)
 
 ifeq ($(SLOT),default)        
     SLOT = $(DEFAULT_SLOT)
@@ -107,7 +108,7 @@ sim-dft-smoke: ## Run chip_core DFT smoke tests for normal/force-IRQ/force-wake 
 .PHONY: sim-dft-smoke
 
 sim-gl-dft-smoke: ## Run gate-level chip_top DFT smoke tests (requires completed LibreLane run in final/)
-	cd cocotb; GL=1 WAVES=$(GL_WAVES) COCOTB_TEST_MODULE=chip_top_dft_tb PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} $(PYTHON) chip_top_tb.py
+	cd cocotb; GL=1 WAVES=$(GL_WAVES) CLK_FREQ_MHZ=$(GL_CLK_FREQ_MHZ) COCOTB_TEST_MODULE=chip_top_dft_tb PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} $(PYTHON) chip_top_tb.py
 .PHONY: sim-gl-dft-smoke
 
 
@@ -127,19 +128,19 @@ build-riscv-toolchain: ## Build bare-metal RISC-V GCC from third_party/riscv-gnu
 .PHONY: build-riscv-toolchain
 
 sim-gl: ## Run gate-level simulation with cocotb (uses sensor bridge wrapper)
-	cd cocotb; GL=1 WAVES=$(GL_WAVES) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} $(PYTHON) chip_top_tb.py
+	cd cocotb; GL=1 WAVES=$(GL_WAVES) CLK_FREQ_MHZ=$(GL_CLK_FREQ_MHZ) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} $(PYTHON) chip_top_tb.py
 .PHONY: sim-gl
 
 sim-gl-smoke: ## Run gate-level chip_top smoke test (uses sensor bridge wrapper)
-	cd cocotb; GL=1 WAVES=$(GL_WAVES) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_FILTER='test_chip_top_smoke$$' $(PYTHON) chip_top_tb.py
+	cd cocotb; GL=1 WAVES=$(GL_WAVES) CLK_FREQ_MHZ=$(GL_CLK_FREQ_MHZ) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_FILTER='test_chip_top_smoke$$' $(PYTHON) chip_top_tb.py
 .PHONY: sim-gl-smoke
 
 sim-gl-boot: ## Run gate-level chip_top boot test (uses sensor bridge wrapper)
-	cd cocotb; GL=1 WAVES=$(GL_WAVES) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_FILTER='test_chip_top_boot$$' $(PYTHON) chip_top_tb.py
+	cd cocotb; GL=1 WAVES=$(GL_WAVES) CLK_FREQ_MHZ=$(GL_CLK_FREQ_MHZ) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_FILTER='test_chip_top_boot$$' $(PYTHON) chip_top_tb.py
 .PHONY: sim-gl-boot
 
 sim-gl-normal: ## Run gate-level chip_top normal pipeline test (uses sensor bridge wrapper)
-	cd cocotb; GL=1 WAVES=$(GL_WAVES) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_FILTER='test_chip_top_normal$$' $(PYTHON) chip_top_tb.py
+	cd cocotb; GL=1 WAVES=$(GL_WAVES) CLK_FREQ_MHZ=$(GL_CLK_FREQ_MHZ) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_FILTER='test_chip_top_normal$$' $(PYTHON) chip_top_tb.py
 .PHONY: sim-gl-normal
 
 GL_REGRESSION_TARGETS ?= sim-gl-smoke sim-gl-boot sim-gl-normal sim-gl-dft-smoke sim-gl-debug-modes sim-gl-sensor-bridge-smoke
@@ -161,26 +162,26 @@ sim-gl-regression: ## Run gate-level regression targets and continue after failu
 .PHONY: sim-gl-ml
 sim-gl-ml: ## Run gate-level ML pipeline smoke test (uses sensor bridge wrapper)
 	$(MAKE) -C cocotb FW_VARIANT=test_top_normal firmware-rebuild
-	cd cocotb; GL=1 WAVES=$(GL_WAVES) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=chip_top_tb COCOTB_TEST_FILTER='test_chip_top_normal$$' $(PYTHON) chip_top_tb.py
+	cd cocotb; GL=1 WAVES=$(GL_WAVES) CLK_FREQ_MHZ=$(GL_CLK_FREQ_MHZ) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=chip_top_tb COCOTB_TEST_FILTER='test_chip_top_normal$$' $(PYTHON) chip_top_tb.py
 
 .PHONY: test-ml
 test-ml: ## Run gate-level ML pipeline equivalent
 test-ml: sim-gl-ml
 
 sim-gl-debug-modes: ## Run gate-level chip_top debug-mode pad smoke test
-	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb GL=1 WAVES=$(GL_WAVES) FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=test_chip_core_debug_modes COCOTB_TEST_FILTER=test_chip_top_debug_modes_force_inputs_reach_debug_bus $(PYTHON) chip_top_tb.py
+	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb GL=1 WAVES=$(GL_WAVES) CLK_FREQ_MHZ=$(GL_CLK_FREQ_MHZ) FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=test_chip_core_debug_modes COCOTB_TEST_FILTER=test_chip_top_debug_modes_force_inputs_reach_debug_bus $(PYTHON) chip_top_tb.py
 .PHONY: sim-gl-debug-modes
 
 sim-gl-sensor-bridge: ## Run gate-level sensor I2C pad smoke test
-	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb GL=1 WAVES=$(GL_WAVES) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env CHIP_NETLIST_TOP=$(TOP) FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=test_chip_top_gl_sensor_bridge COCOTB_TEST_FILTER=test_chip_top_gl_sensor_bridge_reaches_models $(PYTHON) chip_top_tb.py
+	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb GL=1 WAVES=$(GL_WAVES) CLK_FREQ_MHZ=$(GL_CLK_FREQ_MHZ) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env CHIP_NETLIST_TOP=$(TOP) FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=test_chip_top_gl_sensor_bridge COCOTB_TEST_FILTER=test_chip_top_gl_sensor_bridge_reaches_models $(PYTHON) chip_top_tb.py
 .PHONY: sim-gl-sensor-bridge
 
 sim-gl-sensor-bridge-smoke: ## Run gate-level sensor bridge connectivity smoke test
-	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb GL=1 WAVES=$(GL_WAVES) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env CHIP_NETLIST_TOP=$(TOP) FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=test_chip_top_gl_sensor_bridge COCOTB_TEST_FILTER=test_chip_top_gl_sensor_bridge_reaches_models $(PYTHON) chip_top_tb.py
+	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb GL=1 WAVES=$(GL_WAVES) CLK_FREQ_MHZ=$(GL_CLK_FREQ_MHZ) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env CHIP_NETLIST_TOP=$(TOP) FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=test_chip_top_gl_sensor_bridge COCOTB_TEST_FILTER=test_chip_top_gl_sensor_bridge_reaches_models $(PYTHON) chip_top_tb.py
 .PHONY: sim-gl-sensor-bridge-smoke
 
 sim-gl-sensor-bridge-full: ## Run long gate-level sensor I2C debug-feature reference check
-	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb GL=1 WAVES=$(GL_WAVES) GL_SENSOR_I2C_FULL_FEATURES=1 CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env CHIP_NETLIST_TOP=$(TOP) FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=test_chip_top_gl_sensor_bridge COCOTB_TEST_FILTER=test_chip_top_gl_sensor_bridge_debug_features_match_python_reference $(PYTHON) chip_top_tb.py
+	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb GL=1 WAVES=$(GL_WAVES) CLK_FREQ_MHZ=$(GL_CLK_FREQ_MHZ) GL_SENSOR_I2C_FULL_FEATURES=1 CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env CHIP_NETLIST_TOP=$(TOP) FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=test_chip_top_gl_sensor_bridge COCOTB_TEST_FILTER=test_chip_top_gl_sensor_bridge_debug_features_match_python_reference $(PYTHON) chip_top_tb.py
 .PHONY: sim-gl-sensor-bridge-full
 
 sim-rtl-sensor-i2c-pads: ## Run RTL chip_top sensor I2C pad test with cocotbext-i2c
