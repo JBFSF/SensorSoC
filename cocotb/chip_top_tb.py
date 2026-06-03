@@ -507,17 +507,14 @@ async def test_chip_top_normal(dut):
 
     BOOT_TIMEOUT    = 500_000
     RUNTIME_TIMEOUT = 500_000#3_000_000
-    print("1")
     # --- Phase 1: wait for boot ---
     logger.info("Waiting for boot_done...")
     for cycle in range(BOOT_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
         if u_top.boot_done.value == 1:
             break
-        print("2")
     else:
         raise AssertionError("Timeout waiting for boot_done")
-    print("3")
     assert core.pico_trap_w.value == 0, "CPU trapped during boot"
 
     cocotb.log.info("Boot done. Waiting for alarm_o...")
@@ -542,22 +539,6 @@ async def test_chip_top_normal(dut):
         await RisingEdge(dut.clk_PAD)
 
         if cycle % 100_000 == 0:
-<<<<<<< HEAD
-            # Pad signals always work; internal signals only work in RTL
-            alarm_str = "?"
-            try:
-                alarm_str = str(int(dut.alarm_o.value))
-            except Exception:
-                pass
-            ts_str = "n/a"
-            try:
-                ts_str = f"0x{u_top.test_status.value.to_unsigned():08X}"
-            except Exception:
-                pass
-            logger.info(
-                f"  cycle {cycle:7d}: alarm_o={alarm_str}  test_status={ts_str}"
-            )
-=======
             if gl:
                 p = _gl_progress(dut)
                 cocotb.log.info(
@@ -581,7 +562,6 @@ async def test_chip_top_normal(dut):
                     )
                 except Exception:
                     pass
->>>>>>> 10e1f4a0c525e47c9381c4f5c9bf7b94cdbf1a10
 
         # CPU trap check (RTL-only — pico_trap_w doesn't survive synthesis flattening)
         if not gl:
@@ -591,21 +571,6 @@ async def test_chip_top_normal(dut):
             except AttributeError:
                 pass
 
-<<<<<<< HEAD
-        # Fast-fail on firmware-reported error. test_status is an internal MMIO
-        # register; it's not observable in GL (synthesis flattens it out).
-        try:
-            status = u_top.test_status.value.to_unsigned()
-            if status == 0xDEAD_BEEF:
-                tc_raw = u_top.test_code.value
-                try:
-                    code_str = f"0x{tc_raw.to_unsigned():08X}"
-                except ValueError:
-                    code_str = f"X:{tc_raw!s}"
-                raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
-        except (ValueError, AttributeError):
-            pass
-=======
         # Fast-fail on firmware-reported error in RTL. In GL, these debug
         # mailbox vectors are flattened into per-bit escaped nets; keep the
         # GL pass/fail criterion focused on the real pad-level alarm output.
@@ -621,7 +586,6 @@ async def test_chip_top_normal(dut):
                     raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
             except ValueError:
                 pass
->>>>>>> 10e1f4a0c525e47c9381c4f5c9bf7b94cdbf1a10
 
         # Pass condition: alarm_o rose (output pad is always observable, even in GL)
         try:
@@ -686,21 +650,6 @@ async def test_chip_top_normal_full(dut):
         await RisingEdge(dut.clk_PAD)
 
         if cycle % 100_000 == 0:
-<<<<<<< HEAD
-            alarm_str = "?"
-            try:
-                alarm_str = str(int(dut.alarm_o.value))
-            except Exception:
-                pass
-            ts_str = "n/a"
-            try:
-                ts_str = f"0x{u_top.test_status.value.to_unsigned():08X}"
-            except Exception:
-                pass
-            logger.info(
-                f"  cycle {cycle:7d}: alarm_o={alarm_str}  test_status={ts_str}"
-            )
-=======
             if gl:
                 p = _gl_progress(dut)
                 cocotb.log.info(
@@ -724,7 +673,6 @@ async def test_chip_top_normal_full(dut):
                     )
                 except Exception:
                     pass
->>>>>>> 10e1f4a0c525e47c9381c4f5c9bf7b94cdbf1a10
 
         # CPU trap check (RTL-only — pico_trap_w doesn't survive synthesis flattening)
         if not gl:
@@ -734,21 +682,6 @@ async def test_chip_top_normal_full(dut):
             except AttributeError:
                 pass
 
-<<<<<<< HEAD
-        # Fast-fail on firmware-reported error. test_status is an internal MMIO
-        # register; it's not observable in GL.
-        try:
-            status = u_top.test_status.value.to_unsigned()
-            if status == 0xDEAD_BEEF:
-                tc_raw = u_top.test_code.value
-                try:
-                    code_str = f"0x{tc_raw.to_unsigned():08X}"
-                except ValueError:
-                    code_str = f"X:{tc_raw!s}"
-                raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
-        except (ValueError, AttributeError):
-            pass
-=======
         # Fast-fail on firmware-reported error in RTL. In GL, these debug
         # mailbox vectors are flattened into per-bit escaped nets; keep the
         # GL pass/fail criterion focused on the real pad-level alarm output.
@@ -764,7 +697,6 @@ async def test_chip_top_normal_full(dut):
                     raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
             except ValueError:
                 pass
->>>>>>> 10e1f4a0c525e47c9381c4f5c9bf7b94cdbf1a10
 
         # Pass condition: alarm_o rose (output pad is always observable)
         try:
