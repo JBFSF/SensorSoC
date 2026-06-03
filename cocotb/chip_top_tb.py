@@ -309,7 +309,7 @@ async def test_chip_top_smoke(dut):
 
 #boot test
 
-@cocotb.test(skip=(hdl_toplevel != "chip_top_sim_wrap"))
+@cocotb.test(skip=(hdl_toplevel not in {"chip_top_sim_wrap", _GL_SENSOR_BRIDGE}))
 async def test_chip_top_boot(dut):
     """Boot test: wait for boot_done, verify CPU is running (no trap)."""
     logger = logging.getLogger("chip_top_boot")
@@ -325,7 +325,7 @@ async def test_chip_top_boot(dut):
     core  = _core(dut)
     u_top = _top(dut)
 
-    TIMEOUT_CYCLES = 1#500_000
+    TIMEOUT_CYCLES = 500_000
     cocotb.log.info("Waiting for boot_done...")
 
     for cycle in range(TIMEOUT_CYCLES):
