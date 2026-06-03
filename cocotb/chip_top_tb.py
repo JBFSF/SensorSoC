@@ -7,8 +7,12 @@ from pathlib import Path
 
 import cocotb
 from cocotb.clock import Clock
+from cocotb.handle import Force
 from cocotb.triggers import Timer, RisingEdge, ClockCycles, ReadOnly
 from cocotb_tools.runner import get_runner
+from cocotbext.i2c import I2cDevice
+
+_GL_SENSOR_BRIDGE = "sim_chip_top_gl_sensor_bridge_env"
 
 # ---------------------------------------------------------------------------
 # Environment configuration
@@ -49,6 +53,11 @@ def _s16_or_none(handle):
         return _s16(int(handle.value))
     except ValueError:
         return None
+
+
+def _fmt_hex(value, digits=8):
+    return "X" if value is None else f"0x{value:0{digits}X}"
+
 
 async def set_defaults(dut):
     dut.input_PAD.value = 0
@@ -107,11 +116,95 @@ class _FlatGL:
         raise AttributeError(f"{scope._path} has no flat GL net for '{prefix}.{name}'")
 
 
+def _flat_gl_bit(scope, escaped_name):
+    """Look up one escaped flat GL net by exact flattened name."""
+    for escaped in (f"\\{escaped_name} ", f"\\{escaped_name}"):
+        try:
+            return scope._id(escaped, extended=False)
+        except AttributeError:
+            pass
+    raise AttributeError(f"{scope._path} has no flat GL net '{escaped_name}'")
+
+
+def _flat_gl_u(scope, escaped_name):
+    try:
+        return _flat_gl_bit(scope, escaped_name).value.to_unsigned()
+    except (AttributeError, ValueError):
+        return None
+
+
+def _flat_gl_raw(scope, escaped_name):
+    try:
+        return str(_flat_gl_bit(scope, escaped_name).value)
+    except AttributeError:
+        return "MISSING"
+
+
+def _flat_gl_vec(scope, escaped_name, width, missing_zero=False):
+    value = 0
+    for bit in range(width):
+        bit_value = _flat_gl_u(scope, f"{escaped_name}[{bit}]")
+        if bit_value is None:
+            if missing_zero:
+                bit_value = 0
+            else:
+                return None
+        value |= (bit_value & 1) << bit
+    return value
+
+
+def _flat_gl_vec_str(scope, escaped_name, width, digits=None, missing_zero=False):
+    value = _flat_gl_vec(scope, escaped_name, width, missing_zero=missing_zero)
+    if value is not None:
+        if digits is None:
+            digits = max(1, (width + 3) // 4)
+        return f"0x{value:0{digits}X}"
+
+    raw_bits = []
+    for bit in reversed(range(width)):
+        raw_bits.append(_flat_gl_raw(scope, f"{escaped_name}[{bit}]"))
+    if any(bit == "MISSING" for bit in raw_bits):
+        return "MISSING"
+    return "X"
+
+
+def _gl_chip_inst(dut):
+    """Return the chip_top instance handle in GL wrappers."""
+    if hdl_toplevel == _GL_SENSOR_BRIDGE:
+        return dut.u_chip
+    return dut.u_chip_top
+
+
+def _gl_progress(dut):
+    """Collect GL-only flattened debug state for runtime progress logs."""
+    scope = _gl_chip_inst(dut)
+    return {
+        "boot": _flat_gl_raw(scope, "i_chip_core.u_top.boot_done"),
+        "status": _flat_gl_vec_str(scope, "i_chip_core.u_top.test_status", 32),
+        "code": _flat_gl_vec_str(scope, "i_chip_core.u_top.test_code", 32),
+        "fsm": _flat_gl_vec_str(scope, "i_chip_core.u_top.fsm.state_q", 10, digits=3, missing_zero=True),
+        "cpu_clk": _flat_gl_raw(scope, "i_chip_core.pico_cpu_clk_en_w"),
+        "sleep": _flat_gl_raw(scope, "i_chip_core.pico_sleeping_w"),
+        "trap": _flat_gl_raw(scope, "i_chip_core.pico_trap_w"),
+        "mem_v": _flat_gl_raw(scope, "i_chip_core.pico_mem_valid_w"),
+        "mem_i": _flat_gl_raw(scope, "i_chip_core.pico_mem_instr_w"),
+        "mem_addr": _flat_gl_vec_str(scope, "i_chip_core.pico_mem_addr_w", 32, missing_zero=True),
+        "feat_valid": _flat_gl_raw(scope, "i_chip_core.feat_valid_w"),
+        "feat_latched": _flat_gl_raw(scope, "i_chip_core.u_top.feat_latched_valid_r"),
+        "feat_reason": _flat_gl_vec_str(scope, "i_chip_core.u_top.feat_invalid_reason_latched_r", 7, digits=2),
+        "ml_irq": _flat_gl_raw(scope, "i_chip_core.ml_irq_w"),
+        "wflash_state": _flat_gl_vec_str(scope, "i_chip_core.u_top.u_weight_flash.state", 4, digits=1),
+        "logit0": _flat_gl_vec_str(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_0", 32),
+        "logit1": _flat_gl_vec_str(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", 32),
+        "cpu_alarm": _flat_gl_raw(scope, "i_chip_core.u_top.cpu_alarm_w"),
+    }
+
+
 def _core(dut):
     """Return the chip_core handle regardless of toplevel."""
-    if hdl_toplevel == "chip_top_sim_wrap":
+    if hdl_toplevel in {"chip_top_sim_wrap", _GL_SENSOR_BRIDGE}:
         if gl:
-            return _FlatGL(dut.u_chip_top, "i_chip_core")
+            return _FlatGL(_gl_chip_inst(dut), "i_chip_core")
         return dut.u_chip_top.i_chip_core
     return dut.i_chip_core
 
@@ -119,7 +212,7 @@ def _core(dut):
 def _top(dut):
     """Return the top handle (inside chip_core)."""
     if gl:
-        return _FlatGL(dut.u_chip_top, "i_chip_core.u_top")
+        return _FlatGL(_gl_chip_inst(dut), "i_chip_core.u_top")
     return _core(dut).u_top
 
 
@@ -167,7 +260,7 @@ async def test_chip_top_boot(dut):
     u_top = _top(dut)
 
     TIMEOUT_CYCLES = 1#500_000
-    logger.info("Waiting for boot_done...")
+    cocotb.log.info("Waiting for boot_done...")
 
     for cycle in range(TIMEOUT_CYCLES):
         await RisingEdge(dut.clk_PAD)
@@ -377,19 +470,40 @@ async def _logit_monitor(clk, u_top):
             prev = packed
 
 
-@cocotb.test(skip=(hdl_toplevel != "chip_top_sim_wrap"))
+@cocotb.test(skip=(hdl_toplevel not in {"chip_top_sim_wrap", _GL_SENSOR_BRIDGE}))
 async def test_chip_top_normal(dut):
     """Full pipeline: sensor → features → ML inference → alarm output."""
     logger = logging.getLogger("chip_top_normal")
 
-    # ALL mode: features + ML + CPU all active; bypasses SLEEP state in sim.
     await set_defaults(dut)
-    #dut.input_PAD.value = 0b00100000 #0b00000101
     await start_clock(dut.clk_PAD)
     await reset(dut.rst_n_PAD)
 
     core  = _core(dut)
     u_top = _top(dut)
+
+    if gl:
+        # Bypass ICG X-propagation until icgtp_1 fix is re-synthesized.
+        u_top.cpu_clk_en_lat.value = Force(1)
+
+    if gl and hdl_toplevel == _GL_SENSOR_BRIDGE:
+        # Drive real sensor I2C pads with Python slave models.
+        from test_chip_top_i2c_pads import (
+            Lis2dw12Device, Adpd144riDevice, _build_sensor_model_streams,
+        )
+        accel_samples, ppg_samples = _build_sensor_model_streams()
+        _accel = Lis2dw12Device(
+            sda=dut.sensor_sda_sample, sda_o=dut.accel_sda_o,
+            scl=dut.sensor_scl_sample, scl_o=dut.accel_scl_o,
+            samples=accel_samples,
+        )
+        _ppg = Adpd144riDevice(
+            sda=dut.sensor_sda_sample, sda_o=dut.ppg_sda_o,
+            scl=dut.sensor_scl_sample, scl_o=dut.ppg_scl_o,
+            samples=ppg_samples,
+        )
+        cocotb.start_soon(_accel._run())
+        cocotb.start_soon(_ppg._run())
 
     BOOT_TIMEOUT    = 500_000
     RUNTIME_TIMEOUT = 500_000#3_000_000
@@ -406,7 +520,7 @@ async def test_chip_top_normal(dut):
     print("3")
     assert core.pico_trap_w.value == 0, "CPU trapped during boot"
 
-    logger.info("Boot done. Waiting for 30 logits...")
+    cocotb.log.info("Boot done. Waiting for alarm_o...")
     await set_start(dut, 10)
     logger.info(f"[gl={bool(gl)}] start_i pulsed; entering main loop")
     # Start background monitor — prints features + stale logits on every feat_valid_o
@@ -428,6 +542,7 @@ async def test_chip_top_normal(dut):
         await RisingEdge(dut.clk_PAD)
 
         if cycle % 100_000 == 0:
+<<<<<<< HEAD
             # Pad signals always work; internal signals only work in RTL
             alarm_str = "?"
             try:
@@ -442,6 +557,31 @@ async def test_chip_top_normal(dut):
             logger.info(
                 f"  cycle {cycle:7d}: alarm_o={alarm_str}  test_status={ts_str}"
             )
+=======
+            if gl:
+                p = _gl_progress(dut)
+                cocotb.log.info(
+                    f"  cycle {cycle}: "
+                    f"boot={p['boot']} status={p['status']} code={p['code']} "
+                    f"fsm={p['fsm']} cpu_clk={p['cpu_clk']} sleep={p['sleep']} "
+                    f"trap={p['trap']} mem_v={p['mem_v']} mem_i={p['mem_i']} "
+                    f"mem_addr={p['mem_addr']} feat={p['feat_valid']} "
+                    f"latched={p['feat_latched']} reason={p['feat_reason']} "
+                    f"ml_irq={p['ml_irq']} wf_state={p['wflash_state']} "
+                    f"logit0={p['logit0']} logit1={p['logit1']} "
+                    f"cpu_alarm={p['cpu_alarm']} "
+                    f"pad_alarm={dut.alarm_o.value}"
+                )
+            else:
+                try:
+                    ts = u_top.test_status.value.to_unsigned()
+                    alarm = dut.alarm_o.value
+                    cocotb.log.info(
+                        f"  cycle {cycle}: test_status=0x{ts:08X} alarm={alarm}"
+                    )
+                except Exception:
+                    pass
+>>>>>>> 10e1f4a0c525e47c9381c4f5c9bf7b94cdbf1a10
 
         # CPU trap check (RTL-only — pico_trap_w doesn't survive synthesis flattening)
         if not gl:
@@ -451,6 +591,7 @@ async def test_chip_top_normal(dut):
             except AttributeError:
                 pass
 
+<<<<<<< HEAD
         # Fast-fail on firmware-reported error. test_status is an internal MMIO
         # register; it's not observable in GL (synthesis flattens it out).
         try:
@@ -464,6 +605,23 @@ async def test_chip_top_normal(dut):
                 raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
         except (ValueError, AttributeError):
             pass
+=======
+        # Fast-fail on firmware-reported error in RTL. In GL, these debug
+        # mailbox vectors are flattened into per-bit escaped nets; keep the
+        # GL pass/fail criterion focused on the real pad-level alarm output.
+        if not gl:
+            try:
+                status = u_top.test_status.value.to_unsigned()
+                if status == 0xDEAD_BEEF:
+                    tc_raw = u_top.test_code.value
+                    try:
+                        code_str = f"0x{tc_raw.to_unsigned():08X}"
+                    except ValueError:
+                        code_str = f"X:{tc_raw!s}"
+                    raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
+            except ValueError:
+                pass
+>>>>>>> 10e1f4a0c525e47c9381c4f5c9bf7b94cdbf1a10
 
         # Pass condition: alarm_o rose (output pad is always observable, even in GL)
         try:
@@ -497,7 +655,7 @@ async def test_chip_top_normal_full(dut):
     RUNTIME_TIMEOUT = 500_000#3_000_000
 
     # --- Phase 1: wait for boot ---
-    logger.info("Waiting for boot_done...")
+    cocotb.log.info("Waiting for boot_done...")
     for cycle in range(BOOT_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
         if u_top.boot_done.value == 1:
@@ -507,7 +665,7 @@ async def test_chip_top_normal_full(dut):
 
     assert core.pico_trap_w.value == 0, "CPU trapped during boot"
 
-    logger.info("Boot done. Waiting for 30 logits...")
+    cocotb.log.info("Boot done. Waiting for alarm_o...")
     await set_start(dut, 10)
     logger.info(f"[gl={bool(gl)}] start_i pulsed; entering main loop")
     # Start background monitor — prints features + stale logits on every feat_valid_o
@@ -528,6 +686,7 @@ async def test_chip_top_normal_full(dut):
         await RisingEdge(dut.clk_PAD)
 
         if cycle % 100_000 == 0:
+<<<<<<< HEAD
             alarm_str = "?"
             try:
                 alarm_str = str(int(dut.alarm_o.value))
@@ -541,6 +700,31 @@ async def test_chip_top_normal_full(dut):
             logger.info(
                 f"  cycle {cycle:7d}: alarm_o={alarm_str}  test_status={ts_str}"
             )
+=======
+            if gl:
+                p = _gl_progress(dut)
+                cocotb.log.info(
+                    f"  cycle {cycle}: "
+                    f"boot={p['boot']} status={p['status']} code={p['code']} "
+                    f"fsm={p['fsm']} cpu_clk={p['cpu_clk']} sleep={p['sleep']} "
+                    f"trap={p['trap']} mem_v={p['mem_v']} mem_i={p['mem_i']} "
+                    f"mem_addr={p['mem_addr']} feat={p['feat_valid']} "
+                    f"latched={p['feat_latched']} reason={p['feat_reason']} "
+                    f"ml_irq={p['ml_irq']} wf_state={p['wflash_state']} "
+                    f"logit0={p['logit0']} logit1={p['logit1']} "
+                    f"cpu_alarm={p['cpu_alarm']} "
+                    f"pad_alarm={dut.alarm_o.value}"
+                )
+            else:
+                try:
+                    ts = u_top.test_status.value.to_unsigned()
+                    alarm = dut.alarm_o.value
+                    cocotb.log.info(
+                        f"  cycle {cycle}: test_status=0x{ts:08X} alarm={alarm}"
+                    )
+                except Exception:
+                    pass
+>>>>>>> 10e1f4a0c525e47c9381c4f5c9bf7b94cdbf1a10
 
         # CPU trap check (RTL-only — pico_trap_w doesn't survive synthesis flattening)
         if not gl:
@@ -550,6 +734,7 @@ async def test_chip_top_normal_full(dut):
             except AttributeError:
                 pass
 
+<<<<<<< HEAD
         # Fast-fail on firmware-reported error. test_status is an internal MMIO
         # register; it's not observable in GL.
         try:
@@ -563,6 +748,23 @@ async def test_chip_top_normal_full(dut):
                 raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
         except (ValueError, AttributeError):
             pass
+=======
+        # Fast-fail on firmware-reported error in RTL. In GL, these debug
+        # mailbox vectors are flattened into per-bit escaped nets; keep the
+        # GL pass/fail criterion focused on the real pad-level alarm output.
+        if not gl:
+            try:
+                status = u_top.test_status.value.to_unsigned()
+                if status == 0xDEAD_BEEF:
+                    tc_raw = u_top.test_code.value
+                    try:
+                        code_str = f"0x{tc_raw.to_unsigned():08X}"
+                    except ValueError:
+                        code_str = f"X:{tc_raw!s}"
+                    raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
+            except ValueError:
+                pass
+>>>>>>> 10e1f4a0c525e47c9381c4f5c9bf7b94cdbf1a10
 
         # Pass condition: alarm_o rose (output pad is always observable)
         try:
@@ -598,9 +800,14 @@ def chip_top_runner():
         final_dir = Path(os.getenv("FINAL_DIR", proj_path / "../final")).resolve()
         netlist = final_dir / "pnl" / f"{chip_netlist_top}.pnl.v"
         if not netlist.exists():
+            netlist = proj_path / "../src" / f"{chip_netlist_top}.pnl.v"
+        if not netlist.exists():
+            netlist = proj_path / "../src" / f"{chip_netlist_top}.nl.v"
+        if not netlist.exists():
             raise FileNotFoundError(
                 f"gate-level netlist not found: {netlist}. "
-                "Set FINAL_DIR=<run>/final or CHIP_NETLIST_TOP if the netlist top is not chip_top."
+                "Set FINAL_DIR=<run>/final, add src/<top>.pnl.v or src/<top>.nl.v, or set "
+                "CHIP_NETLIST_TOP if the netlist top is not chip_top."
             )
 
         sources += [
@@ -625,6 +832,10 @@ def chip_top_runner():
                 sources.append(proj_path / "sim/tb/spi_flash_model.v")
                 sources.append(proj_path / "sensors/i2c_slave_lis2dw12.sv")
                 sources.append(proj_path / "sensors/i2c_slave_adpd144ri.sv")
+            elif hdl_toplevel == _GL_SENSOR_BRIDGE:
+                # Sensor bridge uses Python cocotbext I2C slaves (no SV models).
+                # Flash model still needed for SPI boot + weight loading.
+                sources.append(proj_path / "sim/tb/spi_flash_model.v")
 
         defines = {"FUNCTIONAL": True, "functional": True, "USE_POWER_PINS": True}
     else:

@@ -125,13 +125,14 @@ build-riscv-toolchain: ## Build bare-metal RISC-V GCC from third_party/riscv-gnu
 	bash cocotb/tools/build-riscv-toolchain.sh
 .PHONY: build-riscv-toolchain
 
-sim-gl: ## Run gate-level simulation with cocotb (after copy-final)
-	cd cocotb; GL=1 FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} $(PYTHON) chip_top_tb.py
+sim-gl: ## Run gate-level simulation with cocotb (uses sensor bridge wrapper)
+	cd cocotb; GL=1 CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} $(PYTHON) chip_top_tb.py
 .PHONY: sim-gl
 
 .PHONY: sim-gl-ml
-sim-gl-ml: ## Run gate-level ML pipeline smoke test
-	cd cocotb; GL=1 FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=chip_top_tb COCOTB_TEST_FILTER=test_chip_top_normal $(PYTHON) chip_top_tb.py
+sim-gl-ml: ## Run gate-level ML pipeline smoke test (uses sensor bridge wrapper)
+	$(MAKE) -C cocotb FW_VARIANT=test_top_normal firmware-rebuild
+	cd cocotb; GL=1 CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=chip_top_tb COCOTB_TEST_FILTER='test_chip_top_normal$$' $(PYTHON) chip_top_tb.py
 
 .PHONY: test-ml
 test-ml: ## Run gate-level ML pipeline equivalent

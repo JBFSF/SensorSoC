@@ -10,10 +10,9 @@ Fabricated on the GF180MCU process via [wafer.space](https://wafer.space) MPW ru
 
 * `src/` - All RTL sources (SystemVerilog/Verilog)
 * `cocotb/` - Simulation testbenches (cocotb + Icarus Verilog)
-* `scripts/` - Utility scripts (padring flow, GDS rendering)
+* `scripts/` - Utility scripts (padring flow, GDS rendering, ML model synthesis, Sesnor Model CSVs/Python Models)
 * `librelane/` - LibreLane PnR configuration and slot definitions
 * `ip/` - Custom IP blocks (chip ID, wafer.space logo)
-* `misc/` - ML model pipeline, sensor models, datasets
 
 ## Prerequisites
 
@@ -55,10 +54,16 @@ make librelane-klayout
 
 We use [cocotb](https://www.cocotb.org/) with Icarus Verilog for RTL verification. See `cocotb/README.md` for the full list of testbench targets.
 
-To run the top-level chip RTL simulation:
+To run the basic, one night test, top-level chip RTL simulation:
 
 ```
 make sim
+```
+
+To run more substantial tests (multiple nights, boot test, smoke tests):
+
+```
+make sim-full
 ```
 
 To rerun the current reproducible firmware smoke flow:
@@ -94,7 +99,7 @@ The build installs into `third_party/riscv-toolchain`, which the firmware
 scripts automatically detect. Skip `make build-riscv-toolchain` when
 `make check-riscv-toolchain` already finds an external toolchain.
 
-To run the gate-level simulation (requires a completed LibreLane run in `final/`):
+To run the gate-level equivalent of make sim (requires a completed LibreLane run in `final/`):
 
 ```
 make sim-gl
@@ -108,12 +113,12 @@ make sim-view
 
 Waveform output: `cocotb/sim_build/chip_top.fst`
 
-## Slot Sizes
+## Slot Size
 
-Supported slot sizes: `1x1` (default), `0p5x1`, `1x0p5`, `0p5x0p5`.
+We are using the default '1x1' slot size for our design.
 
 ```
-SLOT=0p5x0p5 make librelane
+SLOT=1x1 make librelane
 ```
 
 ## Standalone Padring (Analog Design)
@@ -150,8 +155,9 @@ Standard chip behavior when
 * `bidir[2]` - SPI flash MOSI output
 * `bidir[3]` - SPI flash CS_n output
 * `bidir[4]` - SPI flash MISO input
-* `bidir[5]` - I2C SCL input
-* `bidir[6]` - I2C SDA open drain in/out
+* `bidir[5]` - Start Button input
+* `bidir[23]` - I2C SCL input
+* `bidir[24]` - I2C SDA open drain in/out
 * `bidir[22:7]` - 16-bit debug bus outputs in debug/test modes
 * `bidir[37]` - force Pico IRQ input used in test modes `5'b01010` and `5'b11010`
 * `bidir[38]` - force wake source input used in test modes `5'b01011` and `5'b11011`
