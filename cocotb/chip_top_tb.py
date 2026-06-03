@@ -30,6 +30,7 @@ pdk         = os.getenv("PDK", "gf180mcuD")
 scl         = os.getenv("SCL", "gf180mcu_fd_sc_mcu7t5v0")
 gl          = _env_flag("GL")
 waves       = _env_flag("WAVES", True)
+clk_freq_mhz = float(os.getenv("CLK_FREQ_MHZ", "10.0" if gl else "50.0"))
 slot        = os.getenv("SLOT", "1x1")
 test_module = os.getenv("COCOTB_TEST_MODULE", "chip_top_tb")
 
@@ -77,9 +78,12 @@ async def set_start(dut, cycles):
     dut.input_PAD.value = 0b00000000
     cocotb.log.info("Start bit set low")
 
-async def start_clock(clock, freq_mhz: float = 50.0):
+async def start_clock(clock, freq_mhz: float | None = None):
     """Start the clock at freq_mhz MHz."""
+    if freq_mhz is None:
+        freq_mhz = clk_freq_mhz
     period_ns = 1_000.0 / freq_mhz
+    cocotb.log.info(f"Starting clock at {freq_mhz:g} MHz ({period_ns:g} ns period)")
     c = Clock(clock, period_ns, "ns")
     cocotb.start_soon(c.start())
 
@@ -148,6 +152,36 @@ def _flat_gl_raw(scope, escaped_name):
         return "MISSING"
 
 
+def _child_raw(scope, name):
+    try:
+        return str(scope._id(name, extended=False).value)
+    except AttributeError:
+        return "MISSING"
+
+
+def _child_vec_str(scope, name, digits=None):
+    try:
+        value = scope._id(name, extended=False).value
+    except AttributeError:
+        return "MISSING"
+    try:
+        unsigned = value.to_unsigned()
+    except ValueError:
+        return "X"
+    if digits is None:
+        digits = max(1, (len(value) + 3) // 4)
+    return f"0x{unsigned:0{digits}X}"
+
+
+def _flat_gl_handle(scope, escaped_name):
+    for escaped in (f"\\{escaped_name} ", f"\\{escaped_name}"):
+        try:
+            return scope._id(escaped, extended=False)
+        except AttributeError:
+            pass
+    return None
+
+
 def _flat_gl_vec(scope, escaped_name, width, missing_zero=False):
     value = 0
     for bit in range(width):
@@ -176,6 +210,120 @@ def _flat_gl_vec_str(scope, escaped_name, width, digits=None, missing_zero=False
     return "X"
 
 
+def _readmemh_words(path, count):
+    words = []
+    address = 0
+    try:
+        with open(path, encoding="ascii") as f:
+            for line in f:
+                line = line.split("//", 1)[0]
+                for token in line.split():
+                    if token.startswith("@"):
+                        try:
+                            address = int(token[1:], 16)
+                        except ValueError:
+                            address = len(words)
+                        while len(words) < address:
+                            words.append(0)
+                        continue
+                    if any(ch in token.lower() for ch in "xz"):
+                        value = None
+                    else:
+                        value = int(token, 16) & 0xFFFF_FFFF
+                    if address == len(words):
+                        words.append(value)
+                    else:
+                        while len(words) <= address:
+                            words.append(0)
+                        words[address] = value
+                    address += 1
+                    if len(words) >= count:
+                        return words[:count]
+    except OSError:
+        return []
+    return words[:count]
+
+
+def _gl_sram_macro(scope, name):
+    return _flat_gl_handle(scope, f"i_chip_core.u_top.sram.{name}")
+
+
+def _gl_sram_macro_probe(scope, name):
+    macro = _gl_sram_macro(scope, name)
+    if macro is None:
+        return {
+            "name": name, "present": False, "cen": "MISSING", "gwen": "MISSING",
+            "a": "MISSING", "d": "MISSING", "q": "MISSING", "mem": ["MISSING"] * 4,
+        }
+    return {
+        "name": name,
+        "present": True,
+        "cen": _child_raw(macro, "CEN"),
+        "gwen": _child_raw(macro, "GWEN"),
+        "a": _child_vec_str(macro, "A", digits=3),
+        "d": _child_vec_str(macro, "D", digits=2),
+        "q": _child_vec_str(macro, "Q", digits=2),
+        "mem": [_child_vec_str(macro, f"mem_{idx}", digits=2) for idx in range(4)],
+    }
+
+
+def _hex_byte(value):
+    if value in {"MISSING", "X"}:
+        return None
+    try:
+        return int(value, 16) & 0xFF
+    except ValueError:
+        return None
+
+
+def _gl_sram_word_from_macros(scope, bank, word_index):
+    if bank not in {"A", "B"} or not 0 <= word_index <= 3:
+        return None
+    byte_values = []
+    for byte_lane in range(1, 5):
+        macro = _gl_sram_macro(scope, f"mem_{bank}_{byte_lane}")
+        if macro is None:
+            return None
+        raw = _child_vec_str(macro, f"mem_{word_index}", digits=2)
+        value = _hex_byte(raw)
+        if value is None:
+            return None
+        byte_values.append(value)
+    return (
+        byte_values[0]
+        | (byte_values[1] << 8)
+        | (byte_values[2] << 16)
+        | (byte_values[3] << 24)
+    )
+
+
+def _gl_sram_boot_words(scope, count=4):
+    words = []
+    for word_index in range(count):
+        bank = "A" if word_index < 512 else "B"
+        bank_word = word_index if bank == "A" else word_index - 512
+        words.append(_gl_sram_word_from_macros(scope, bank, bank_word))
+    return words
+
+
+def _fmt_word(value):
+    return "MISSING/X" if value is None else f"0x{value:08X}"
+
+
+def _gl_boot_integrity(scope, count=4):
+    expected = _readmemh_words(_FIRMWARE_HEX, count)
+    observed = _gl_sram_boot_words(scope, count)
+    rows = []
+    ok = True
+    for idx in range(count):
+        exp = expected[idx] if idx < len(expected) else None
+        obs = observed[idx] if idx < len(observed) else None
+        match = exp is not None and obs == exp
+        ok = ok and match
+        rows.append((idx, exp, obs, match))
+    return ok, rows
+
+
 def _gl_chip_inst(dut):
     """Return the chip_top instance handle in GL wrappers."""
     if hdl_toplevel == _GL_SENSOR_BRIDGE:
@@ -202,8 +350,8 @@ def _gl_progress(dut):
 
         # ---------- top FSM ----------
         "boot":         _flat_gl_raw(scope, "i_chip_core.u_top.boot_done"),
-        "fsm":          _flat_gl_vec_str(scope, "i_chip_core.u_top.fsm.state_q", 4, digits=1, missing_zero=True),
-        "fsm_d":        _flat_gl_vec_str(scope, "i_chip_core.u_top.fsm.state_d", 4, digits=1, missing_zero=True),
+        "fsm":          _flat_gl_vec_str(scope, "i_chip_core.u_top.fsm.state_q", 4, digits=1),
+        "fsm_d":        _flat_gl_vec_str(scope, "i_chip_core.u_top.fsm.state_d", 4, digits=1),
         # FSM transition inputs — tells you why FSM isn't moving
         "fsm_bdi":      _flat_gl_raw(scope, "i_chip_core.u_top.fsm.boot_done_i"),
         "fsm_starti":   _flat_gl_raw(scope, "i_chip_core.u_top.fsm.start_i"),
@@ -226,9 +374,13 @@ def _gl_progress(dut):
         "mem_v":        _flat_gl_raw(scope, "i_chip_core.pico_mem_valid_w"),
         "mem_i":        _flat_gl_raw(scope, "i_chip_core.pico_mem_instr_w"),
         "mem_rdy":      _flat_gl_raw(scope, "i_chip_core.u_top.mem_ready"),
-        "mem_addr":     _flat_gl_vec_str(scope, "i_chip_core.pico_mem_addr_w", 32, missing_zero=True),
-        "mem_wstrb":    _flat_gl_vec_str(scope, "i_chip_core.u_top.mem_wstrb", 4, digits=1, missing_zero=True),
-        "mem_wdata":    _flat_gl_vec_str(scope, "i_chip_core.u_top.mem_wdata", 32, missing_zero=True),
+        "pico_rdy":     _flat_gl_raw(scope, "i_chip_core.pico_mem_ready_w"),
+        "mem_addr":     _flat_gl_vec_str(scope, "i_chip_core.pico_mem_addr_w", 32),
+        "mem_wstrb":    _flat_gl_vec_str(scope, "i_chip_core.u_top.mem_wstrb", 4, digits=1),
+        "mem_wdata":    _flat_gl_vec_str(scope, "i_chip_core.u_top.mem_wdata", 32),
+        "mem_rdata":    _flat_gl_vec_str(scope, "i_chip_core.u_top.mem_rdata", 32),
+        "sram_ready":   _flat_gl_raw(scope, "i_chip_core.u_top.sram_ready"),
+        "sram_rdata":   _flat_gl_vec_str(scope, "i_chip_core.u_top.sram_rdata", 32),
 
         # ---------- Test/diag MMIO registers ----------
         "status":       _flat_gl_vec_str(scope, "i_chip_core.u_top.test_status", 32),
@@ -272,6 +424,62 @@ def _gl_progress(dut):
         "cpu_alarm":    _flat_gl_raw(scope, "i_chip_core.u_top.cpu_alarm_w"),
         "fsm_alarm_o":  _flat_gl_raw(scope, "i_chip_core.u_top.fsm.alarm_o"),
     }
+
+
+def _log_gl_sram_macros(dut, logger, label=""):
+    scope = _gl_chip_inst(dut)
+    suffix = f" {label}" if label else ""
+    logger.info(f"[gl_sram{suffix}] first four boot words:")
+    ok, rows = _gl_boot_integrity(scope, count=4)
+    for idx, expected, observed, match in rows:
+        verdict = "OK" if match else "MISMATCH"
+        logger.info(
+            f"  word[{idx}] expected={_fmt_word(expected)} "
+            f"observed={_fmt_word(observed)} {verdict}"
+        )
+    logger.info(f"[gl_sram{suffix}] boot integrity first4={'OK' if ok else 'FAIL'}")
+
+    for bank in ("A", "B"):
+        for lane in range(1, 5):
+            probe = _gl_sram_macro_probe(scope, f"mem_{bank}_{lane}")
+            logger.info(
+                f"  sram.{probe['name']} CEN={probe['cen']} GWEN={probe['gwen']} "
+                f"A={probe['a']} D={probe['d']} Q={probe['q']} "
+                f"mem0..3={','.join(probe['mem'])}"
+            )
+
+
+async def _gl_pico_fetch_monitor(dut, logger, cycles=2_000, limit=16):
+    """Log the first visible Pico memory handshakes after GL boot."""
+    if not gl:
+        return
+
+    prev = None
+    logged = 0
+    for cycle in range(cycles):
+        await RisingEdge(dut.clk_PAD)
+        p = _gl_progress(dut)
+        snapshot = (
+            p["mem_v"], p["mem_i"], p["pico_rdy"], p["mem_rdy"],
+            p["mem_addr"], p["mem_wstrb"], p["mem_wdata"],
+            p["mem_rdata"], p["sram_ready"], p["sram_rdata"],
+        )
+        interesting = (
+            snapshot != prev
+            and any(value not in {"0", "0x0", "0x00000000", "MISSING"} for value in snapshot)
+        )
+        if interesting:
+            logger.info(
+                f"[gl_fetch {cycle:5d}] mem_v={p['mem_v']} instr={p['mem_i']} "
+                f"pico_ready={p['pico_rdy']} top_ready={p['mem_rdy']} "
+                f"addr={p['mem_addr']} wstrb={p['mem_wstrb']} "
+                f"wdata={p['mem_wdata']} rdata={p['mem_rdata']} "
+                f"sram_ready={p['sram_ready']} sram_rdata={p['sram_rdata']}"
+            )
+            logged += 1
+            if logged >= limit:
+                return
+        prev = snapshot
 
 
 def _core(dut):
@@ -344,6 +552,10 @@ async def test_chip_top_boot(dut):
             break
     else:
         raise AssertionError(f"boot_done never asserted within {TIMEOUT_CYCLES} cycles")
+
+    if gl:
+        _log_gl_sram_macros(dut, logger, "after boot_done")
+        await _gl_pico_fetch_monitor(dut, logger, cycles=2_000, limit=8)
 
     assert core.pico_trap_w.value == 0, \
         "CPU trapped — firmware likely loaded incorrectly"
@@ -591,6 +803,10 @@ async def test_chip_top_normal(dut):
         raise AssertionError("Timeout waiting for boot_done")
     assert core.pico_trap_w.value == 0, "CPU trapped during boot"
 
+    if gl:
+        _log_gl_sram_macros(dut, logger, "after boot_done")
+        cocotb.start_soon(_gl_pico_fetch_monitor(dut, logger, cycles=5_000, limit=16))
+
     cocotb.log.info("Boot done. Waiting for alarm_o...")
     await set_start(dut, 10)
     logger.info(f"[gl={bool(gl)}] start_i pulsed; entering main loop")
@@ -612,11 +828,7 @@ async def test_chip_top_normal(dut):
     for cycle in range(RUNTIME_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
 
-<<<<<<< HEAD
         if cycle % 10_000 == 0:
-=======
-        if cycle % 100_000 == 0:
->>>>>>> a7a90025da03fa71b1d93924be9b9bc10babba6e
             if gl:
                 p = _gl_progress(dut)
                 cocotb.log.info(f"==== cycle {cycle} GL snapshot ====")
@@ -643,9 +855,11 @@ async def test_chip_top_normal(dut):
                 )
                 cocotb.log.info(
                     f"  [cpu]      sleep={p['sleep']} trap={p['trap']} "
-                    f"mem_v={p['mem_v']} mem_i={p['mem_i']} mem_rdy={p['mem_rdy']} "
+                    f"mem_v={p['mem_v']} mem_i={p['mem_i']} "
+                    f"pico_rdy={p['pico_rdy']} mem_rdy={p['mem_rdy']} "
                     f"mem_addr={p['mem_addr']} mem_wstrb={p['mem_wstrb']} "
-                    f"mem_wdata={p['mem_wdata']}"
+                    f"mem_wdata={p['mem_wdata']} mem_rdata={p['mem_rdata']} "
+                    f"sram_ready={p['sram_ready']} sram_rdata={p['sram_rdata']}"
                 )
                 cocotb.log.info(
                     f"  [test]     status={p['status']} code={p['code']}"
@@ -774,11 +988,7 @@ async def test_chip_top_normal_full(dut):
     for cycle in range(RUNTIME_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
 
-<<<<<<< HEAD
         if cycle % 10_000 == 0:
-=======
-        if cycle % 100_000 == 0:
->>>>>>> a7a90025da03fa71b1d93924be9b9bc10babba6e
             if gl:
                 p = _gl_progress(dut)
                 cocotb.log.info(
