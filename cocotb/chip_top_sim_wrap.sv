@@ -22,6 +22,11 @@ module chip_top_sim_wrap #(
     wire [39:0] bidir_PAD;
     wire  [1:0] analog_PAD;
 
+`ifdef USE_POWER_PINS
+    wire VDD = 1'b1;
+    wire VSS = 1'b0;
+`endif
+
     wire        sim_req_o;
     wire  [6:0] sim_addr_o;
     wire  [7:0] sim_reg_o;
@@ -79,6 +84,10 @@ module chip_top_sim_wrap #(
     )
     `endif
     u_chip_top (
+        `ifdef USE_POWER_PINS
+        .VDD        (VDD),
+        .VSS        (VSS),
+        `endif
         .clk_PAD    (clk_PAD),
         .rst_n_PAD  (rst_n_PAD),
         .input_PAD  (input_PAD),

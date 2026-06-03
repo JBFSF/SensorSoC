@@ -131,7 +131,8 @@ sim-gl: ## Run gate-level simulation with cocotb (after copy-final)
 
 .PHONY: sim-gl-ml
 sim-gl-ml: ## Run gate-level ML pipeline smoke test
-	cd cocotb; GL=1 FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=chip_top_tb COCOTB_TEST_FILTER=test_chip_top_normal $(PYTHON) chip_top_tb.py
+	$(MAKE) -C cocotb FW_VARIANT=test_top_normal firmware-rebuild
+	cd cocotb; GL=1 FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=chip_top_tb COCOTB_TEST_FILTER='test_chip_top_normal$$' $(PYTHON) chip_top_tb.py
 
 .PHONY: test-ml
 test-ml: ## Run gate-level ML pipeline equivalent
