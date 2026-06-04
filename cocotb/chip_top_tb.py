@@ -23,6 +23,13 @@ def _env_flag(name, default=False):
     return value.strip().lower() not in {"", "0", "false", "no", "off"}
 
 
+def _env_int(name, default):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return int(value, 0)
+
+
 sim         = os.getenv("SIM", "icarus")
 pdk_root    = os.getenv("PDK_ROOT", Path("~/.ciel").expanduser())
 pdk         = os.getenv("PDK", "gf180mcuD")
@@ -32,6 +39,10 @@ waves       = _env_flag("WAVES", True)
 clk_freq_mhz = float(os.getenv("CLK_FREQ_MHZ", "10.0" if gl else "50.0"))
 slot        = os.getenv("SLOT", "1x1")
 test_module = os.getenv("COCOTB_TEST_MODULE", "chip_top_tb")
+gl_debug_probes = _env_flag("GL_DEBUG_PROBES")
+gl_sram_probes = _env_flag("GL_SRAM_PROBES", gl_debug_probes)
+gl_fetch_monitor = _env_flag("GL_FETCH_MONITOR", gl_debug_probes)
+gl_snapshot_interval = _env_int("GL_SNAPSHOT_INTERVAL", 50_000 if gl_debug_probes else 0)
 
 
 hdl_toplevel = os.getenv("CHIP_TOPLEVEL", "chip_top_sim_wrap")
@@ -552,8 +563,9 @@ async def test_chip_top_boot(dut):
     else:
         raise AssertionError(f"boot_done never asserted within {TIMEOUT_CYCLES} cycles")
 
-    if gl:
+    if gl and gl_sram_probes:
         _log_gl_sram_macros(dut, logger, "after boot_done")
+    if gl and gl_fetch_monitor:
         await _gl_pico_fetch_monitor(dut, logger, cycles=2_000, limit=8)
 
     assert int(core.pico_trap_w.value) != 1, \
@@ -786,8 +798,8 @@ async def test_chip_top_normal(dut):
         cocotb.start_soon(_accel._run())
         cocotb.start_soon(_ppg._run())
 
-    BOOT_TIMEOUT    = 500_000
-    RUNTIME_TIMEOUT = 500_000#3_000_000
+    BOOT_TIMEOUT    = _env_int("BOOT_TIMEOUT_CYCLES", 250_000 if gl else 500_000)
+    RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 300_000 if gl else 500_000)
     # --- Phase 1: wait for boot ---
     logger.info("Waiting for boot_done...")
     for cycle in range(BOOT_TIMEOUT):
@@ -799,8 +811,9 @@ async def test_chip_top_normal(dut):
         raise AssertionError("Timeout waiting for boot_done")
     #assert core.pico_trap_w.value == 0, "CPU trapped during boot"
 
-    if gl:
+    if gl and gl_sram_probes:
         _log_gl_sram_macros(dut, logger, "after boot_done")
+    if gl and gl_fetch_monitor:
         cocotb.start_soon(_gl_pico_fetch_monitor(dut, logger, cycles=5_000, limit=16))
 
     cocotb.log.info("Boot done. Waiting for alarm_o...")
@@ -824,7 +837,9 @@ async def test_chip_top_normal(dut):
     for cycle in range(RUNTIME_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
 
-        if cycle % 10_000 == 0:
+        if (gl and gl_snapshot_interval and cycle % gl_snapshot_interval == 0) or (
+            not gl and cycle % 10_000 == 0
+        ):
             if gl:
                 p = _gl_progress(dut)
                 cocotb.log.info(f"==== cycle {cycle} GL snapshot ====")
@@ -950,8 +965,8 @@ async def test_chip_top_normal_full(dut):
     core  = _core(dut)
     u_top = _top(dut)
 
-    BOOT_TIMEOUT    = 500_000
-    RUNTIME_TIMEOUT = 500_000#3_000_000
+    BOOT_TIMEOUT    = _env_int("BOOT_TIMEOUT_CYCLES", 250_000 if gl else 500_000)
+    RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 300_000 if gl else 500_000)
 
     # --- Phase 1: wait for boot ---
     cocotb.log.info("Waiting for boot_done...")
@@ -984,7 +999,9 @@ async def test_chip_top_normal_full(dut):
     for cycle in range(RUNTIME_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
 
-        if cycle % 10_000 == 0:
+        if (gl and gl_snapshot_interval and cycle % gl_snapshot_interval == 0) or (
+            not gl and cycle % 10_000 == 0
+        ):
             if gl:
                 p = _gl_progress(dut)
                 cocotb.log.info(
@@ -1109,10 +1126,14 @@ def chip_top_runner():
         src_dir = proj_path / "../src"
         pad_level = hdl_toplevel in {"chip_top", "chip_top_sim_wrap"}
         skip = {"dummy_top.sv", "soc_top.v"}
+        netlist_suffixes = (".nl.v", ".pnl.v")
         if pad_level:
             skip.add("gf180mcu_fd_ip_sram__sram512x8m8wm1.v")
         sources += sorted(p for p in src_dir.glob("*.sv") if p.name not in skip)
-        sources += sorted(p for p in src_dir.glob("*.v")  if p.name not in skip)
+        sources += sorted(
+            p for p in src_dir.glob("*.v")
+            if p.name not in skip and not p.name.endswith(netlist_suffixes)
+        )
         sources.append(proj_path / "../ip/picorv32.v")
 
         # Simulation models
