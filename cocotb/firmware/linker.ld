@@ -17,8 +17,10 @@ SECTIONS {
   } > RAM
 
   .bss : {
+    __bss_start = .;
     *(.bss*)
     *(COMMON)
+    __bss_end = .;
   } > RAM
 
   _stack_top = ORIGIN(RAM) + LENGTH(RAM);

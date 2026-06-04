@@ -23,6 +23,17 @@ _reset_entry:
   la gp, __global_pointer$
   .option pop
   la sp, _stack_top
+
+  // Zero BSS so GLS SRAM X's don't corrupt C globals
+  la t0, __bss_start
+  la t1, __bss_end
+_bss_clear:
+  bgeu t0, t1, _bss_done
+  sw   zero, 0(t0)
+  addi t0, t0, 4
+  j    _bss_clear
+_bss_done:
+
   call main
 1: j 1b
 
