@@ -370,8 +370,6 @@ def _gl_progress(dut):
         "fsm_mlirq":    _flat_gl_raw(scope, "i_chip_core.u_top.fsm.ml_irq_i"),
         "fsm_cpualm":   _flat_gl_raw(scope, "i_chip_core.u_top.fsm.cpu_alarm_i"),
         "fsm_wakerq":   _flat_gl_raw(scope, "i_chip_core.u_top.fsm.irqc_wake_req_i"),
-        "fsm_memv":     _flat_gl_raw(scope, "i_chip_core.u_top.fsm.mem_valid_i"),
-        "fsm_idleR":    _flat_gl_raw(scope, "i_chip_core.u_top.fsm.cpu_idle_seen_r"),
         "fsm_tmode":    _flat_gl_vec_str(scope, "i_chip_core.u_top.fsm.test_mode_i", 4, digits=1, missing_zero=True),
         # FSM outputs
         "feat_en":      _flat_gl_raw(scope, "i_chip_core.u_top.fsm.feat_en_o"),
@@ -668,16 +666,12 @@ async def _can_sleep_monitor(clk, u_top, core):
         except ValueError:
             wr = "X"
         try:
-            ids = int(fsm.cpu_idle_seen_r.value)
-        except ValueError:
-            ids = "X"
-        try:
             bd = int(u_top.boot_done.value)
         except ValueError:
             bd = "X"
         print(
             f"[sleep_mon] state_q={raw} ({label})  "
-            f"sleep_req={sr}  idle={ids}  wake_req={wr}  boot_done={bd}",
+            f"sleep_req={sr}  wake_req={wr}  boot_done={bd}",
             flush=True,
         )
 
@@ -857,8 +851,7 @@ async def test_chip_top_normal(dut):
                     f"  [fsm_in]   bdi={p['fsm_bdi']} start={p['fsm_starti']} "
                     f"sleep_req={p['fsm_sleepi']} feat_v={p['fsm_featvi']} "
                     f"ml_irq={p['fsm_mlirq']} cpu_alm={p['fsm_cpualm']} "
-                    f"wake_req={p['fsm_wakerq']} mem_v={p['fsm_memv']} "
-                    f"idle_seen={p['fsm_idleR']}"
+                    f"wake_req={p['fsm_wakerq']}"
                 )
                 cocotb.log.info(
                     f"  [fsm_out]  feat_en={p['feat_en']} ml_en={p['ml_en']} "
