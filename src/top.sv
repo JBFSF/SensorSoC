@@ -506,11 +506,13 @@ module top #(
     assign ppg_i2c_err_event_w = ppg_i2c_err_w & ~ppg_i2c_err_d;
 
     //Switched off the negedge dff logic, this is supposed to latch the clock anyway
-    always_latch begin 
-        if (!clk_i) cpu_clk_en_lat <= cpu_clk_en;
+    always_latch begin
+        if (!clk_i) cpu_clk_en_lat = cpu_clk_en;
     end
 
-    assign cpu_clk = clk_i & cpu_clk_en_lat;
+    // TE=reset_i keeps cpu_clk running during reset so PicoRV32's synchronous
+    // reset can register — equivalent to icgtp_1(E=cpu_clk_en, TE=reset_i).
+    assign cpu_clk = clk_i & (cpu_clk_en_lat | reset_i);
 
     wire [31:0] irq_eoi_o_wide;
 
