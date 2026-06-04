@@ -5,9 +5,12 @@ module sim_chip_top_gl_sensor_bridge_env;
   localparam integer SENSOR_SDA_PAD = 24;
   localparam integer HOST_SDA_PAD   = 6;
 
-  logic        clk_PAD   = 1'b0;
-  logic        rst_n_PAD = 1'b0;
-  logic [11:0] input_PAD = 12'h000;
+  logic        clk_drv = 1'b0;
+  logic        rst_n_drv = 1'b0;
+  logic [11:0] input_drv = 12'h000;
+  wire         clk_PAD;
+  wire         rst_n_PAD;
+  wire  [11:0] input_PAD;
   logic [39:0] bidir_drv = 40'h0;
   logic [39:0] bidir_oe = 40'h0;
   wire  [39:0] bidir_PAD;
@@ -27,6 +30,9 @@ module sim_chip_top_gl_sensor_bridge_env;
   assign bidir_sample = bidir_PAD;
   assign sensor_scl_sample = bidir_PAD[SENSOR_SCL_PAD];
   assign sensor_sda_sample = bidir_PAD[SENSOR_SDA_PAD];
+  assign clk_PAD = clk_drv;
+  assign rst_n_PAD = rst_n_drv;
+  assign input_PAD = input_drv;
 
   genvar i;
   generate

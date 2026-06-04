@@ -78,14 +78,33 @@ def _fmt_hex(value, digits=8):
     return "X" if value is None else f"0x{value:0{digits}X}"
 
 
+def _dut_handle(dut, preferred, fallback):
+    try:
+        return getattr(dut, preferred)
+    except AttributeError:
+        return getattr(dut, fallback)
+
+
+def _clk(dut):
+    return _dut_handle(dut, "clk_drv", "clk_PAD")
+
+
+def _rst_n(dut):
+    return _dut_handle(dut, "rst_n_drv", "rst_n_PAD")
+
+
+def _input(dut):
+    return _dut_handle(dut, "input_drv", "input_PAD")
+
+
 async def set_defaults(dut):
-    dut.input_PAD.value = 0
+    _input(dut).value = 0
 
 async def set_start(dut, cycles):
     cocotb.log.info("Start bit set high")
-    dut.input_PAD.value = 0b00100000
-    await ClockCycles(dut.clk_PAD, cycles)
-    dut.input_PAD.value = 0b00000000
+    _input(dut).value = 0b00100000
+    await ClockCycles(_clk(dut), cycles)
+    _input(dut).value = 0b00000000
     cocotb.log.info("Start bit set low")
 
 async def start_clock(clock, freq_mhz: float | None = None):
@@ -110,8 +129,8 @@ async def reset(rst_n, active_low=True, time_ns=1000):
 async def start_up(dut):
     """Common startup: defaults → clock → reset."""
     await set_defaults(dut)
-    await start_clock(dut.clk_PAD)
-    await reset(dut.rst_n_PAD)
+    await start_clock(_clk(dut))
+    await reset(_rst_n(dut))
 
 
 class _FlatGL:
@@ -465,7 +484,7 @@ async def _gl_pico_fetch_monitor(dut, logger, cycles=2_000, limit=16):
     prev = None
     logged = 0
     for cycle in range(cycles):
-        await RisingEdge(dut.clk_PAD)
+        await RisingEdge(_clk(dut))
         p = _gl_progress(dut)
         snapshot = (
             p["mem_v"], p["mem_i"], p["pico_rdy"], p["mem_rdy"],
@@ -514,13 +533,13 @@ async def test_chip_top_smoke(dut):
     await start_up(dut)
 
     # Normal mode
-    dut.input_PAD.value = 0
-    await ClockCycles(dut.clk_PAD, 20)
+    _input(dut).value = 0
+    await ClockCycles(_clk(dut), 20)
 
     core = _core(dut)
     logger.info("Checking normal-mode wiring...")
 
-    assert dut.rst_n_PAD.value == 1, "reset should be deasserted after startup"
+    assert _rst_n(dut).value == 1, "reset should be deasserted after startup"
     if not gl:
         assert core.test_mode_w.value.integer == 0, "chip should be in normal mode"
         assert core.core_clk_w.value == core.clk.value, \
@@ -541,10 +560,10 @@ async def test_chip_top_boot(dut):
     # Force FSM to ALL mode so feat+ML+CPU all run without sleeping.
     # input_PAD[3:0] drives test_mode[3:0]; 4'b0101 = ALL mode.
     await set_defaults(dut)
-    dut.input_PAD.value = 0b00100000
+    _input(dut).value = 0b00100000
 
-    await start_clock(dut.clk_PAD)
-    await reset(dut.rst_n_PAD)
+    await start_clock(_clk(dut))
+    await reset(_rst_n(dut))
 
     core  = _core(dut)
     u_top = _top(dut)
@@ -553,7 +572,7 @@ async def test_chip_top_boot(dut):
     cocotb.log.info("Waiting for boot_done...")
 
     for cycle in range(TIMEOUT_CYCLES):
-        await RisingEdge(dut.clk_PAD)
+        await RisingEdge(_clk(dut))
         if cycle % 10_000 == 0:
             logger.info(f"  cycle {cycle}: boot_done={u_top.boot_done.value}")
         if u_top.boot_done.value == 1:
@@ -685,7 +704,7 @@ async def _gl_heartbeat(dut):
     last_spi_clk = None
     last_alarm = None
     while True:
-        await ClockCycles(dut.clk_PAD, 1)
+        await ClockCycles(_clk(dut), 1)
         cycles += 1
         # Sample SPI clock and alarm
         try:
@@ -767,8 +786,8 @@ async def test_chip_top_normal(dut):
     logger = logging.getLogger("chip_top_normal")
 
     await set_defaults(dut)
-    await start_clock(dut.clk_PAD)
-    await reset(dut.rst_n_PAD)
+    await start_clock(_clk(dut))
+    await reset(_rst_n(dut))
 
     core  = _core(dut)
     u_top = _top(dut)
@@ -798,9 +817,9 @@ async def test_chip_top_normal(dut):
     logger.info("Waiting for boot_done...")
     cocotb.log.info(f"Firmware.hex is: {_FIRMWARE_HEX}")
     for cycle in range(BOOT_TIMEOUT):
-        await RisingEdge(dut.clk_PAD)
+        await RisingEdge(_clk(dut))
         if u_top.boot_done.value == 1:
-            await ClockCycles(dut.clk_PAD, 10)
+            await ClockCycles(_clk(dut), 10)
             break
     else:
         raise AssertionError("Timeout waiting for boot_done")
@@ -818,9 +837,9 @@ async def test_chip_top_normal(dut):
     # Skip in GL mode: feat_valid_o and logit_reg_0 are RTL-only signals
     if not gl:
         cocotb.start_soon(_feat_monitor(u_top))
-        cocotb.start_soon(_logit_monitor(dut.clk_PAD, u_top))
-        cocotb.start_soon(_axi_write_monitor(dut.clk_PAD, u_top))
-        cocotb.start_soon(_can_sleep_monitor(dut.clk_PAD, u_top, core))
+        cocotb.start_soon(_logit_monitor(_clk(dut), u_top))
+        cocotb.start_soon(_axi_write_monitor(_clk(dut), u_top))
+        cocotb.start_soon(_can_sleep_monitor(_clk(dut), u_top, core))
     else:
         # GL mode — internal signals are flattened away. Only pads are observable.
         cocotb.start_soon(_gl_heartbeat(dut))
@@ -830,7 +849,7 @@ async def test_chip_top_normal(dut):
     # threshold is hit; that drives the FSM to ALARM state which asserts alarm_o.
     # A firmware-side DEAD_BEEF in TEST_STATUS still fails fast.
     for cycle in range(RUNTIME_TIMEOUT):
-        await RisingEdge(dut.clk_PAD)
+        await RisingEdge(_clk(dut))
 
         if (gl and gl_snapshot_interval and cycle % gl_snapshot_interval == 0) or (
             not gl and cycle % 10_000 == 0
@@ -884,7 +903,7 @@ async def test_chip_top_normal(dut):
         # Pass condition: alarm_o rose (output pad is always observable, even in GL)
         try:
             if int(dut.alarm_o.value) == 1:
-                await ClockCycles(dut.clk_PAD, 10)
+                await ClockCycles(_clk(dut), 10)
                 if int(dut.alarm_o.value) == 1:
                     cocotb.log.info(f"alarm_o asserted at cycle {cycle} — test passed.")
                     return
@@ -903,8 +922,8 @@ async def test_chip_top_normal_full(dut):
     # ALL mode: features + ML + CPU all active; bypasses SLEEP state in sim.
     await set_defaults(dut)
     #dut.input_PAD.value = 0b00100000 #0b00000101
-    await start_clock(dut.clk_PAD)
-    await reset(dut.rst_n_PAD)
+    await start_clock(_clk(dut))
+    await reset(_rst_n(dut))
 
     core  = _core(dut)
     u_top = _top(dut)
@@ -915,7 +934,7 @@ async def test_chip_top_normal_full(dut):
     # --- Phase 1: wait for boot ---
     cocotb.log.info("Waiting for boot_done...")
     for cycle in range(BOOT_TIMEOUT):
-        await RisingEdge(dut.clk_PAD)
+        await RisingEdge(_clk(dut))
         if u_top.boot_done.value == 1:
             break
     else:
@@ -930,9 +949,9 @@ async def test_chip_top_normal_full(dut):
     # Skip in GL mode: feat_valid_o and logit_reg_0 are RTL-only signals
     if not gl:
         cocotb.start_soon(_feat_monitor(u_top))
-        cocotb.start_soon(_logit_monitor(dut.clk_PAD, u_top))
-        cocotb.start_soon(_axi_write_monitor(dut.clk_PAD, u_top))
-        cocotb.start_soon(_can_sleep_monitor(dut.clk_PAD, u_top, core))
+        cocotb.start_soon(_logit_monitor(_clk(dut), u_top))
+        cocotb.start_soon(_axi_write_monitor(_clk(dut), u_top))
+        cocotb.start_soon(_can_sleep_monitor(_clk(dut), u_top, core))
     else:
         cocotb.start_soon(_gl_heartbeat(dut))
 
@@ -941,7 +960,7 @@ async def test_chip_top_normal_full(dut):
     # threshold is hit; that drives the FSM to ALARM state which asserts alarm_o.
     # A firmware-side DEAD_BEEF in TEST_STATUS still fails fast.
     for cycle in range(RUNTIME_TIMEOUT):
-        await RisingEdge(dut.clk_PAD)
+        await RisingEdge(_clk(dut))
 
         if (gl and gl_snapshot_interval and cycle % gl_snapshot_interval == 0) or (
             not gl and cycle % 10_000 == 0
@@ -997,15 +1016,15 @@ async def test_chip_top_normal_full(dut):
         # Pass condition: alarm_o rose (output pad is always observable)
         try:
             if int(dut.alarm_o.value) == 1:
-                await ClockCycles(dut.clk_PAD, 10)
+                await ClockCycles(_clk(dut), 10)
                 if int(dut.alarm_o.value) == 1:
                     cocotb.log.info(f"alarm_o asserted at cycle {cycle} — test passed.")
-                    await ClockCycles(dut.clk_PAD, 1000)
+                    await ClockCycles(_clk(dut), 1000)
                     await set_start(dut, 10)
-                    await ClockCycles(dut.clk_PAD, 10)
+                    await ClockCycles(_clk(dut), 10)
                     await set_start(dut, 10)
-                    await reset(dut.rst_n_PAD)
-                    await ClockCycles(dut.clk_PAD, 10_000)
+                    await reset(_rst_n(dut))
+                    await ClockCycles(_clk(dut), 10_000)
                     await set_start(dut, 10)
 
                     return
