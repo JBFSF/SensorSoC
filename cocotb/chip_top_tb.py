@@ -57,8 +57,8 @@ _WEIGHT_HEX = str(_PROJ / "firmware" / "build" / "generated" / "taketwo_params.h
 
 def _u32_or_none(handle):
     try:
-        return handle.value.to_unsigned()
-    except ValueError:
+        return int(handle.value)
+    except (ValueError, TypeError):
         return None
 
 
