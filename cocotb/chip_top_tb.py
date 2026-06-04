@@ -150,8 +150,8 @@ def _flat_gl_bit(scope, escaped_name):
 
 def _flat_gl_u(scope, escaped_name):
     try:
-        return _flat_gl_bit(scope, escaped_name).value.to_unsigned()
-    except (AttributeError, ValueError):
+        return int(_flat_gl_bit(scope, escaped_name).value)
+    except (AttributeError, ValueError, TypeError):
         return None
 
 
@@ -796,6 +796,7 @@ async def test_chip_top_normal(dut):
     RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 300_000 if gl else 500_000)
     # --- Phase 1: wait for boot ---
     logger.info("Waiting for boot_done...")
+    cocotb.log.info(f"Firmware.hex is: {_FIRMWARE_HEX}")
     for cycle in range(BOOT_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
         if u_top.boot_done.value == 1:
@@ -835,70 +836,20 @@ async def test_chip_top_normal(dut):
             not gl and cycle % 10_000 == 0
         ):
             if gl:
-                p = _gl_progress(dut)
-                cocotb.log.info(f"==== cycle {cycle} GL snapshot ====")
-                cocotb.log.info(
-                    f"  [rst/clk]  rst_n={p['rst_n']} reset_i={p['reset_i']} "
-                    f"fsm_rstn={p['fsm_rstn']} fsm_clk={p['fsm_clk']} "
-                    f"core_clk={p['core_clk']} cpu_clk={p['cpu_clk']} "
-                    f"cpu_clk_lat={p['cpu_clk_lat']}"
-                )
-                cocotb.log.info(
-                    f"  [fsm]      state_q={p['fsm']} state_d={p['fsm_d']} "
-                    f"boot={p['boot']} tmode={p['fsm_tmode']}"
-                )
-                cocotb.log.info(
-                    f"  [fsm_in]   bdi={p['fsm_bdi']} start={p['fsm_starti']} "
-                    f"sleep_req={p['fsm_sleepi']} feat_v={p['fsm_featvi']} "
-                    f"ml_irq={p['fsm_mlirq']} cpu_alm={p['fsm_cpualm']} "
-                    f"wake_req={p['fsm_wakerq']}"
-                )
-                cocotb.log.info(
-                    f"  [fsm_out]  feat_en={p['feat_en']} ml_en={p['ml_en']} "
-                    f"cpu_en={p['cpu_en']} alarm_o={p['fsm_alarm_o']}"
-                )
-                cocotb.log.info(
-                    f"  [cpu]      sleep={p['sleep']} trap={p['trap']} "
-                    f"mem_v={p['mem_v']} mem_i={p['mem_i']} "
-                    f"pico_rdy={p['pico_rdy']} mem_rdy={p['mem_rdy']} "
-                    f"mem_addr={p['mem_addr']} mem_wstrb={p['mem_wstrb']} "
-                    f"mem_wdata={p['mem_wdata']} mem_rdata={p['mem_rdata']} "
-                    f"sram_ready={p['sram_ready']} sram_rdata={p['sram_rdata']}"
-                )
-                cocotb.log.info(
-                    f"  [test]     status={p['status']} code={p['code']}"
-                )
-                cocotb.log.info(
-                    f"  [timer]    evt={p['tim_evt']} evt_lat={p['tim_evt_lat']} "
-                    f"ctrl={p['tim_ctrl']} count={p['tim_count']}"
-                )
-                cocotb.log.info(
-                    f"  [irqc]     pend={p['irq_pend']} mask={p['irq_mask']} "
-                    f"wake_en={p['irq_wake_en']} wake_req={p['irq_wake_req']} "
-                    f"to_cpu={p['irq_to_cpu']}"
-                )
-                cocotb.log.info(
-                    f"  [pwr]      sleep_req={p['pwr_sleep_req']} "
-                    f"wake_st={p['pwr_wake_st']}"
-                )
-                cocotb.log.info(
-                    f"  [sensors]  accel_v={p['accel_v']} ppg_v={p['ppg_v']} "
-                    f"epoch={p['epoch_end']} feat_v={p['feat_valid']} "
-                    f"feat_latched={p['feat_latched']} feat_reason={p['feat_reason']}"
-                )
-                cocotb.log.info(
-                    f"  [ml]       ml_irq={p['ml_irq']} ml_en={p['ml_en_w']} "
-                    f"wf_state={p['wflash_state']} dbg_log0={p['dbg_logit0']} "
-                    f"dbg_log1={p['dbg_logit1']} logit_reg0={p['logit0']} "
-                    f"logit_reg1={p['logit1']}"
-                )
-                cocotb.log.info(
-                    f"  [alarm]    cpu_alarm={p['cpu_alarm']} "
-                    f"fsm_alarm_o={p['fsm_alarm_o']} pad={dut.alarm_o.value}"
-                )
+                try:
+                    p = _gl_progress(dut)
+                    print(f"[GL @{cycle:7d}] rst_n={p['rst_n']} reset_i={p['reset_i']} core_clk={p['core_clk']} cpu_clk={p['cpu_clk']}", flush=True)
+                    print(f"[GL @{cycle:7d}] fsm={p['fsm']} boot={p['boot']} start={p['fsm_starti']} feat_v={p['fsm_featvi']} ml_irq={p['fsm_mlirq']} alarm={p['fsm_alarm_o']}", flush=True)
+                    print(f"[GL @{cycle:7d}] cpu_sleep={p['sleep']} trap={p['trap']} status={p['status']} code={p['code']}", flush=True)
+                    print(f"[GL @{cycle:7d}] timer_evt={p['tim_evt']} tim_ctrl={p['tim_ctrl']} tim_count={p['tim_count']}", flush=True)
+                    print(f"[GL @{cycle:7d}] irq_pend={p['irq_pend']} wake_en={p['irq_wake_en']} wake_req={p['irq_wake_req']}", flush=True)
+                    print(f"[GL @{cycle:7d}] accel_v={p['accel_v']} ppg_v={p['ppg_v']} feat_valid={p['feat_valid']} logit0={p['logit0']} logit1={p['logit1']}", flush=True)
+                    print(f"[GL @{cycle:7d}] pad_alarm={dut.alarm_o.value}", flush=True)
+                except Exception as e:
+                    print(f"[GL @{cycle:7d}] _gl_progress ERROR: {e}", flush=True)
             else:
                 try:
-                    ts = u_top.test_status.value.to_unsigned()
+                    ts = int(u_top.test_status.value)
                     alarm = dut.alarm_o.value
                     cocotb.log.info(
                         f"  cycle {cycle}: test_status=0x{ts:08X} alarm={alarm}"
@@ -919,12 +870,12 @@ async def test_chip_top_normal(dut):
         # GL pass/fail criterion focused on the real pad-level alarm output.
         if not gl:
             try:
-                status = u_top.test_status.value.to_unsigned()
+                status = int(u_top.test_status.value)
                 if status == 0xDEAD_BEEF:
                     tc_raw = u_top.test_code.value
                     try:
-                        code_str = f"0x{tc_raw.to_unsigned():08X}"
-                    except ValueError:
+                        code_str = f"0x{int(tc_raw):08X}"
+                    except (ValueError, TypeError):
                         code_str = f"X:{tc_raw!s}"
                     raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
             except ValueError:
@@ -1011,7 +962,7 @@ async def test_chip_top_normal_full(dut):
                 )
             else:
                 try:
-                    ts = u_top.test_status.value.to_unsigned()
+                    ts = int(u_top.test_status.value)
                     alarm = dut.alarm_o.value
                     cocotb.log.info(
                         f"  cycle {cycle}: test_status=0x{ts:08X} alarm={alarm}"
@@ -1032,12 +983,12 @@ async def test_chip_top_normal_full(dut):
         # GL pass/fail criterion focused on the real pad-level alarm output.
         if not gl:
             try:
-                status = u_top.test_status.value.to_unsigned()
+                status = int(u_top.test_status.value)
                 if status == 0xDEAD_BEEF:
                     tc_raw = u_top.test_code.value
                     try:
-                        code_str = f"0x{tc_raw.to_unsigned():08X}"
-                    except ValueError:
+                        code_str = f"0x{int(tc_raw):08X}"
+                    except (ValueError, TypeError):
                         code_str = f"X:{tc_raw!s}"
                     raise AssertionError(f"Firmware reported FAIL: test_code={code_str}")
             except ValueError:
