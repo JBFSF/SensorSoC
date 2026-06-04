@@ -287,7 +287,7 @@ module top #(
     // SoC path that reads those features, writes them into shared ML memory,
     // and starts the taketwo accelerator.
     //reg cpu_clk_en;
-    reg cpu_clk_en_lat;
+    logic cpu_clk_en_lat;
     wire cpu_clk;
     wire watchdog_w;
 
@@ -505,14 +505,14 @@ module top #(
     assign fifo_overflow_event_w = fifo_overflow_w & ~fifo_overflow_d;
     assign ppg_i2c_err_event_w = ppg_i2c_err_w & ~ppg_i2c_err_d;
 
-    always @(negedge clk_i or posedge reset_i) begin
-        if (reset_i)
-            cpu_clk_en_lat <= 1'b1;
-        else
-            cpu_clk_en_lat <= cpu_clk_en;
+    //Switched off the negedge dff logic, this is supposed to latch the clock anyway
+    always_latch begin
+        if (!clk_i) cpu_clk_en_lat = cpu_clk_en;
     end
 
-    assign cpu_clk = clk_i & cpu_clk_en_lat;
+    // TE=reset_i keeps cpu_clk running during reset so PicoRV32's synchronous
+    // reset can register — equivalent to icgtp_1(E=cpu_clk_en, TE=reset_i).
+    assign cpu_clk = clk_i & (cpu_clk_en_lat | reset_i);
 
     wire [31:0] irq_eoi_o_wide;
 
@@ -1245,8 +1245,8 @@ module top #(
     );
     
     logic cpu_clk_en_lat_dbg;
-    always_ff @(posedge clk_i or posedge reset_i) begin
-        if (reset_i) cpu_clk_en_lat_dbg <= 1'b1;
+    always_ff @(posedge clk_i) begin
+        if (reset_i) cpu_clk_en_lat_dbg <= 1'b0;
         else         cpu_clk_en_lat_dbg <= cpu_clk_en_lat;
     end
 
