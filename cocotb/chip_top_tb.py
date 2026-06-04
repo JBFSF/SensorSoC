@@ -796,6 +796,7 @@ async def test_chip_top_normal(dut):
     RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 300_000 if gl else 500_000)
     # --- Phase 1: wait for boot ---
     logger.info("Waiting for boot_done...")
+    cocotb.log.info(f"Firmware.hex is: {_FIRMWARE_HEX}")
     for cycle in range(BOOT_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
         if u_top.boot_done.value == 1:
