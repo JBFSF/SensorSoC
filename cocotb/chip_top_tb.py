@@ -47,8 +47,8 @@ _WEIGHT_HEX = str(_PROJ / "firmware" / "build" / "generated" / "taketwo_params.h
 
 def _u32_or_none(handle):
     try:
-        return handle.value.to_unsigned()
-    except ValueError:
+        return int(handle.value)
+    except (ValueError, TypeError):
         return None
 
 
@@ -768,9 +768,6 @@ async def test_chip_top_normal(dut):
     core  = _core(dut)
     u_top = _top(dut)
 
-    if gl:
-        # Bypass ICG X-propagation until icgtp_1 fix is re-synthesized.
-        u_top.cpu_clk_en_lat.value = Force(1)
 
     if gl and hdl_toplevel == _GL_SENSOR_BRIDGE:
         # Drive real sensor I2C pads with Python slave models.
