@@ -411,6 +411,10 @@ def _gl_progress(dut):
         "pwr_sleep_req":_flat_gl_raw(scope, "i_chip_core.u_top.u_pwr.sleep_req_o"),
         "pwr_wake_st":  _flat_gl_vec_str(scope, "i_chip_core.u_top.u_pwr.wake_status", 32),
 
+        # ---------- FSM enable outputs ----------
+        "feat_en":       _flat_gl_raw(scope, "i_chip_core.u_top.feat_en"),
+        "cpu_sleep_raw": _flat_gl_raw(scope, "i_chip_core.u_top.sleeping_r"),
+
         # ---------- Sensor pipeline (post-I2C) ----------
         "accel_v":      _flat_gl_raw(scope, "i_chip_core.u_top.accel_valid_w"),
         "ppg_v":        _flat_gl_raw(scope, "i_chip_core.u_top.ppg_sample_valid_w"),
@@ -848,6 +852,7 @@ async def test_chip_top_normal(dut):
                     print(f"[GL @{cycle:7d}] cpu_sleep={p['sleep']} trap={p['trap']} status={p['status']} code={p['code']}", flush=True)
                     print(f"[GL @{cycle:7d}] timer_evt={p['tim_evt']} tim_ctrl={p['tim_ctrl']} tim_count={p['tim_count']}", flush=True)
                     print(f"[GL @{cycle:7d}] irq_pend={p['irq_pend']} wake_en={p['irq_wake_en']} wake_req={p['irq_wake_req']}", flush=True)
+                    print(f"[GL @{cycle:7d}] feat_en={p['feat_en']} sleeping={p['sleep']} cpu_sleep={p['cpu_sleep_raw']}", flush=True)
                     print(f"[GL @{cycle:7d}] accel_v={p['accel_v']} ppg_v={p['ppg_v']} feat_valid={p['feat_valid']} logit0={p['logit0']} logit1={p['logit1']}", flush=True)
                     print(f"[GL @{cycle:7d}] pad_alarm={dut.alarm_o.value}", flush=True)
                 except Exception as e:

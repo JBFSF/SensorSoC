@@ -3,6 +3,12 @@ MAKEFILE_DIR := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 RUN_TAG = $(shell ls librelane/runs/ | tail -n 1)
 TOP = chip_top
 FINAL_DIR ?= $(if $(wildcard $(MAKEFILE_DIR)/final/pnl/$(TOP).pnl.v),$(MAKEFILE_DIR)/final,$(MAKEFILE_DIR)/librelane/runs/$(RUN_TAG)/final)
+# GL sim netlist: synthesized with GL_SIM define for compressed timing loops.
+# Run "make synth-glsim" once to populate this directory before sim-gl-normal.
+FINAL_DIR_GLSIM ?= $(MAKEFILE_DIR)/final_glsim
+# Runtime cycle budget for the GL normal test; 500k covers one full epoch_end
+# (100k) + ML inference + alarm with comfortable margin.
+GL_RUNTIME_TIMEOUT ?= 500000
 
 PDK_ROOT ?= $(MAKEFILE_DIR)/gf180mcu
 PDK ?= gf180mcuD
@@ -70,6 +76,10 @@ check-riscv-toolchain: ## Check the selected RISC-V GCC toolchain
 librelane: ## Run LibreLane flow (synthesis, PnR, verification)
 	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --save-views-to $(MAKEFILE_DIR)/final --pdk ${PDK} --pdk-root ${PDK_ROOT} --manual-pdk
 .PHONY: librelane
+
+synth-glsim: ## Synthesize GL-sim netlist (GL_SIM define: compressed timing for full-pipeline GL test)
+	librelane librelane/slots/slot_${SLOT}.yaml librelane/config_glsim.yaml --save-views-to $(FINAL_DIR_GLSIM) --pdk ${PDK} --pdk-root ${PDK_ROOT} --manual-pdk
+.PHONY: synth-glsim
 
 librelane-nodrc: ## Run LibreLane flow without DRC checks
 	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --save-views-to $(MAKEFILE_DIR)/final --pdk ${PDK} --pdk-root ${PDK_ROOT} --manual-pdk --skip KLayout.Antenna --skip KLayout.DRC --skip Magic.DRC
@@ -139,8 +149,8 @@ sim-gl-boot: ## Run gate-level chip_top boot test (uses sensor bridge wrapper)
 	cd cocotb; GL=1 WAVES=$(GL_WAVES) CLK_FREQ_MHZ=$(GL_CLK_FREQ_MHZ) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_FILTER='test_chip_top_boot$$' $(PYTHON) chip_top_tb.py
 .PHONY: sim-gl-boot
 
-sim-gl-normal: ## Run gate-level chip_top normal pipeline test (uses sensor bridge wrapper)
-	cd cocotb; GL=1 WAVES=$(GL_WAVES) CLK_FREQ_MHZ=$(GL_CLK_FREQ_MHZ) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_FILTER='test_chip_top_normal$$' $(PYTHON) chip_top_tb.py
+sim-gl-normal: ## Run full GL pipeline test against the GL-sim netlist (requires: make synth-glsim)
+	cd cocotb; GL=1 WAVES=$(GL_WAVES) CLK_FREQ_MHZ=$(GL_CLK_FREQ_MHZ) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb FINAL_DIR=$(FINAL_DIR_GLSIM) RUNTIME_TIMEOUT_CYCLES=$(GL_RUNTIME_TIMEOUT) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_FILTER='test_chip_top_normal$$' $(PYTHON) chip_top_tb.py
 .PHONY: sim-gl-normal
 
 GL_REGRESSION_TARGETS ?= sim-gl-smoke sim-gl-boot sim-gl-normal sim-gl-dft-smoke sim-gl-debug-modes sim-gl-sensor-bridge-smoke

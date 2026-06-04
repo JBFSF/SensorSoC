@@ -1,0 +1,299 @@
+# Gate-level simulation synthesis configuration.
+#
+# Identical to config.yaml except GL_SIM is added to VERILOG_DEFINES.
+# This activates compressed timing defaults in chip_top.sv so the full
+# sensor→feature→ML→alarm pipeline completes in ~300k sim cycles
+# (vs >100M cycles with production parameters).
+#
+# Usage:
+#   make synth-glsim          # produces final_glsim/pnl/chip_top.pnl.v
+#   make sim-gl-normal        # runs test_chip_top_normal against that netlist
+#
+# The production netlist (final/) is unchanged and is what gets submitted
+# for tapeout.
+
+meta:
+  version: 3
+  flow: Chip
+  substituting_steps:
+
+DESIGN_NAME: chip_top
+VERILOG_DEFINES: ["SLOT_1X1", "USE_POWER_PINS", "GL_SIM"]
+VERILOG_FILES:
+- dir::../src/chip_top.sv
+- dir::../src/chip_core.sv
+- dir::../src/top.sv
+- dir::../src/accel_reader.sv
+- dir::../src/alarm_mmio.v
+- dir::../src/axi_interface.sv
+- dir::../src/clock_mux.sv
+- dir::../src/cpu_to_ml.v
+- dir::../src/feature_engine.sv
+- dir::../src/globaltimer.sv
+- dir::../src/gpio_mmio.v
+- dir::../src/host_i2c_bridge_regs.v
+- dir::../src/host_i2c_target.v
+- dir::../src/i2c_master.sv
+- dir::../src/irq_ctrl_mmio.v
+- dir::../src/logit_to_confidence.sv
+- dir::../src/ml_axil_bridge_mmio.v
+- dir::../src/ml_stub_mmio.v
+- dir::../src/motion_process.sv
+- dir::../src/mssd_engine.sv
+- dir::../src/ppg_fifo_reader.sv
+- dir::../src/ppg_process.sv
+- dir::../src/pwrctrl_mmio.v
+- dir::../src/reset_ctrl.v
+- dir::../src/signal_quality.sv
+- dir::../src/simple_sram.v
+- dir::../src/spi_boot_ctrl.v
+- dir::../src/spi_master_mmio.v
+- dir::../src/taketwo.v
+- dir::../src/taketwo_wrap.v
+- dir::../src/test_mmio.v
+- dir::../src/timer_mmio.v
+- dir::../src/top_fsm.sv
+- dir::../src/weight_ram_axi.v
+- dir::../src/weight_flash_axi.v
+- dir::../ip/picorv32.v
+
+PRIMARY_GDSII_STREAMOUT_TOOL: klayout
+
+PNR_SDC_FILE: dir::chip_top.sdc
+SIGNOFF_SDC_FILE: dir::chip_top.sdc
+FALLBACK_SDC: dir::chip_top.sdc
+
+VDD_NETS:
+- VDD
+GND_NETS:
+- VSS
+
+IGNORE_DISCONNECTED_MODULES:
+- gf180mcu_fd_io__bi_24t
+- gf180mcu_ws_ip__id
+- gf180mcu_ws_ip__logo
+
+CLOCK_PORT: clk_PAD
+CLOCK_NET: clk_pad/Y
+CLOCK_PERIOD: 200
+
+PL_RESIZER_HOLD_SLACK_MARGIN: 0.8
+GRT_RESIZER_HOLD_SLACK_MARGIN: 0.7
+
+PL_MAX_DISPLACEMENT_X: 2000
+PL_MAX_DISPLACEMENT_Y: 1200
+DESIGN_REPAIR_MAX_SLEW_PCT: 30
+DESIGN_REPAIR_MAX_CAP_PCT: 60
+GRT_DESIGN_REPAIR_MAX_SLEW_PCT: 20
+GRT_DESIGN_REPAIR_MAX_CAP_PCT: 40
+DESIGN_REPAIR_MAX_WIRE_LENGTH: 250
+GRT_DESIGN_REPAIR_MAX_WIRE_LENGTH: 200
+RUN_POST_GRT_DESIGN_REPAIR: true
+RUN_POST_GRT_RESIZER_TIMING: true
+MAX_FANOUT_CONSTRAINT: 12
+
+CTS_SINK_CLUSTERING_SIZE: 12
+CTS_SINK_CLUSTERING_MAX_DIAMETER: 25
+CTS_CLK_MAX_WIRE_LENGTH: 450
+CTS_SINK_BUFFER_MAX_CAP_DERATE_PCT: 25
+CTS_APPLY_NDR: none
+
+PL_TARGET_DENSITY_PCT: 35
+GRT_ALLOW_CONGESTION: true
+
+DRT_ANTENNA_REPAIR_ITERS: 10
+DRT_ANTENNA_REPAIR_MARGIN: 10
+RUN_HEURISTIC_DIODE_INSERTION: false
+HEURISTIC_ANTENNA_THRESHOLD: 90
+DIODE_ON_PORTS: in
+
+GRT_ANTENNA_REPAIR_MARGIN: 0
+GRT_ANTENNA_REPAIR_ITERS: 5
+
+PDN_VWIDTH: 5
+PDN_HWIDTH: 5
+PDN_VSPACING: 1
+PDN_HSPACING: 1
+PDN_VPITCH: 75
+PDN_HPITCH: 75
+
+PDN_CORE_RING: True
+PDN_CORE_RING_VWIDTH: 25
+PDN_CORE_RING_HWIDTH: 25
+PDN_CORE_RING_CONNECT_TO_PADS: True
+PDN_ENABLE_PINS: False
+PDN_CORE_VERTICAL_LAYER: Metal2
+PDN_CORE_HORIZONTAL_LAYER: Metal3
+
+ERROR_ON_MAGIC_DRC: False
+
+MAGIC_GDS_FLATGLOB:
+- "*_CDNS_*"
+- "*$$*"
+- "M1_N*"
+- "M1_P*"
+- "M2_M1*"
+- "M3_M2*"
+- "nmos_5p0*"
+- "nmos_1p2*"
+- "pmos_5p0*"
+- "pmos_1p2*"
+- "via1_*"
+- "ypass_gate*"
+- "G_ring_*"
+- "dcap_103*"
+- "din_*"
+- "mux821_*"
+- "rdummy_*"
+- "pmoscap_*"
+- "xdec_*"
+- "ypredec*"
+- "xpredec*"
+- "prexdec_*"
+- "xdec8_*"
+- "xdec16_*"
+- "xdec32_*"
+- "sa_*"
+
+KLAYOUT_FILLER_OPTIONS:
+  Metal2_ignore_active: true
+
+MAGIC_EXT_UNIQUE: notopports
+
+MACROS:
+  gf180mcu_ws_ip__id:
+    gds:
+      - dir::../ip/gf180mcu_ws_ip__id/gds/gf180mcu_ws_ip__id.gds
+    lef:
+      - dir::../ip/gf180mcu_ws_ip__id/lef/gf180mcu_ws_ip__id.lef
+    vh:
+      - dir::../ip/gf180mcu_ws_ip__id/vh/gf180mcu_ws_ip__id.v
+    lib:
+      "*":
+        - dir::../ip/gf180mcu_ws_ip__id/lib/gf180mcu_ws_ip__id.lib
+    instances:
+      chip_id:
+        location: [26, 26]
+        orientation: N
+
+  gf180mcu_ws_ip__logo:
+    gds:
+      - dir::../ip/gf180mcu_ws_ip__logo/gds/gf180mcu_ws_ip__logo.gds
+    lef:
+      - dir::../ip/gf180mcu_ws_ip__logo/lef/gf180mcu_ws_ip__logo.lef
+    vh:
+      - dir::../ip/gf180mcu_ws_ip__logo/vh/gf180mcu_ws_ip__logo.v
+    lib:
+      "*":
+        - dir::../ip/gf180mcu_ws_ip__logo/lib/gf180mcu_ws_ip__logo.lib
+    instances:
+      wafer_space_logo:
+        location: [3762.75, 4952.75]
+        orientation: N
+
+  gf180mcu_fd_ip_sram__sram512x8m8wm1:
+    gds:
+      - pdk_dir::libs.ref/gf180mcu_fd_ip_sram/gds/gf180mcu_fd_ip_sram__sram512x8m8wm1.gds
+    lef:
+      - pdk_dir::libs.ref/gf180mcu_fd_ip_sram/lef/gf180mcu_fd_ip_sram__sram512x8m8wm1.lef
+    vh:
+      - pdk_dir::libs.ref/gf180mcu_fd_ip_sram/verilog/gf180mcu_fd_ip_sram__sram512x8m8wm1__blackbox.v
+    lib:
+      "*_tt_025C_5v00":
+        - pdk_dir::libs.ref/gf180mcu_fd_ip_sram/lib/gf180mcu_fd_ip_sram__sram512x8m8wm1__tt_025C_5v00.lib
+      "*_ff_n40C_5v50":
+        - pdk_dir::libs.ref/gf180mcu_fd_ip_sram/lib/gf180mcu_fd_ip_sram__sram512x8m8wm1__ff_n40C_5v50.lib
+      "*_ss_125C_4v50":
+        - pdk_dir::libs.ref/gf180mcu_fd_ip_sram/lib/gf180mcu_fd_ip_sram__sram512x8m8wm1__ss_125C_4v50.lib
+    instances:
+      i_chip_core.u_top.sram.mem_A_1:
+        location: [490, 500]
+        orientation: N
+      i_chip_core.u_top.sram.mem_A_2:
+        location: [930, 500]
+        orientation: N
+      i_chip_core.u_top.sram.mem_A_3:
+        location: [1370, 500]
+        orientation: N
+      i_chip_core.u_top.sram.mem_A_4:
+        location: [1810, 500]
+        orientation: N
+      i_chip_core.u_top.sram.mem_B_1:
+        location: [490, 1020]
+        orientation: N
+      i_chip_core.u_top.sram.mem_B_2:
+        location: [930, 1020]
+        orientation: N
+      i_chip_core.u_top.sram.mem_B_3:
+        location: [1370, 1020]
+        orientation: N
+      i_chip_core.u_top.sram.mem_B_4:
+        location: [1810, 1020]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id0_0.mem_bot:
+        location: [490, 1600]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id0_0.mem_top:
+        location: [930, 1600]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id0_1.mem_bot:
+        location: [1370, 1600]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id0_1.mem_top:
+        location: [1810, 1600]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id1_0.mem_bot:
+        location: [2250, 1600]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id1_0.mem_top:
+        location: [490, 2180]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id1_1.mem_bot:
+        location: [930, 2180]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id1_1.mem_top:
+        location: [1370, 2180]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id2_0.mem_bot:
+        location: [1810, 2180]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id2_0.mem_top:
+        location: [2250, 2180]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id2_1.mem_bot:
+        location: [490, 2760]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id2_1.mem_top:
+        location: [930, 2760]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id3_0.mem_bot:
+        location: [1370, 2760]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id3_0.mem_top:
+        location: [1810, 2760]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id3_1.mem_bot:
+        location: [2250, 2760]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id3_1.mem_top:
+        location: [490, 3340]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_0.mem_bot:
+        location: [930, 3340]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_0.mem_top:
+        location: [1370, 3340]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_1.mem_bot:
+        location: [1810, 3340]
+        orientation: N
+      i_chip_core.u_top.u_taketwo_wrap.u_core.inst_ram_w16_l512_id4_1.mem_top:
+        location: [2250, 3340]
+        orientation: N
+
+FP_MACRO_HORIZONTAL_HALO: 10
+FP_MACRO_VERTICAL_HALO: 10
+PDN_HORIZONTAL_HALO: 5
+PDN_VERTICAL_HALO: 5
+
+PDN_CFG: dir::pdn_cfg.tcl

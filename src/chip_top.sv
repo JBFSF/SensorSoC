@@ -21,13 +21,24 @@ module chip_top #(
     parameter integer CLK_HZ                = 10_000_000,
     parameter integer GT_CLK_HZ             = 10_000_000,
     parameter integer GT_EPOCH_HZ           = 100,
+    // GL_SIM compresses timing loops so the full pipeline completes in
+    // ~300k cycles instead of >100M, without changing any logic.
+    // Production synthesis uses config.yaml (no GL_SIM define).
+    // GL sim synthesis uses config_glsim.yaml (GL_SIM defined).
+`ifdef GL_SIM
+    parameter integer GT_EPOCH_COUNT_MAX    = 1,
+    parameter integer ACC_POLL_PERIOD_TICKS = 10_000,
+    parameter [15:0]  CFG_MOTION_HI_TH      = 16'hFFFF,
+    parameter [15:0]  CFG_MAX_MOTION_HI     = 16'hFFFF,
+`else
     parameter integer GT_EPOCH_COUNT_MAX    = 1000,
     parameter integer ACC_POLL_PERIOD_TICKS = 50_000,
+    parameter [15:0]  CFG_MOTION_HI_TH      = 16'd2000,
+    parameter [15:0]  CFG_MAX_MOTION_HI     = 16'd3,
+`endif
     parameter integer PPG_POLL_PERIOD_TICKS = 100,
     parameter integer PPG_WATERMARK         = 8,
     parameter integer PPG_MAX_BURST_SAMPLES = 32,
-    parameter [15:0]  CFG_MOTION_HI_TH      = 16'd2000,
-    parameter [15:0]  CFG_MAX_MOTION_HI     = 16'd3,
     parameter integer TIMER_RELOAD_DEFAULT  = 5_000_000
     )(
     `ifdef USE_POWER_PINS
