@@ -679,39 +679,45 @@ async def _can_sleep_monitor(clk, u_top, core):
 async def _gl_heartbeat(dut):
     """GL-friendly progress beat — only watches pads, which survive flattening.
     Tracks SPI activity (toggle count on bidir[1] = boot_spi_clk) and alarm.
+    Also tracks sensor SCL (bidir[23]) to diagnose I2C sensor communication.
     """
     cycles = 0
     spi_clk_toggles = 0
+    sensor_scl_toggles = 0
     last_spi_clk = None
+    last_sensor_scl = None
     last_alarm = None
     while True:
         await ClockCycles(dut.clk_PAD, 1)
         cycles += 1
-        # Sample SPI clock and alarm
         try:
             bpad = dut.bidir_PAD.value
-            # bidir_PAD[1] is boot SPI clock pre-boot_done; weight SPI after
-            spi_clk_now = int(bpad[1])
-            alarm_now   = int(bpad[0])
+            spi_clk_now    = int(bpad[1])
+            alarm_now      = int(bpad[0])
+            sensor_scl_now = int(bpad[23])
         except Exception:
-            spi_clk_now = None
-            alarm_now   = None
+            spi_clk_now    = None
+            alarm_now      = None
+            sensor_scl_now = None
 
         if last_spi_clk is not None and spi_clk_now != last_spi_clk:
             spi_clk_toggles += 1
         last_spi_clk = spi_clk_now
 
-        # Print alarm transitions immediately
+        if last_sensor_scl is not None and sensor_scl_now != last_sensor_scl:
+            sensor_scl_toggles += 1
+        last_sensor_scl = sensor_scl_now
+
         if alarm_now is not None and alarm_now != last_alarm:
             print(f"[gl_hb @{cycles:8d}] alarm_o transition: {last_alarm} -> {alarm_now}",
                   flush=True)
             last_alarm = alarm_now
 
-        # Heartbeat every 25k cycles with rolling counts
         if cycles % 25_000 == 0:
             print(
                 f"[gl_hb @{cycles:8d}]  alarm_o={alarm_now}  "
-                f"spi_clk_toggles_so_far={spi_clk_toggles}",
+                f"spi_clk_toggles={spi_clk_toggles}  "
+                f"sensor_scl_toggles={sensor_scl_toggles}",
                 flush=True,
             )
 
