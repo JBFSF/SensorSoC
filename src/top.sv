@@ -505,14 +505,25 @@ module top #(
     assign fifo_overflow_event_w = fifo_overflow_w & ~fifo_overflow_d;
     assign ppg_i2c_err_event_w = ppg_i2c_err_w & ~ppg_i2c_err_d;
 
-    //Switched off the negedge dff logic, this is supposed to latch the clock anyway
+`ifdef SIM
+    // Behavioral ICG for RTL simulation: latch transparent when clock low.
+    // TE=reset_i modelled by ORing reset_i at the AND gate so PicoRV32 receives
+    // clock edges during reset and can register its synchronous reset state.
     always_latch begin
         if (!clk_i) cpu_clk_en_lat = cpu_clk_en;
     end
-
-    // TE=reset_i keeps cpu_clk running during reset so PicoRV32's synchronous
-    // reset can register — equivalent to icgtp_1(E=cpu_clk_en, TE=reset_i).
     assign cpu_clk = clk_i & (cpu_clk_en_lat | reset_i);
+`else
+    // Synthesis + GL sim: icgtp_1 is the GF180MCU latch-based ICG cell.
+    // TE=reset_i keeps cpu_clk ungated during reset for PicoRV32 sync-reset.
+    assign cpu_clk_en_lat = cpu_clk_en;
+    gf180mcu_fd_sc_mcu7t5v0__icgtp_1 u_cpu_icg (
+        .CLK(clk_i),
+        .E  (cpu_clk_en),
+        .TE (reset_i),
+        .Q  (cpu_clk)
+    );
+`endif
 
     wire [31:0] irq_eoi_o_wide;
 
