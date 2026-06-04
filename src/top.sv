@@ -1227,7 +1227,6 @@ module top #(
 
         // CPU sleep/wake inputs
         .sleep_req_i(sleep_req),     // CPU requests sleep (from pwrctrl MMIO)
-        .mem_valid_i(mem_valid),     // CPU memory-access valid (for idle detection)
         .irqc_wake_req_i(irqc_wake_req), // interrupt controller forces wake
         .cpu_alarm_i(cpu_alarm_w),       // alarm is active from MMIO
 

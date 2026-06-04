@@ -7,7 +7,6 @@ from pathlib import Path
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.handle import Force
 from cocotb.triggers import Timer, RisingEdge, ClockCycles, ReadOnly
 from cocotb_tools.runner import get_runner
 from cocotbext.i2c import I2cDevice
@@ -24,6 +23,13 @@ def _env_flag(name, default=False):
     return value.strip().lower() not in {"", "0", "false", "no", "off"}
 
 
+def _env_int(name, default):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return int(value, 0)
+
+
 sim         = os.getenv("SIM", "icarus")
 pdk_root    = os.getenv("PDK_ROOT", Path("~/.ciel").expanduser())
 pdk         = os.getenv("PDK", "gf180mcuD")
@@ -33,6 +39,10 @@ waves       = _env_flag("WAVES", True)
 clk_freq_mhz = float(os.getenv("CLK_FREQ_MHZ", "10.0" if gl else "50.0"))
 slot        = os.getenv("SLOT", "1x1")
 test_module = os.getenv("COCOTB_TEST_MODULE", "chip_top_tb")
+gl_debug_probes = _env_flag("GL_DEBUG_PROBES")
+gl_sram_probes = _env_flag("GL_SRAM_PROBES", gl_debug_probes)
+gl_fetch_monitor = _env_flag("GL_FETCH_MONITOR", gl_debug_probes)
+gl_snapshot_interval = _env_int("GL_SNAPSHOT_INTERVAL", 50_000 if gl_debug_probes else 0)
 
 
 hdl_toplevel = os.getenv("CHIP_TOPLEVEL", "chip_top_sim_wrap")
@@ -360,8 +370,6 @@ def _gl_progress(dut):
         "fsm_mlirq":    _flat_gl_raw(scope, "i_chip_core.u_top.fsm.ml_irq_i"),
         "fsm_cpualm":   _flat_gl_raw(scope, "i_chip_core.u_top.fsm.cpu_alarm_i"),
         "fsm_wakerq":   _flat_gl_raw(scope, "i_chip_core.u_top.fsm.irqc_wake_req_i"),
-        "fsm_memv":     _flat_gl_raw(scope, "i_chip_core.u_top.fsm.mem_valid_i"),
-        "fsm_idleR":    _flat_gl_raw(scope, "i_chip_core.u_top.fsm.cpu_idle_seen_r"),
         "fsm_tmode":    _flat_gl_vec_str(scope, "i_chip_core.u_top.fsm.test_mode_i", 4, digits=1, missing_zero=True),
         # FSM outputs
         "feat_en":      _flat_gl_raw(scope, "i_chip_core.u_top.fsm.feat_en_o"),
@@ -553,11 +561,12 @@ async def test_chip_top_boot(dut):
     else:
         raise AssertionError(f"boot_done never asserted within {TIMEOUT_CYCLES} cycles")
 
-    if gl:
+    if gl and gl_sram_probes:
         _log_gl_sram_macros(dut, logger, "after boot_done")
+    if gl and gl_fetch_monitor:
         await _gl_pico_fetch_monitor(dut, logger, cycles=2_000, limit=8)
 
-    assert _u32_or_none(core.pico_trap_w) != 1, \
+    assert int(core.pico_trap_w.value) != 1, \
         "CPU trapped — firmware likely loaded incorrectly"
 
     logger.info(f"Boot complete. CPU running (no trap).")
@@ -657,16 +666,12 @@ async def _can_sleep_monitor(clk, u_top, core):
         except ValueError:
             wr = "X"
         try:
-            ids = int(fsm.cpu_idle_seen_r.value)
-        except ValueError:
-            ids = "X"
-        try:
             bd = int(u_top.boot_done.value)
         except ValueError:
             bd = "X"
         print(
             f"[sleep_mon] state_q={raw} ({label})  "
-            f"sleep_req={sr}  idle={ids}  wake_req={wr}  boot_done={bd}",
+            f"sleep_req={sr}  wake_req={wr}  boot_done={bd}",
             flush=True,
         )
 
@@ -768,7 +773,6 @@ async def test_chip_top_normal(dut):
     core  = _core(dut)
     u_top = _top(dut)
 
-
     if gl and hdl_toplevel == _GL_SENSOR_BRIDGE:
         # Drive real sensor I2C pads with Python slave models.
         from test_chip_top_i2c_pads import (
@@ -788,8 +792,8 @@ async def test_chip_top_normal(dut):
         cocotb.start_soon(_accel._run())
         cocotb.start_soon(_ppg._run())
 
-    BOOT_TIMEOUT    = 500_000
-    RUNTIME_TIMEOUT = 500_000#3_000_000
+    BOOT_TIMEOUT    = _env_int("BOOT_TIMEOUT_CYCLES", 250_000 if gl else 500_000)
+    RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 300_000 if gl else 500_000)
     # --- Phase 1: wait for boot ---
     logger.info("Waiting for boot_done...")
     for cycle in range(BOOT_TIMEOUT):
@@ -801,8 +805,9 @@ async def test_chip_top_normal(dut):
         raise AssertionError("Timeout waiting for boot_done")
     #assert core.pico_trap_w.value == 0, "CPU trapped during boot"
 
-    if gl:
+    if gl and gl_sram_probes:
         _log_gl_sram_macros(dut, logger, "after boot_done")
+    if gl and gl_fetch_monitor:
         cocotb.start_soon(_gl_pico_fetch_monitor(dut, logger, cycles=5_000, limit=16))
 
     cocotb.log.info("Boot done. Waiting for alarm_o...")
@@ -826,7 +831,9 @@ async def test_chip_top_normal(dut):
     for cycle in range(RUNTIME_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
 
-        if cycle % 10_000 == 0:
+        if (gl and gl_snapshot_interval and cycle % gl_snapshot_interval == 0) or (
+            not gl and cycle % 10_000 == 0
+        ):
             if gl:
                 p = _gl_progress(dut)
                 cocotb.log.info(f"==== cycle {cycle} GL snapshot ====")
@@ -844,8 +851,7 @@ async def test_chip_top_normal(dut):
                     f"  [fsm_in]   bdi={p['fsm_bdi']} start={p['fsm_starti']} "
                     f"sleep_req={p['fsm_sleepi']} feat_v={p['fsm_featvi']} "
                     f"ml_irq={p['fsm_mlirq']} cpu_alm={p['fsm_cpualm']} "
-                    f"wake_req={p['fsm_wakerq']} mem_v={p['fsm_memv']} "
-                    f"idle_seen={p['fsm_idleR']}"
+                    f"wake_req={p['fsm_wakerq']}"
                 )
                 cocotb.log.info(
                     f"  [fsm_out]  feat_en={p['feat_en']} ml_en={p['ml_en']} "
@@ -952,8 +958,8 @@ async def test_chip_top_normal_full(dut):
     core  = _core(dut)
     u_top = _top(dut)
 
-    BOOT_TIMEOUT    = 500_000
-    RUNTIME_TIMEOUT = 500_000#3_000_000
+    BOOT_TIMEOUT    = _env_int("BOOT_TIMEOUT_CYCLES", 250_000 if gl else 500_000)
+    RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 300_000 if gl else 500_000)
 
     # --- Phase 1: wait for boot ---
     cocotb.log.info("Waiting for boot_done...")
@@ -986,7 +992,9 @@ async def test_chip_top_normal_full(dut):
     for cycle in range(RUNTIME_TIMEOUT):
         await RisingEdge(dut.clk_PAD)
 
-        if cycle % 10_000 == 0:
+        if (gl and gl_snapshot_interval and cycle % gl_snapshot_interval == 0) or (
+            not gl and cycle % 10_000 == 0
+        ):
             if gl:
                 p = _gl_progress(dut)
                 cocotb.log.info(
@@ -1111,10 +1119,14 @@ def chip_top_runner():
         src_dir = proj_path / "../src"
         pad_level = hdl_toplevel in {"chip_top", "chip_top_sim_wrap"}
         skip = {"dummy_top.sv", "soc_top.v"}
+        netlist_suffixes = (".nl.v", ".pnl.v")
         if pad_level:
             skip.add("gf180mcu_fd_ip_sram__sram512x8m8wm1.v")
         sources += sorted(p for p in src_dir.glob("*.sv") if p.name not in skip)
-        sources += sorted(p for p in src_dir.glob("*.v")  if p.name not in skip)
+        sources += sorted(
+            p for p in src_dir.glob("*.v")
+            if p.name not in skip and not p.name.endswith(netlist_suffixes)
+        )
         sources.append(proj_path / "../ip/picorv32.v")
 
         # Simulation models

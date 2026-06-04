@@ -59,7 +59,7 @@ VERILOG_FILES:
 - dir::../src/taketwo_wrap.v
 - dir::../src/test_mmio.v
 - dir::../src/timer_mmio.v
-- dir::../src/top_fsm.v
+- dir::../src/top_fsm.sv
 - dir::../src/weight_ram_axi.v
 - dir::../src/weight_flash_axi.v
 - dir::../ip/picorv32.v
