@@ -7,7 +7,6 @@ from pathlib import Path
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.handle import Force
 from cocotb.triggers import Timer, RisingEdge, ClockCycles, ReadOnly
 from cocotb_tools.runner import get_runner
 from cocotbext.i2c import I2cDevice
@@ -557,7 +556,7 @@ async def test_chip_top_boot(dut):
         _log_gl_sram_macros(dut, logger, "after boot_done")
         await _gl_pico_fetch_monitor(dut, logger, cycles=2_000, limit=8)
 
-    assert _u32_or_none(core.pico_trap_w) != 1, \
+    assert int(core.pico_trap_w.value) != 1, \
         "CPU trapped — firmware likely loaded incorrectly"
 
     logger.info(f"Boot complete. CPU running (no trap).")
@@ -767,10 +766,6 @@ async def test_chip_top_normal(dut):
 
     core  = _core(dut)
     u_top = _top(dut)
-
-    if gl:
-        # Bypass ICG X-propagation until icgtp_1 fix is re-synthesized.
-        u_top.cpu_clk_en_lat.value = Force(1)
 
     if gl and hdl_toplevel == _GL_SENSOR_BRIDGE:
         # Drive real sensor I2C pads with Python slave models.
