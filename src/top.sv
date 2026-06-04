@@ -1244,7 +1244,7 @@ module top #(
     
     logic cpu_clk_en_lat_dbg;
     always_ff @(posedge clk_i) begin
-        if (reset_i) cpu_clk_en_lat_dbg <= 1'b1;
+        if (reset_i) cpu_clk_en_lat_dbg <= 1'b0;
         else         cpu_clk_en_lat_dbg <= cpu_clk_en_lat;
     end
 
