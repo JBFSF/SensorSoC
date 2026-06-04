@@ -66,7 +66,7 @@ VERILOG_FILES:
 
 # Enable plugin for better SystemVerilog support
 USE_SLANG: True
-# SLANG_ARGUMENTS: ['--keep-hierarchy']
+SLANG_ARGUMENTS: ['--keep-hierarchy']
 
 # Slightly smaller file sizes
 PRIMARY_GDSII_STREAMOUT_TOOL: klayout
@@ -95,8 +95,8 @@ CLOCK_NET: clk_pad/Y
 CLOCK_PERIOD: 200 # 5 MHz
 
 # Fix hold violations
-PL_RESIZER_HOLD_SLACK_MARGIN: 0.35
-GRT_RESIZER_HOLD_SLACK_MARGIN: 0.3
+PL_RESIZER_HOLD_SLACK_MARGIN: 0.8
+GRT_RESIZER_HOLD_SLACK_MARGIN: 0.7
 
 # legalize design after repairs and having to insert one million buffers :(
 # these values control how far detailed placement can move cells when attempting to inserting hella buffers
