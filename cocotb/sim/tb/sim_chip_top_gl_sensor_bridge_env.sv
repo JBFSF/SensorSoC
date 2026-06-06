@@ -53,7 +53,26 @@ module sim_chip_top_gl_sensor_bridge_env;
   wire alarm_o;
   assign alarm_o = bidir_PAD[0];
 
-  chip_top u_chip (
+  chip_top
+  `ifndef FUNCTIONAL
+  // Parameter overrides only apply in RTL mode. In GL the netlist
+  // already has parameters baked from synthesis.
+  #(
+    .CLK_HZ                 (1_000_000),    // 1 MHz (vs real 10MHz) — 10x faster sim
+    .I2C_CLK_HZ             (100_000),      // QUARTER = 1M/(4*100k) = 2 → 8 sys-clk per I2C bit (near minimum)
+    .GT_CLK_HZ              (1_000_000),
+    .GT_EPOCH_HZ            (100),
+    .GT_EPOCH_COUNT_MAX     (100),          // 1 sec / epoch_end — fast features for sim
+    .ACC_POLL_PERIOD_TICKS  (5_000),        // 5ms intervals (matches real-chip ratio)
+    .PPG_POLL_PERIOD_TICKS  (10),
+    .PPG_WATERMARK          (8),
+    .PPG_MAX_BURST_SAMPLES  (32),
+    .CFG_MOTION_HI_TH       (16'hFFFF),
+    .CFG_MAX_MOTION_HI      (16'hFFFF),
+    .TIMER_RELOAD_DEFAULT   (100)
+  )
+  `endif
+  u_chip (
     `ifdef USE_POWER_PINS
     .VDD(VDD),
     .VSS(VSS),

@@ -580,7 +580,7 @@ async def _gl_heartbeat(dut):
     last_spi_clk = None
     last_alarm = None
     while True:
-        await ClockCycles(dut.clk_PAD, 1)
+        await ClockCycles(_clk_handle(dut), 1)
         cycles += 1
         # Sample SPI clock and alarm
         try:
@@ -609,6 +609,129 @@ async def _gl_heartbeat(dut):
                 f"spi_clk_toggles_so_far={spi_clk_toggles}",
                 flush=True,
             )
+
+
+async def _sec_results_logger(dut, results_path):
+    """Write a CSV row to `results_path` every time time_in_night_seconds_o
+    changes. Captures key signals (reset, boot, fsm, alarm, features, logits)
+    so we can review chip behavior post-run without waveforms."""
+    clk = _clk_handle(dut)
+    u_top = _top(dut)
+    core  = _core(dut)
+    scope = _gl_chip_inst(dut)
+
+    # Open the file and write header
+    f = open(results_path, "w", buffering=1)  # line-buffered
+    f.write(
+        "sec,rst_n,boot,fsm,alarm_o,"
+        "motion,time,delta_hr,mssd,"
+        "logit_reg0,logit_reg1,dbg_logit0,dbg_logit1\n"
+    )
+    cocotb.log.info(f"[sec_log] writing results to {results_path}")
+
+    def read_signed_or_x(handle):
+        try:
+            return str(_s16(int(handle.value)))
+        except (ValueError, AttributeError):
+            return "X"
+
+    def read_u32_or_x(handle, digits=8):
+        try:
+            return f"0x{int(handle.value):0{digits}X}"
+        except (ValueError, AttributeError):
+            return "X"
+
+    def read_bit(handle):
+        try:
+            return str(int(handle.value))
+        except (ValueError, AttributeError):
+            return "X"
+
+    # Find the seconds register — globaltimer hierarchical name
+    # Try multiple ways since hierarchy may flatten
+    sec_handle = None
+    try:
+        sec_handle = u_top.u_globaltimer.time_in_night_seconds_o
+    except AttributeError:
+        try:
+            sec_handle = u_top.seconds_w  # latched signal in top.sv
+        except AttributeError:
+            cocotb.log.warning("[sec_log] could not find time_in_night_seconds_o; falling back to cycle-based logging")
+
+    last_sec = -1
+    cycle_count = 0
+    while True:
+        await RisingEdge(clk)
+        cycle_count += 1
+
+        # Determine current second
+        try:
+            if sec_handle is not None:
+                cur_sec = int(sec_handle.value)
+            else:
+                # Fallback: log every ~10K cycles when seconds reg is missing
+                if cycle_count % 10_000 != 0:
+                    continue
+                cur_sec = cycle_count // 10_000
+        except ValueError:
+            continue
+        if cur_sec == last_sec:
+            continue
+        last_sec = cur_sec
+
+        # Snapshot signals — robust to missing handles
+        rst_n  = read_bit(_rst_handle(dut))
+        try:
+            boot = read_bit(u_top.boot_done)
+        except AttributeError:
+            boot = "X"
+
+        # FSM state — use the existing one-hot decoder
+        if gl:
+            fsm = _gl_decode_fsm_state(scope)
+        else:
+            try:
+                fsm_int = int(u_top.fsm.state_q.value)
+                fsm = _FSM_LABELS.get(fsm_int, f"?({fsm_int})")
+            except (AttributeError, ValueError):
+                fsm = "X"
+
+        try:
+            alarm = read_bit(dut.alarm_o)
+        except AttributeError:
+            alarm = "X"
+
+        # Feature latched values
+        motion = read_signed_or_x(getattr(u_top, "feat_motion_latched_r", None))
+        timev  = read_signed_or_x(getattr(u_top, "feat_time_latched_r",   None))
+        dhr    = read_signed_or_x(getattr(u_top, "feat_delta_hr_latched_r", None))
+        mssd   = read_signed_or_x(getattr(u_top, "feat_mssd_latched_r",   None))
+
+        # Logit registers from weight_flash
+        try:
+            logit0 = read_u32_or_x(u_top.u_weight_flash.logit_reg_0)
+        except AttributeError:
+            logit0 = "X"
+        try:
+            logit1 = read_u32_or_x(u_top.u_weight_flash.logit_reg_1)
+        except AttributeError:
+            logit1 = "X"
+
+        # Debug logits driven directly by taketwo
+        try:
+            dbg0 = read_signed_or_x(u_top.logit0)
+        except AttributeError:
+            dbg0 = "X"
+        try:
+            dbg1 = read_signed_or_x(u_top.logit1)
+        except AttributeError:
+            dbg1 = "X"
+
+        f.write(
+            f"{cur_sec},{rst_n},{boot},{fsm},{alarm},"
+            f"{motion},{timev},{dhr},{mssd},"
+            f"{logit0},{logit1},{dbg0},{dbg1}\n"
+        )
 
 
 async def _logit_monitor(clk, u_top):
@@ -803,7 +926,7 @@ async def test_chip_top_normal(dut):
         cocotb.start_soon(_ppg._run())
 
     BOOT_TIMEOUT    = 500_000
-    RUNTIME_TIMEOUT = 11_000_000
+    RUNTIME_TIMEOUT = 1_000_000
     # --- Phase 1: wait for boot ---
     logger.info("Waiting for boot_done...")
     for cycle in range(BOOT_TIMEOUT):
@@ -827,6 +950,10 @@ async def test_chip_top_normal(dut):
     else:
         # GL mode — internal signals are flattened away. Only pads are observable.
         cocotb.start_soon(_gl_heartbeat(dut))
+
+    # Per-second CSV results logger (always on — no waves means we need this)
+    results_path = str(_PROJ / "sim_results.csv")
+    cocotb.start_soon(_sec_results_logger(dut, results_path))
 
     # --- Phase 2: wait for alarm_o to assert (test passes on rising edge) ---
     # The firmware runs inferences and writes ALARM_CTRL=1 once the wake streak
@@ -1156,6 +1283,9 @@ def chip_top_runner():
         parameters["DEBUG_STIM_EN"] = 1
 
     runner = get_runner(sim)
+    # Wave dumping is expensive for long GL/bridge runs. Set WAVES=0 to disable.
+    waves_on = os.getenv("WAVES", "1") != "0"
+
     runner.build(
         sources=sources,
         hdl_toplevel=hdl_toplevel,
@@ -1164,7 +1294,7 @@ def chip_top_runner():
         always=True,
         includes=includes,
         build_args=build_args,
-        waves=True,
+        waves=waves_on,
     )
 
     # Absolute paths — VVP runs from sim_build/, so relative paths fail.
@@ -1178,7 +1308,7 @@ def chip_top_runner():
         hdl_toplevel=hdl_toplevel,
         test_module=test_module,
         plusargs=plusargs,
-        waves=True,
+        waves=waves_on,
     )
 
 

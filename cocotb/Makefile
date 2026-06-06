@@ -1573,7 +1573,7 @@ SENSOR_PIPELINE_SOURCES := sim/tb/tb_sensor_pipeline.sv \
 SENSOR_PIPELINE_VCD     := $(WAVE_DIR)/sensor_pipeline.vcd
 
 $(SENSOR_PIPELINE_VVP): $(SENSOR_PIPELINE_SOURCES) | $(BUILD_DIR)
-	$(IVERILOG) -g2012 -o $@ $^
+	$(IVERILOG) -g2012 -DSIM -o $@ $^
 
 .PHONY: sim-sensor-pipeline
 sim-sensor-pipeline: $(SENSOR_PIPELINE_VVP)

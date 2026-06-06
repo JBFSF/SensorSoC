@@ -17,6 +17,7 @@ module top #(
     parameter TEST_BASE    = 32'h0300_F000,
 
     parameter integer CLK_HZ = 10_000_000,
+    parameter integer I2C_CLK_HZ = 100_000,
     parameter integer GT_CLK_HZ = 10_000_000,
     parameter integer TIMER_RELOAD_DEFAULT = 5_000_000,
     parameter integer GT_EPOCH_HZ = 100,
@@ -618,7 +619,7 @@ module top #(
     //JF: Feat Pipline, sleep until watchdog
     i2c_master #(
         .CLK_HZ    (CLK_HZ),
-        .I2C_CLK_HZ(100_000)
+        .I2C_CLK_HZ(I2C_CLK_HZ)
     ) u_i2c_master (
         .clk(clk_i),
         .resetn(~reset_i),
