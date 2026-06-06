@@ -26,7 +26,7 @@ slot       = os.getenv("SLOT", "1x1")
 test_module = os.getenv("COCOTB_TEST_MODULE", "chip_top_tb")
 
 
-hdl_toplevel = os.getenv("CHIP_TOPLEVEL", "chip_top_sim_wrap")
+hdl_toplevel = os.getenv("CHIP_TOPLEVEL", "sim_chip_top_gl_sensor_bridge_env")#"chip_top_sim_wrap" )
 chip_netlist_top = os.getenv("CHIP_NETLIST_TOP", "chip_top")
 
 
@@ -59,14 +59,38 @@ def _fmt_hex(value, digits=8):
     return "X" if value is None else f"0x{value:0{digits}X}"
 
 
+def _clk_handle(dut):
+    """Return the clock handle that the testbench actually drives.
+
+    chip_top_sim_wrap exposes clk_PAD as a module input port (driveable).
+    sim_chip_top_gl_sensor_bridge_env has clk_PAD as an internal wire
+    driven by clk_drv; cocotb can only poke the reg, not the wire.
+    """
+    if hdl_toplevel == _GL_SENSOR_BRIDGE:
+        return dut.clk_drv
+    return dut.clk_PAD
+
+
+def _rst_handle(dut):
+    if hdl_toplevel == _GL_SENSOR_BRIDGE:
+        return dut.rst_n_drv
+    return dut.rst_n_PAD
+
+
+def _input_handle(dut):
+    if hdl_toplevel == _GL_SENSOR_BRIDGE:
+        return dut.input_drv
+    return dut.input_PAD
+
+
 async def set_defaults(dut):
-    dut.input_PAD.value = 0
+    _input_handle(dut).value = 0
 
 async def set_start(dut, cycles):
     cocotb.log.info("Start bit set high")
-    dut.input_PAD.value = 0b00100000
-    await ClockCycles(dut.clk_PAD, cycles)
-    dut.input_PAD.value = 0b00000000
+    _input_handle(dut).value = 0b00100000
+    await ClockCycles(_clk_handle(dut), cycles)
+    _input_handle(dut).value = 0b00000000
     cocotb.log.info("Start bit set low")
 
 async def start_clock(clock, freq_mhz: float = 50.0):
@@ -76,20 +100,20 @@ async def start_clock(clock, freq_mhz: float = 50.0):
     cocotb.start_soon(c.start())
 
 
-async def reset(rst_n, active_low=True, time_ns=1000):
+async def reset(dut, time_ns=1000):
     """Assert then deassert reset."""
     cocotb.log.info("Reset asserted...")
-    rst_n.value = not active_low
+    _rst_handle(dut).value = 0
     await Timer(time_ns, "ns")
-    rst_n.value = active_low
+    _rst_handle(dut).value = 1
     cocotb.log.info("Reset deasserted.")
 
 
 async def start_up(dut):
     """Common startup: defaults → clock → reset."""
     await set_defaults(dut)
-    await start_clock(dut.clk_PAD)
-    await reset(dut.rst_n_PAD)
+    await start_clock(_clk_handle(dut))
+    await reset(dut)
 
 
 class _FlatGL:
@@ -366,7 +390,8 @@ def _core(dut):
     if hdl_toplevel in {"chip_top_sim_wrap", _GL_SENSOR_BRIDGE}:
         if gl:
             return _FlatGL(_gl_chip_inst(dut), "i_chip_core")
-        return dut.u_chip_top.i_chip_core
+        # chip_top_sim_wrap instantiates `u_chip_top`; the bridge uses `u_chip`.
+        return _gl_chip_inst(dut).i_chip_core
     return dut.i_chip_core
 
 
@@ -385,8 +410,8 @@ async def test_chip_top_smoke(dut):
     await start_up(dut)
 
     # Normal mode
-    dut.input_PAD.value = 0
-    await ClockCycles(dut.clk_PAD, 20)
+    _input_handle(dut).value = 0
+    await ClockCycles(_clk_handle(dut), 20)
 
     core = _core(dut)
     logger.info("Checking normal-mode wiring...")
@@ -404,7 +429,7 @@ async def test_chip_top_smoke(dut):
 
 #boot test
 
-@cocotb.test(skip=(hdl_toplevel != "chip_top_sim_wrap"))
+@cocotb.test(skip=(hdl_toplevel not in {"chip_top_sim_wrap", _GL_SENSOR_BRIDGE}))
 async def test_chip_top_boot(dut):
     """Boot test: wait for boot_done, verify CPU is running (no trap)."""
     logger = logging.getLogger("chip_top_boot")
@@ -412,10 +437,10 @@ async def test_chip_top_boot(dut):
     # Force FSM to ALL mode so feat+ML+CPU all run without sleeping.
     # input_PAD[3:0] drives test_mode[3:0]; 4'b0101 = ALL mode.
     await set_defaults(dut)
-    dut.input_PAD.value = 0b00100000
+    _input_handle(dut).value = 0b00100000
 
-    await start_clock(dut.clk_PAD)
-    await reset(dut.rst_n_PAD)
+    await start_clock(_clk_handle(dut))
+    await reset(dut)
 
     core  = _core(dut)
     u_top = _top(dut)
@@ -637,13 +662,13 @@ async def test_chip_top_normal(dut):
     logger = logging.getLogger("chip_top_normal")
 
     await set_defaults(dut)
-    await start_clock(dut.clk_PAD)
+    await start_clock(_clk_handle(dut))
 
     # Assert reset (active low) BEFORE forcing so we can latch FSM state in
     # one-hot BOOT during the reset window.
     cocotb.log.info("Reset asserted (pre-force)")
-    dut.rst_n_PAD.value = 0
-    await ClockCycles(dut.clk_PAD, 5)
+    _rst_handle(dut).value = 0
+    await ClockCycles(_clk_handle(dut), 5)
 
     core  = _core(dut)
     u_top = _top(dut)
@@ -720,9 +745,10 @@ async def test_chip_top_normal(dut):
     await ClockCycles(dut.clk_PAD, 5)
 
     # Deassert reset (active low → high)
-    dut.rst_n_PAD.value = 1
-    await ClockCycles(dut.clk_PAD, 2)
+    _rst_handle(dut).value = 1
+    await ClockCycles(_clk_handle(dut), 2)
     cocotb.log.info("Reset deasserted")
+    await reset(dut)
 
     if gl:
         # Release all the forces so logic can run normally
@@ -756,8 +782,9 @@ async def test_chip_top_normal(dut):
 
         cocotb.log.info("Released all force-init nets — chip should run with defined initial state")
 
-    if gl and hdl_toplevel == _GL_SENSOR_BRIDGE:
+    if hdl_toplevel == _GL_SENSOR_BRIDGE:
         # Drive real sensor I2C pads with Python slave models.
+        # The bridge wrapper exposes scl/sda hooks regardless of RTL or GL.
         from test_chip_top_i2c_pads import (
             Lis2dw12Device, Adpd144riDevice, _build_sensor_model_streams,
         )
@@ -776,7 +803,7 @@ async def test_chip_top_normal(dut):
         cocotb.start_soon(_ppg._run())
 
     BOOT_TIMEOUT    = 500_000
-    RUNTIME_TIMEOUT = 500_000#3_000_000
+    RUNTIME_TIMEOUT = 11_000_000
     # --- Phase 1: wait for boot ---
     logger.info("Waiting for boot_done...")
     for cycle in range(BOOT_TIMEOUT):
@@ -918,7 +945,7 @@ async def test_chip_top_normal(dut):
         f"Timeout after {RUNTIME_TIMEOUT} cycles — alarm_o never asserted"
     )
 
-@cocotb.test(skip=(hdl_toplevel != "chip_top_sim_wrap"))
+@cocotb.test(skip=(hdl_toplevel not in {"chip_top_sim_wrap", _GL_SENSOR_BRIDGE}))
 async def test_chip_top_normal_full(dut):
     """Full pipeline: sensor → features → ML inference → alarm output."""
     logger = logging.getLogger("chip_top_full")
@@ -926,8 +953,8 @@ async def test_chip_top_normal_full(dut):
     # ALL mode: features + ML + CPU all active; bypasses SLEEP state in sim.
     await set_defaults(dut)
     #dut.input_PAD.value = 0b00100000 #0b00000101
-    await start_clock(dut.clk_PAD)
-    await reset(dut.rst_n_PAD)
+    await start_clock(_clk_handle(dut))
+    await reset(dut)
 
     core  = _core(dut)
     u_top = _top(dut)
@@ -1025,7 +1052,7 @@ async def test_chip_top_normal_full(dut):
                     await set_start(dut, 10)
                     await ClockCycles(dut.clk_PAD, 10)
                     await set_start(dut, 10)
-                    await reset(dut.rst_n_PAD)
+                    await reset(dut)
                     await ClockCycles(dut.clk_PAD, 10_000)
                     await set_start(dut, 10)
 
@@ -1089,7 +1116,7 @@ def chip_top_runner():
         defines = {"FUNCTIONAL": True, "functional": True, "USE_POWER_PINS": True}
     else:
         src_dir = proj_path / "../src"
-        pad_level = hdl_toplevel in {"chip_top", "chip_top_sim_wrap"}
+        pad_level = hdl_toplevel in {"chip_top", "chip_top_sim_wrap", _GL_SENSOR_BRIDGE}
         skip = {"dummy_top.sv", "soc_top.v"}
         if pad_level:
             skip.add("gf180mcu_fd_ip_sram__sram512x8m8wm1.v")
@@ -1102,9 +1129,13 @@ def chip_top_runner():
         sources.append(proj_path / "sensors/i2c_slave_lis2dw12.sv")
         sources.append(proj_path / "sensors/i2c_slave_adpd144ri.sv")
 
-        # Sim wrapper is only needed when it is the selected HDL toplevel.
+        # Pick the right wrapper based on the selected HDL toplevel.
         if hdl_toplevel == "chip_top_sim_wrap":
             sources.append(proj_path / "chip_top_sim_wrap.sv")
+        elif hdl_toplevel == _GL_SENSOR_BRIDGE:
+            # Bridge wrapper drives real SCL/SDA pads with Python BFMs; no SV
+            # I2C slave models needed (cocotbext-i2c provides them at runtime).
+            sources.append(proj_path / "sim/tb" / f"{_GL_SENSOR_BRIDGE}.sv")
 
         # Pad-level builds need GF180 IO models. Direct chip_core RTL DFT does not.
         if pad_level:

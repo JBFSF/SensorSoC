@@ -54,8 +54,10 @@ module sim_chip_top_gl_sensor_bridge_env;
   assign alarm_o = bidir_PAD[0];
 
   chip_top u_chip (
+    `ifdef USE_POWER_PINS
     .VDD(VDD),
     .VSS(VSS),
+    `endif
     .clk_PAD(clk_PAD),
     .rst_n_PAD(rst_n_PAD),
     .input_PAD(input_PAD),
