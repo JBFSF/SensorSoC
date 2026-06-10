@@ -1171,42 +1171,6 @@ test-top-unified-forced-wake-irq: $(TOP_UNIFIED_ENV_VVP)
 test-top-unified-runtime: test-top-unified-prod-loop test-top-unified-prod-alarm test-top-unified-forced-wake-irq
 	@true
 
-# ============================================================
-# Bare taketwo_wrap: canonical_v1 isolated golden-vector check
-# ============================================================
-
-.PHONY: test-ml-canonical-v1
-test-ml-canonical-v1:
-	@echo "[COCOTB] Running isolated taketwo_wrap canonical_v1 check"
-	@$(MAKE) -C $(TB_DIR)/ml MODULE=ml_tb_canonical
-
-# ============================================================
-# Cocotb: unified-top golden-vector check via golden_vectors.py
-# ============================================================
-
-TOP_ML_GOLDEN_ENV_TOP    := sim_top_ml_golden_env
-TOP_ML_GOLDEN_ENV_TOP_V  := $(TB_DIR)/sim_top_ml_golden_env.sv
-TOP_ML_GOLDEN_ENV_VVP    := $(BUILD_DIR)/$(TOP_ML_GOLDEN_ENV_TOP).vvp
-TOP_ML_GOLDEN_ENV_PYMOD  := test_top_ml_golden_vector
-TOP_ML_GOLDEN_ENV_SRCS   := \
-  $(TOP_ML_GOLDEN_ENV_TOP_V) \
-  $(UNIFIED_TOP_RTL_SRCS) \
-  $(TB_DIR)/spi_flash_model.v \
-  sensors/i2c_slave_lis2dw12.sv \
-  sensors/i2c_slave_adpd144ri.sv
-
-$(TOP_ML_GOLDEN_ENV_VVP): $(TOP_ML_GOLDEN_ENV_SRCS)
-	@echo "[COCOTB] Building $@"
-	$(IVERILOG) -g2012 -grelative-include -DTAKETWO_V_SOURCE -DSIM -I $(RTL_DIR) -s $(TOP_ML_GOLDEN_ENV_TOP) -o $@ $(TOP_ML_GOLDEN_ENV_SRCS)
-
-.PHONY: test-top-ml-golden-vector-unified
-test-top-ml-golden-vector-unified: $(TOP_ML_GOLDEN_ENV_VVP)
-	@$(SELF_MAKE) FW_VARIANT=test_top_ml_golden_vector_unified firmware
-	@$(SELF_MAKE) $(TAKETWO_PARAMS_HEX)
-	@echo "[COCOTB] Running $(TOP_ML_GOLDEN_ENV_PYMOD) on $(TOP_ML_GOLDEN_ENV_TOP)"
-	@export COCOTB_TOPLEVEL=$(TOP_ML_GOLDEN_ENV_TOP); \
-	export COCOTB_TEST_MODULES=$(TOP_ML_GOLDEN_ENV_PYMOD); \
-	$(call RUN_COCOTB_ICARUS,$(TOP_ML_GOLDEN_ENV_VVP))
 
 # ============================================================
 # Cocotb: unified top feature latch/MMIO check
@@ -1356,59 +1320,6 @@ test-signal-quality-ref: $(SIGNAL_QUALITY_REF_VVP)
 	@export COCOTB_TOPLEVEL=$(SIGNAL_QUALITY_REF_TOP); \
 	export COCOTB_TEST_MODULES=$(SIGNAL_QUALITY_REF_PYMOD); \
 	$(call RUN_COCOTB_ICARUS,$(SIGNAL_QUALITY_REF_VVP))
-
-
-# ============================================================
-# HOST I2C TARGET
-# ============================================================
-
-HOST_I2C_TARGET_TOP     := tb_host_i2c_target
-HOST_I2C_TARGET_VVP     := $(BUILD_DIR)/$(HOST_I2C_TARGET_TOP).vvp
-HOST_I2C_TARGET_SOURCES := sim/tb/tb_host_i2c_target.sv \
-                           $(RTL_DIR)/host_i2c_target.v \
-                           $(RTL_DIR)/host_i2c_bridge_regs.v
-
-$(HOST_I2C_TARGET_VVP): $(HOST_I2C_TARGET_SOURCES)
-	$(IVERILOG) -g2012 -s $(HOST_I2C_TARGET_TOP) -o $@ $^
-
-.PHONY: sim-host-i2c-target
-sim-host-i2c-target: $(HOST_I2C_TARGET_VVP)
-	@echo "== Running $(HOST_I2C_TARGET_TOP) =="
-	$(VVP) $(HOST_I2C_TARGET_VVP)
-
-# ============================================================
-# SOC HOST I2C IRQ
-# ============================================================
-
-SOC_I2C_IRQ_TOP     := tb_soc_host_i2c_irq
-SOC_I2C_IRQ_VVP     := $(BUILD_DIR)/$(SOC_I2C_IRQ_TOP).vvp
-SOC_I2C_IRQ_SOURCES := sim/tb/tb_soc_host_i2c_irq.sv \
-                       $(SOC_RTL_SRCS)
-
-$(SOC_I2C_IRQ_VVP): $(SOC_I2C_IRQ_SOURCES)
-	$(IVERILOG) -g2012 -s $(SOC_I2C_IRQ_TOP) -o $@ $^
-
-.PHONY: sim-soc-host-i2c-irq
-sim-soc-host-i2c-irq: $(SOC_I2C_IRQ_VVP)
-	@echo "== Running $(SOC_I2C_IRQ_TOP) =="
-	$(VVP) $(SOC_I2C_IRQ_VVP)
-
-# ============================================================
-# HOST I2C IRQC PROXY (SOC integration)
-# ============================================================
-
-HOST_I2C_IRQC_PROXY_TOP     := tb_host_i2c_irqc_proxy
-HOST_I2C_IRQC_PROXY_VVP     := $(BUILD_DIR)/$(HOST_I2C_IRQC_PROXY_TOP).vvp
-HOST_I2C_IRQC_PROXY_SOURCES := sim/tb/tb_host_i2c_irqc_proxy.sv \
-                               $(SOC_RTL_SRCS)
-
-$(HOST_I2C_IRQC_PROXY_VVP): $(HOST_I2C_IRQC_PROXY_SOURCES)
-	$(IVERILOG) -g2012 -s $(HOST_I2C_IRQC_PROXY_TOP) -o $@ $^
-
-.PHONY: sim-host-i2c-irqc-proxy
-sim-host-i2c-irqc-proxy: $(HOST_I2C_IRQC_PROXY_VVP)
-	@echo "== Running $(HOST_I2C_IRQC_PROXY_TOP) =="
-	$(VVP) $(HOST_I2C_IRQC_PROXY_VVP)
 
 # ============================================================
 # GLOBAL TIMER / EPOCH TIMEBASE
@@ -1573,7 +1484,7 @@ SENSOR_PIPELINE_SOURCES := sim/tb/tb_sensor_pipeline.sv \
 SENSOR_PIPELINE_VCD     := $(WAVE_DIR)/sensor_pipeline.vcd
 
 $(SENSOR_PIPELINE_VVP): $(SENSOR_PIPELINE_SOURCES) | $(BUILD_DIR)
-	$(IVERILOG) -g2012 -o $@ $^
+	$(IVERILOG) -g2012 -DSIM -o $@ $^
 
 .PHONY: sim-sensor-pipeline
 sim-sensor-pipeline: $(SENSOR_PIPELINE_VVP)

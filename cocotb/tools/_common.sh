@@ -14,8 +14,10 @@ detect_riscv_prefix() {
     for candidate in \
         "${SUBMODULE_RISCV_BIN}/riscv-none-elf-" \
         "${SUBMODULE_RISCV_BIN}/riscv64-unknown-elf-" \
+        "${SUBMODULE_RISCV_BIN}/riscv32-unknown-elf-" \
         "${LOCAL_RISCV_BIN}/riscv-none-elf-" \
         "${LOCAL_RISCV_BIN}/riscv64-unknown-elf-" \
+        "${LOCAL_RISCV_BIN}/riscv32-unknown-elf-" \
         "riscv-none-elf-" \
         "riscv64-unknown-elf-"
     do
