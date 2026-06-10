@@ -199,62 +199,253 @@ module i2c_master #(
             ppg_rsp_done_o    <= 1'b0;
             ppg_rsp_err_o     <= 1'b0;
 
-`ifdef SIM
-            // SIM PATH: functional bus, no real I2C timing
-            sim_req <= 1'b0;
-            scl_o   <= 1'b1;
-            sda_oe  <= 1'b0;
+// `ifdef SIM
+//             // SIM PATH: functional bus, no real I2C timing
+//             sim_req <= 1'b0;
+//             scl_o   <= 1'b1;
+//             sda_oe  <= 1'b0;
 
-            case (state_r)
+//             case (state_r)
 
-                ST_IDLE: begin
-                    if (accel_req || ppg_req)
-                        state_r <= ST_ARB;
+//                 ST_IDLE: begin
+//                     if (accel_req || ppg_req)
+//                         state_r <= ST_ARB;
+//                 end
+
+//                 ST_ARB: begin
+//                     if (accel_req && ppg_req) begin
+//                         active_client <= ~last_grant;
+//                         last_grant    <= ~last_grant;
+//                     end else if (accel_req) begin
+//                         active_client <= 1'b0;
+//                         last_grant    <= 1'b0;
+//                     end else begin
+//                         active_client <= 1'b1;
+//                         last_grant    <= 1'b1;
+//                     end
+//                     state_r <= ST_REQ;
+//                 end
+
+//                 ST_REQ: begin
+//                     if (active_client == 1'b0) begin
+//                         accel_cmd_ready_o <= 1'b1;
+//                         cmd_addr_r  <= accel_cmd_addr_i;
+//                         cmd_reg_r   <= accel_cmd_reg_i;
+//                         cmd_len_r   <= accel_cmd_len_i;
+//                         cmd_write_r <= accel_cmd_write_i;
+//                         cmd_wdata_r <= accel_cmd_wdata_i;
+//                     end else begin
+//                         ppg_cmd_ready_o <= 1'b1;
+//                         cmd_addr_r  <= ppg_cmd_addr_i;
+//                         cmd_reg_r   <= ppg_cmd_reg_i;
+//                         cmd_len_r   <= ppg_cmd_len_i;
+//                         cmd_write_r <= ppg_cmd_write_i;
+//                         cmd_wdata_r <= ppg_cmd_wdata_i;
+//                     end
+//                     byte_cnt_r <= 8'h00;
+//                     state_r    <= ST_SIM_WAIT_ACK;
+//                 end
+
+//                 ST_SIM_WAIT_ACK: begin
+//                     sim_req   <= 1'b1;
+//                     sim_addr  <= cmd_addr_r;
+//                     sim_reg   <= cmd_reg_r;
+//                     sim_len   <= cmd_len_r;
+//                     sim_write <= cmd_write_r;
+//                     sim_wdata <= cmd_wdata_r;
+
+//                     if (sim_err) begin
+//                         if (active_client == 1'b0) begin
+//                             accel_rsp_err_o  <= 1'b1;
+//                             accel_rsp_done_o <= 1'b1;
+//                         end else begin
+//                             ppg_rsp_err_o  <= 1'b1;
+//                             ppg_rsp_done_o <= 1'b1;
+//                         end
+//                         state_r <= ST_SIM_DONE;
+//                     end else if (sim_ack) begin
+//                         sim_req <= 1'b0;
+//                         if (cmd_write_r) begin
+//                             if (active_client == 1'b0)
+//                                 accel_rsp_done_o <= 1'b1;
+//                             else
+//                                 ppg_rsp_done_o <= 1'b1;
+//                             state_r <= ST_SIM_DONE;
+//                         end else begin
+//                             state_r <= ST_SIM_DATA;
+//                         end
+//                     end
+//                 end
+
+//                 ST_SIM_DATA: begin
+//                     if (sim_err) begin
+//                         if (active_client == 1'b0) begin
+//                             accel_rsp_err_o  <= 1'b1;
+//                             accel_rsp_done_o <= 1'b1;
+//                         end else begin
+//                             ppg_rsp_err_o  <= 1'b1;
+//                             ppg_rsp_done_o <= 1'b1;
+//                         end
+//                         state_r <= ST_SIM_DONE;
+//                     end else if (sim_rvalid) begin
+//                         byte_cnt_r <= byte_cnt_r + 8'h01;
+//                         if (active_client == 1'b0) begin
+//                             accel_rsp_valid_o <= 1'b1;
+//                             accel_rsp_data_o  <= sim_rdata;
+//                             accel_rsp_last_o  <= sim_rlast;
+//                             if (sim_rlast) begin
+//                                 accel_rsp_done_o <= 1'b1;
+//                                 state_r <= ST_SIM_DONE;
+//                             end
+//                         end else begin
+//                             ppg_rsp_valid_o <= 1'b1;
+//                             ppg_rsp_data_o  <= sim_rdata;
+//                             ppg_rsp_last_o  <= sim_rlast;
+//                             if (sim_rlast) begin
+//                                 ppg_rsp_done_o <= 1'b1;
+//                                 state_r <= ST_SIM_DONE;
+//                             end
+//                         end
+//                     end
+//                 end
+
+//                 ST_SIM_DONE: begin
+//                     state_r <= ST_IDLE;
+//                 end
+
+//                 default: state_r <= ST_IDLE;
+//             endcase
+
+// `else
+        // SYNTHESIS PATH: real I2C bus master
+        sim_req   <= 1'b0;
+        sim_addr  <= 7'h00;
+        sim_reg   <= 8'h00;
+        sim_len   <= 8'h00;
+        sim_write <= 1'b0;
+        sim_wdata <= 8'h00;
+
+        // Timer counts down each cycle; state transitions load a new value
+        // which shadows the decrement on the same clock edge
+        if (timer_r != '0)
+            timer_r <= timer_r - 1'b1;
+
+        case (state_r)
+
+            ST_IDLE: begin
+                if (accel_req || ppg_req)
+                    state_r <= ST_ARB;
+            end
+
+            ST_ARB: begin
+                if (accel_req && ppg_req) begin
+                    active_client <= ~last_grant;
+                    last_grant    <= ~last_grant;
+                end else if (accel_req) begin
+                    active_client <= 1'b0;
+                    last_grant    <= 1'b0;
+                end else begin
+                    active_client <= 1'b1;
+                    last_grant    <= 1'b1;
                 end
+                state_r <= ST_REQ;
+            end
 
-                ST_ARB: begin
-                    if (accel_req && ppg_req) begin
-                        active_client <= ~last_grant;
-                        last_grant    <= ~last_grant;
-                    end else if (accel_req) begin
-                        active_client <= 1'b0;
-                        last_grant    <= 1'b0;
+            ST_REQ: begin
+                if (active_client == 1'b0) begin
+                    accel_cmd_ready_o <= 1'b1;
+                    cmd_addr_r  <= accel_cmd_addr_i;
+                    cmd_reg_r   <= accel_cmd_reg_i;
+                    cmd_len_r   <= accel_cmd_len_i;
+                    cmd_write_r <= accel_cmd_write_i;
+                    cmd_wdata_r <= accel_cmd_wdata_i;
+                end else begin
+                    ppg_cmd_ready_o <= 1'b1;
+                    cmd_addr_r  <= ppg_cmd_addr_i;
+                    cmd_reg_r   <= ppg_cmd_reg_i;
+                    cmd_len_r   <= ppg_cmd_len_i;
+                    cmd_write_r <= ppg_cmd_write_i;
+                    cmd_wdata_r <= ppg_cmd_wdata_i;
+                end
+                byte_cnt_r <= 8'h00;
+                state_r <= ST_S1;
+                scl_o   <= 1'b1;
+                sda_oe  <= 1'b0;
+                timer_r <= QUARTER - 1;
+            end
+
+            ST_S1: begin
+                if (timer_r == '0) begin
+                    state_r <= ST_S2;
+                    sda_oe  <= 1'b1; // SDA falls while SCL=1: START condition
+                    timer_r <= QUARTER - 1;
+                end
+            end
+
+            ST_S2: begin
+                if (timer_r == '0) begin
+                    state_r <= ST_S3;
+                    scl_o   <= 1'b0; // SCL falls, hold SDA low
+                    timer_r <= QUARTER - 1;
+                end
+            end
+
+            ST_S3: begin
+                if (timer_r == '0) begin
+                    // Load addr+W into the shift register and begin the first
+                    // TX bit. sda_oe is driven from cmd_addr_r[6] directly
+                    // (combinatorial) because sr_r is not readable until the
+                    // next clock edge.
+                    sr_r         <= {cmd_addr_r, 1'b0};
+                    bit_cnt_r    <= 3'd7;
+                    byte_phase_r <= PHASE_ADDR_W;
+                    state_r      <= ST_BIT_LO;
+                    sda_oe       <= ~cmd_addr_r[6];
+                    timer_r      <= HALF - 1;
+                end
+            end
+
+            ST_BIT_LO: begin
+                if (timer_r == '0) begin
+                    state_r <= ST_BIT_HI;
+                    scl_o   <= 1'b1; // SCL rises; slave samples SDA during this phase
+                    timer_r <= HALF - 1;
+                end
+            end
+
+            ST_BIT_HI: begin
+                if (timer_r == '0) begin
+                    if (bit_cnt_r != 3'd0) begin
+                        // Shift register left; the next bit to drive is old sr[6]
+                        // which becomes the new sr[7] after the shift
+                        sr_r      <= {sr_r[6:0], 1'b0};
+                        bit_cnt_r <= bit_cnt_r - 1'b1;
+                        state_r   <= ST_BIT_LO;
+                        scl_o     <= 1'b0;
+                        sda_oe    <= ~sr_r[6];
+                        timer_r   <= HALF - 1;
                     end else begin
-                        active_client <= 1'b1;
-                        last_grant    <= 1'b1;
+                        // All 8 bits sent; release SDA so the slave can drive ACK
+                        state_r <= ST_ACK_LO;
+                        scl_o   <= 1'b0;
+                        sda_oe  <= 1'b0;
+                        timer_r <= HALF - 1;
                     end
-                    state_r <= ST_REQ;
                 end
+            end
 
-                ST_REQ: begin
-                    if (active_client == 1'b0) begin
-                        accel_cmd_ready_o <= 1'b1;
-                        cmd_addr_r  <= accel_cmd_addr_i;
-                        cmd_reg_r   <= accel_cmd_reg_i;
-                        cmd_len_r   <= accel_cmd_len_i;
-                        cmd_write_r <= accel_cmd_write_i;
-                        cmd_wdata_r <= accel_cmd_wdata_i;
-                    end else begin
-                        ppg_cmd_ready_o <= 1'b1;
-                        cmd_addr_r  <= ppg_cmd_addr_i;
-                        cmd_reg_r   <= ppg_cmd_reg_i;
-                        cmd_len_r   <= ppg_cmd_len_i;
-                        cmd_write_r <= ppg_cmd_write_i;
-                        cmd_wdata_r <= ppg_cmd_wdata_i;
-                    end
-                    byte_cnt_r <= 8'h00;
-                    state_r    <= ST_SIM_WAIT_ACK;
+            ST_ACK_LO: begin
+                if (timer_r == '0) begin
+                    state_r <= ST_ACK_HI;
+                    scl_o   <= 1'b1; // SCL rises; master will sample SDA next
+                    timer_r <= HALF - 1;
                 end
+            end
 
-                ST_SIM_WAIT_ACK: begin
-                    sim_req   <= 1'b1;
-                    sim_addr  <= cmd_addr_r;
-                    sim_reg   <= cmd_reg_r;
-                    sim_len   <= cmd_len_r;
-                    sim_write <= cmd_write_r;
-                    sim_wdata <= cmd_wdata_r;
-
-                    if (sim_err) begin
+            ST_ACK_HI: begin
+                if (timer_r == '0) begin
+                    if (sda_i) begin
+                        // NACK: abort the transaction, issue STOP, report error
                         if (active_client == 1'b0) begin
                             accel_rsp_err_o  <= 1'b1;
                             accel_rsp_done_o <= 1'b1;
@@ -262,401 +453,210 @@ module i2c_master #(
                             ppg_rsp_err_o  <= 1'b1;
                             ppg_rsp_done_o <= 1'b1;
                         end
-                        state_r <= ST_SIM_DONE;
-                    end else if (sim_ack) begin
-                        sim_req <= 1'b0;
-                        if (cmd_write_r) begin
-                            if (active_client == 1'b0)
-                                accel_rsp_done_o <= 1'b1;
-                            else
-                                ppg_rsp_done_o <= 1'b1;
-                            state_r <= ST_SIM_DONE;
-                        end else begin
-                            state_r <= ST_SIM_DATA;
-                        end
-                    end
-                end
-
-                ST_SIM_DATA: begin
-                    if (sim_err) begin
-                        if (active_client == 1'b0) begin
-                            accel_rsp_err_o  <= 1'b1;
-                            accel_rsp_done_o <= 1'b1;
-                        end else begin
-                            ppg_rsp_err_o  <= 1'b1;
-                            ppg_rsp_done_o <= 1'b1;
-                        end
-                        state_r <= ST_SIM_DONE;
-                    end else if (sim_rvalid) begin
-                        byte_cnt_r <= byte_cnt_r + 8'h01;
-                        if (active_client == 1'b0) begin
-                            accel_rsp_valid_o <= 1'b1;
-                            accel_rsp_data_o  <= sim_rdata;
-                            accel_rsp_last_o  <= sim_rlast;
-                            if (sim_rlast) begin
-                                accel_rsp_done_o <= 1'b1;
-                                state_r <= ST_SIM_DONE;
-                            end
-                        end else begin
-                            ppg_rsp_valid_o <= 1'b1;
-                            ppg_rsp_data_o  <= sim_rdata;
-                            ppg_rsp_last_o  <= sim_rlast;
-                            if (sim_rlast) begin
-                                ppg_rsp_done_o <= 1'b1;
-                                state_r <= ST_SIM_DONE;
-                            end
-                        end
-                    end
-                end
-
-                ST_SIM_DONE: begin
-                    state_r <= ST_IDLE;
-                end
-
-                default: state_r <= ST_IDLE;
-            endcase
-
-`else
-            // SYNTHESIS PATH: real I2C bus master
-            sim_req   <= 1'b0;
-            sim_addr  <= 7'h00;
-            sim_reg   <= 8'h00;
-            sim_len   <= 8'h00;
-            sim_write <= 1'b0;
-            sim_wdata <= 8'h00;
-
-            // Timer counts down each cycle; state transitions load a new value
-            // which shadows the decrement on the same clock edge
-            if (timer_r != '0)
-                timer_r <= timer_r - 1'b1;
-
-            case (state_r)
-
-                ST_IDLE: begin
-                    if (accel_req || ppg_req)
-                        state_r <= ST_ARB;
-                end
-
-                ST_ARB: begin
-                    if (accel_req && ppg_req) begin
-                        active_client <= ~last_grant;
-                        last_grant    <= ~last_grant;
-                    end else if (accel_req) begin
-                        active_client <= 1'b0;
-                        last_grant    <= 1'b0;
+                        state_r <= ST_P1;
+                        scl_o   <= 1'b0;
+                        sda_oe  <= 1'b1; // drive SDA low to set up STOP
+                        timer_r <= QUARTER - 1;
                     end else begin
-                        active_client <= 1'b1;
-                        last_grant    <= 1'b1;
-                    end
-                    state_r <= ST_REQ;
-                end
+                        // ACK received; next step depends on the transaction phase
+                        case (byte_phase_r)
 
-                ST_REQ: begin
-                    if (active_client == 1'b0) begin
-                        accel_cmd_ready_o <= 1'b1;
-                        cmd_addr_r  <= accel_cmd_addr_i;
-                        cmd_reg_r   <= accel_cmd_reg_i;
-                        cmd_len_r   <= accel_cmd_len_i;
-                        cmd_write_r <= accel_cmd_write_i;
-                        cmd_wdata_r <= accel_cmd_wdata_i;
-                    end else begin
-                        ppg_cmd_ready_o <= 1'b1;
-                        cmd_addr_r  <= ppg_cmd_addr_i;
-                        cmd_reg_r   <= ppg_cmd_reg_i;
-                        cmd_len_r   <= ppg_cmd_len_i;
-                        cmd_write_r <= ppg_cmd_write_i;
-                        cmd_wdata_r <= ppg_cmd_wdata_i;
+                            PHASE_ADDR_W: begin
+                                // Address+W was ACK'd; send register address byte next
+                                sr_r         <= cmd_reg_r;
+                                bit_cnt_r    <= 3'd7;
+                                byte_phase_r <= PHASE_REG;
+                                state_r      <= ST_BIT_LO;
+                                scl_o        <= 1'b0;
+                                sda_oe       <= ~cmd_reg_r[7];
+                                timer_r      <= HALF - 1;
+                            end
+
+                            PHASE_REG: begin
+                                if (cmd_write_r) begin
+                                    // Write transaction: send the data byte next
+                                    sr_r         <= cmd_wdata_r;
+                                    bit_cnt_r    <= 3'd7;
+                                    byte_phase_r <= PHASE_TX;
+                                    state_r      <= ST_BIT_LO;
+                                    scl_o        <= 1'b0;
+                                    sda_oe       <= ~cmd_wdata_r[7];
+                                    timer_r      <= HALF - 1;
+                                end else begin
+                                    // Read transaction: generate repeated START next
+                                    byte_phase_r <= PHASE_ADDR_R;
+                                    state_r      <= ST_RS1;
+                                    scl_o        <= 1'b0;
+                                    sda_oe       <= 1'b0;
+                                    timer_r      <= QUARTER - 1;
+                                end
+                            end
+
+                            PHASE_ADDR_R: begin
+                                // addr+R was ACK'd; begin receiving data bytes
+                                byte_cnt_r   <= 8'h00;
+                                bit_cnt_r    <= 3'd7;
+                                byte_phase_r <= PHASE_RX;
+                                state_r      <= ST_RX_LO;
+                                scl_o        <= 1'b0;
+                                sda_oe       <= 1'b0;
+                                timer_r      <= HALF - 1;
+                            end
+
+                            PHASE_TX: begin
+                                // Write data was ACK'd; transaction is complete
+                                if (active_client == 1'b0)
+                                    accel_rsp_done_o <= 1'b1;
+                                else
+                                    ppg_rsp_done_o <= 1'b1;
+                                state_r <= ST_P1;
+                                scl_o   <= 1'b0;
+                                sda_oe  <= 1'b1;
+                                timer_r <= QUARTER - 1;
+                            end
+
+                            default: begin
+                                state_r <= ST_P1;
+                                scl_o   <= 1'b0;
+                                sda_oe  <= 1'b1;
+                                timer_r <= QUARTER - 1;
+                            end
+
+                        endcase
                     end
-                    byte_cnt_r <= 8'h00;
-                    state_r <= ST_S1;
+                end
+            end
+
+            ST_RS1: begin
+                if (timer_r == '0) begin
+                    // Release SDA high before raising SCL for repeated START
+                    state_r <= ST_RS2;
                     scl_o   <= 1'b1;
                     sda_oe  <= 1'b0;
                     timer_r <= QUARTER - 1;
                 end
+            end
 
-                ST_S1: begin
-                    if (timer_r == '0) begin
-                        state_r <= ST_S2;
-                        sda_oe  <= 1'b1; // SDA falls while SCL=1: START condition
-                        timer_r <= QUARTER - 1;
-                    end
+            ST_RS2: begin
+                if (timer_r == '0) begin
+                    // SCL=1, SDA=1; now pull SDA low to create repeated START
+                    state_r <= ST_RS3;
+                    sda_oe  <= 1'b1;
+                    timer_r <= QUARTER - 1;
                 end
+            end
 
-                ST_S2: begin
-                    if (timer_r == '0) begin
-                        state_r <= ST_S3;
-                        scl_o   <= 1'b0; // SCL falls, hold SDA low
-                        timer_r <= QUARTER - 1;
-                    end
+            ST_RS3: begin
+                if (timer_r == '0) begin
+                    state_r <= ST_RS4;
+                    scl_o   <= 1'b0; // SCL falls after repeated START
+                    timer_r <= QUARTER - 1;
                 end
+            end
 
-                ST_S3: begin
-                    if (timer_r == '0) begin
-                        // Load addr+W into the shift register and begin the first
-                        // TX bit. sda_oe is driven from cmd_addr_r[6] directly
-                        // (combinatorial) because sr_r is not readable until the
-                        // next clock edge.
-                        sr_r         <= {cmd_addr_r, 1'b0};
-                        bit_cnt_r    <= 3'd7;
-                        byte_phase_r <= PHASE_ADDR_W;
-                        state_r      <= ST_BIT_LO;
-                        sda_oe       <= ~cmd_addr_r[6];
-                        timer_r      <= HALF - 1;
-                    end
+            ST_RS4: begin
+                if (timer_r == '0) begin
+                    // byte_phase_r is already PHASE_ADDR_R from ST_ACK_HI
+                    sr_r      <= {cmd_addr_r, 1'b1};
+                    bit_cnt_r <= 3'd7;
+                    state_r   <= ST_BIT_LO;
+                    scl_o     <= 1'b0;
+                    sda_oe    <= ~cmd_addr_r[6];
+                    timer_r   <= HALF - 1;
                 end
+            end
 
-                ST_BIT_LO: begin
-                    if (timer_r == '0) begin
-                        state_r <= ST_BIT_HI;
-                        scl_o   <= 1'b1; // SCL rises; slave samples SDA during this phase
+            ST_RX_LO: begin
+                if (timer_r == '0) begin
+                    state_r <= ST_RX_HI;
+                    scl_o   <= 1'b1; // SCL rises; master samples SDA this phase
+                    timer_r <= HALF - 1;
+                end
+            end
+
+            ST_RX_HI: begin
+                if (timer_r == '0) begin
+                    sr_r <= {sr_r[6:0], sda_i}; // shift received bit into LSB
+                    if (bit_cnt_r != 3'd0) begin
+                        bit_cnt_r <= bit_cnt_r - 1'b1;
+                        state_r   <= ST_RX_LO;
+                        scl_o     <= 1'b0;
+                        timer_r   <= HALF - 1;
+                    end else begin
+                        // Full byte received; output response data and
+                        // set ACK (more bytes coming) or NACK (last byte)
+                        byte_cnt_r <= byte_cnt_r + 8'h01;
+                        bit_cnt_r  <= 3'd7;
+                        if (active_client == 1'b0) begin
+                            accel_rsp_valid_o <= 1'b1;
+                            accel_rsp_data_o  <= {sr_r[6:0], sda_i};
+                            accel_rsp_last_o  <= rx_last_w;
+                            accel_rsp_done_o  <= rx_last_w;
+                        end else begin
+                            ppg_rsp_valid_o <= 1'b1;
+                            ppg_rsp_data_o  <= {sr_r[6:0], sda_i};
+                            ppg_rsp_last_o  <= rx_last_w;
+                            ppg_rsp_done_o  <= rx_last_w;
+                        end
+                        state_r <= ST_RACK_LO;
+                        scl_o   <= 1'b0;
+                        sda_oe  <= ~rx_last_w; // drive low=ACK; release=NACK on last byte
                         timer_r <= HALF - 1;
                     end
                 end
+            end
 
-                ST_BIT_HI: begin
-                    if (timer_r == '0) begin
-                        if (bit_cnt_r != 3'd0) begin
-                            // Shift register left; the next bit to drive is old sr[6]
-                            // which becomes the new sr[7] after the shift
-                            sr_r      <= {sr_r[6:0], 1'b0};
-                            bit_cnt_r <= bit_cnt_r - 1'b1;
-                            state_r   <= ST_BIT_LO;
-                            scl_o     <= 1'b0;
-                            sda_oe    <= ~sr_r[6];
-                            timer_r   <= HALF - 1;
-                        end else begin
-                            // All 8 bits sent; release SDA so the slave can drive ACK
-                            state_r <= ST_ACK_LO;
-                            scl_o   <= 1'b0;
-                            sda_oe  <= 1'b0;
-                            timer_r <= HALF - 1;
-                        end
-                    end
+            ST_RACK_LO: begin
+                if (timer_r == '0) begin
+                    state_r <= ST_RACK_HI;
+                    scl_o   <= 1'b1;
+                    timer_r <= HALF - 1;
                 end
+            end
 
-                ST_ACK_LO: begin
-                    if (timer_r == '0) begin
-                        state_r <= ST_ACK_HI;
-                        scl_o   <= 1'b1; // SCL rises; master will sample SDA next
-                        timer_r <= HALF - 1;
-                    end
-                end
-
-                ST_ACK_HI: begin
-                    if (timer_r == '0) begin
-                        if (sda_i) begin
-                            // NACK: abort the transaction, issue STOP, report error
-                            if (active_client == 1'b0) begin
-                                accel_rsp_err_o  <= 1'b1;
-                                accel_rsp_done_o <= 1'b1;
-                            end else begin
-                                ppg_rsp_err_o  <= 1'b1;
-                                ppg_rsp_done_o <= 1'b1;
-                            end
-                            state_r <= ST_P1;
-                            scl_o   <= 1'b0;
-                            sda_oe  <= 1'b1; // drive SDA low to set up STOP
-                            timer_r <= QUARTER - 1;
-                        end else begin
-                            // ACK received; next step depends on the transaction phase
-                            case (byte_phase_r)
-
-                                PHASE_ADDR_W: begin
-                                    // Address+W was ACK'd; send register address byte next
-                                    sr_r         <= cmd_reg_r;
-                                    bit_cnt_r    <= 3'd7;
-                                    byte_phase_r <= PHASE_REG;
-                                    state_r      <= ST_BIT_LO;
-                                    scl_o        <= 1'b0;
-                                    sda_oe       <= ~cmd_reg_r[7];
-                                    timer_r      <= HALF - 1;
-                                end
-
-                                PHASE_REG: begin
-                                    if (cmd_write_r) begin
-                                        // Write transaction: send the data byte next
-                                        sr_r         <= cmd_wdata_r;
-                                        bit_cnt_r    <= 3'd7;
-                                        byte_phase_r <= PHASE_TX;
-                                        state_r      <= ST_BIT_LO;
-                                        scl_o        <= 1'b0;
-                                        sda_oe       <= ~cmd_wdata_r[7];
-                                        timer_r      <= HALF - 1;
-                                    end else begin
-                                        // Read transaction: generate repeated START next
-                                        byte_phase_r <= PHASE_ADDR_R;
-                                        state_r      <= ST_RS1;
-                                        scl_o        <= 1'b0;
-                                        sda_oe       <= 1'b0;
-                                        timer_r      <= QUARTER - 1;
-                                    end
-                                end
-
-                                PHASE_ADDR_R: begin
-                                    // addr+R was ACK'd; begin receiving data bytes
-                                    byte_cnt_r   <= 8'h00;
-                                    bit_cnt_r    <= 3'd7;
-                                    byte_phase_r <= PHASE_RX;
-                                    state_r      <= ST_RX_LO;
-                                    scl_o        <= 1'b0;
-                                    sda_oe       <= 1'b0;
-                                    timer_r      <= HALF - 1;
-                                end
-
-                                PHASE_TX: begin
-                                    // Write data was ACK'd; transaction is complete
-                                    if (active_client == 1'b0)
-                                        accel_rsp_done_o <= 1'b1;
-                                    else
-                                        ppg_rsp_done_o <= 1'b1;
-                                    state_r <= ST_P1;
-                                    scl_o   <= 1'b0;
-                                    sda_oe  <= 1'b1;
-                                    timer_r <= QUARTER - 1;
-                                end
-
-                                default: begin
-                                    state_r <= ST_P1;
-                                    scl_o   <= 1'b0;
-                                    sda_oe  <= 1'b1;
-                                    timer_r <= QUARTER - 1;
-                                end
-
-                            endcase
-                        end
-                    end
-                end
-
-                ST_RS1: begin
-                    if (timer_r == '0) begin
-                        // Release SDA high before raising SCL for repeated START
-                        state_r <= ST_RS2;
-                        scl_o   <= 1'b1;
+            ST_RACK_HI: begin
+                if (timer_r == '0) begin
+                    if (byte_cnt_r < cmd_len_r) begin
+                        state_r <= ST_RX_LO;
+                        scl_o   <= 1'b0;
                         sda_oe  <= 1'b0;
-                        timer_r <= QUARTER - 1;
-                    end
-                end
-
-                ST_RS2: begin
-                    if (timer_r == '0) begin
-                        // SCL=1, SDA=1; now pull SDA low to create repeated START
-                        state_r <= ST_RS3;
+                        timer_r <= HALF - 1;
+                    end else begin
+                        // All bytes received; issue STOP
+                        state_r <= ST_P1;
+                        scl_o   <= 1'b0;
                         sda_oe  <= 1'b1;
                         timer_r <= QUARTER - 1;
                     end
                 end
+            end
 
-                ST_RS3: begin
-                    if (timer_r == '0) begin
-                        state_r <= ST_RS4;
-                        scl_o   <= 1'b0; // SCL falls after repeated START
-                        timer_r <= QUARTER - 1;
-                    end
+            ST_P1: begin
+                if (timer_r == '0) begin
+                    state_r <= ST_P2;
+                    scl_o   <= 1'b1; // SCL rises; SDA is still low
+                    timer_r <= QUARTER - 1;
                 end
+            end
 
-                ST_RS4: begin
-                    if (timer_r == '0) begin
-                        // byte_phase_r is already PHASE_ADDR_R from ST_ACK_HI
-                        sr_r      <= {cmd_addr_r, 1'b1};
-                        bit_cnt_r <= 3'd7;
-                        state_r   <= ST_BIT_LO;
-                        scl_o     <= 1'b0;
-                        sda_oe    <= ~cmd_addr_r[6];
-                        timer_r   <= HALF - 1;
-                    end
+            ST_P2: begin
+                if (timer_r == '0) begin
+                    state_r <= ST_P3;
+                    sda_oe  <= 1'b0; // SDA rises while SCL=1: STOP condition
+                    timer_r <= QUARTER - 1;
                 end
+            end
 
-                ST_RX_LO: begin
-                    if (timer_r == '0) begin
-                        state_r <= ST_RX_HI;
-                        scl_o   <= 1'b1; // SCL rises; master samples SDA this phase
-                        timer_r <= HALF - 1;
-                    end
+            ST_P3: begin
+                if (timer_r == '0) begin
+                    state_r <= ST_IDLE;
                 end
+            end
 
-                ST_RX_HI: begin
-                    if (timer_r == '0) begin
-                        sr_r <= {sr_r[6:0], sda_i}; // shift received bit into LSB
-                        if (bit_cnt_r != 3'd0) begin
-                            bit_cnt_r <= bit_cnt_r - 1'b1;
-                            state_r   <= ST_RX_LO;
-                            scl_o     <= 1'b0;
-                            timer_r   <= HALF - 1;
-                        end else begin
-                            // Full byte received; output response data and
-                            // set ACK (more bytes coming) or NACK (last byte)
-                            byte_cnt_r <= byte_cnt_r + 8'h01;
-                            bit_cnt_r  <= 3'd7;
-                            if (active_client == 1'b0) begin
-                                accel_rsp_valid_o <= 1'b1;
-                                accel_rsp_data_o  <= {sr_r[6:0], sda_i};
-                                accel_rsp_last_o  <= rx_last_w;
-                                accel_rsp_done_o  <= rx_last_w;
-                            end else begin
-                                ppg_rsp_valid_o <= 1'b1;
-                                ppg_rsp_data_o  <= {sr_r[6:0], sda_i};
-                                ppg_rsp_last_o  <= rx_last_w;
-                                ppg_rsp_done_o  <= rx_last_w;
-                            end
-                            state_r <= ST_RACK_LO;
-                            scl_o   <= 1'b0;
-                            sda_oe  <= ~rx_last_w; // drive low=ACK; release=NACK on last byte
-                            timer_r <= HALF - 1;
-                        end
-                    end
-                end
+            default: state_r <= ST_IDLE;
 
-                ST_RACK_LO: begin
-                    if (timer_r == '0) begin
-                        state_r <= ST_RACK_HI;
-                        scl_o   <= 1'b1;
-                        timer_r <= HALF - 1;
-                    end
-                end
-
-                ST_RACK_HI: begin
-                    if (timer_r == '0) begin
-                        if (byte_cnt_r < cmd_len_r) begin
-                            state_r <= ST_RX_LO;
-                            scl_o   <= 1'b0;
-                            sda_oe  <= 1'b0;
-                            timer_r <= HALF - 1;
-                        end else begin
-                            // All bytes received; issue STOP
-                            state_r <= ST_P1;
-                            scl_o   <= 1'b0;
-                            sda_oe  <= 1'b1;
-                            timer_r <= QUARTER - 1;
-                        end
-                    end
-                end
-
-                ST_P1: begin
-                    if (timer_r == '0) begin
-                        state_r <= ST_P2;
-                        scl_o   <= 1'b1; // SCL rises; SDA is still low
-                        timer_r <= QUARTER - 1;
-                    end
-                end
-
-                ST_P2: begin
-                    if (timer_r == '0) begin
-                        state_r <= ST_P3;
-                        sda_oe  <= 1'b0; // SDA rises while SCL=1: STOP condition
-                        timer_r <= QUARTER - 1;
-                    end
-                end
-
-                ST_P3: begin
-                    if (timer_r == '0) begin
-                        state_r <= ST_IDLE;
-                    end
-                end
-
-                default: state_r <= ST_IDLE;
-
-            endcase
-`endif
+        endcase
+// `endif
 
         end
     end

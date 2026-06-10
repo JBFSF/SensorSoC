@@ -96,11 +96,11 @@ librelane-padring: ## Only create the padring
 .PHONY: librelane-padring
 
 sim: ## Run RTL simulation with cocotb (basic normal-mode test)
-	cd cocotb; PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_FILTER='test_chip_top_normal$$' $(PYTHON) chip_top_tb.py
+	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_FILTER='test_chip_top_normal$$' $(PYTHON) chip_top_tb.py
 .PHONY: sim
 
 sim-full: ## Run RTL simulation with cocotb (full normal-mode test with extra checkers)
-	cd cocotb; PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_FILTER='test_chip_top_normal_full$$' $(PYTHON) chip_top_tb.py
+	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_FILTER='test_chip_top_normal_full$$' $(PYTHON) chip_top_tb.py
 .PHONY: sim-full
 
 sim-dft-smoke: ## Run chip_core DFT smoke tests for normal/force-IRQ/force-wake modes
