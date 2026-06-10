@@ -59,7 +59,7 @@ VERILOG_FILES:
 - dir::../src/taketwo_wrap.v
 - dir::../src/test_mmio.v
 - dir::../src/timer_mmio.v
-- dir::../src/top_fsm.v
+- dir::../src/top_fsm.sv
 - dir::../src/weight_ram_axi.v
 - dir::../src/weight_flash_axi.v
 - dir::../ip/picorv32.v
@@ -95,8 +95,8 @@ CLOCK_NET: clk_pad/Y
 CLOCK_PERIOD: 200 # 5 MHz
 
 # Fix hold violations
-PL_RESIZER_HOLD_SLACK_MARGIN: 0.35
-GRT_RESIZER_HOLD_SLACK_MARGIN: 0.3
+PL_RESIZER_HOLD_SLACK_MARGIN: 0.8
+GRT_RESIZER_HOLD_SLACK_MARGIN: 0.7
 
 # legalize design after repairs and having to insert one million buffers :(
 # these values control how far detailed placement can move cells when attempting to inserting hella buffers
