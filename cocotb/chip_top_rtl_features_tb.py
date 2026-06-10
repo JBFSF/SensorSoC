@@ -124,13 +124,12 @@ async def test_chip_top_normal(dut):
     logger = logging.getLogger("chip_top_normal")
 
     await _set_defaults(dut)
-    dut.input_PAD.value = 0b00000101
     await _start_clock(dut.clk_PAD)
     await _reset(dut.rst_n_PAD)
     core  = _core(dut)
     u_top = _top(dut)
     BOOT_TIMEOUT    = 500_000
-    RUNTIME_TIMEOUT = 10_000_000
+    RUNTIME_TIMEOUT = 1_000_000
 
     logger.info("Waiting for boot_done...")
     for cycle in range(BOOT_TIMEOUT):
@@ -141,7 +140,12 @@ async def test_chip_top_normal(dut):
         raise AssertionError("Timeout waiting for boot_done")
 
     assert core.pico_trap_w.value == 0, "CPU trapped during boot"
-    logger.info("Boot done. Running feature pipeline...")
+    logger.info("Boot done. Pulsing start_i to kick FSM from IDLE...")
+    dut.input_PAD.value = 0b00100000  # input_PAD[5] = start_w
+    await ClockCycles(dut.clk_PAD, 10)
+    dut.input_PAD.value = 0b00000000
+
+    logger.info("Running feature pipeline...")
 
     _csv_path = Path(__file__).parent / "sim" / "data" / "rtl_features.csv"
     _csv_path.parent.mkdir(parents=True, exist_ok=True)

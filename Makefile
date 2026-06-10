@@ -20,6 +20,12 @@ PYTHON ?= python3
 endif
 endif
 
+_RISCV_BIN := $(MAKEFILE_DIR)/third_party/riscv-toolchain/bin
+RISCV_PREFIX ?= $(shell \
+    for p in "$(_RISCV_BIN)/riscv-none-elf-" "$(_RISCV_BIN)/riscv64-unknown-elf-" "$(_RISCV_BIN)/riscv32-unknown-elf-" "riscv-none-elf-" "riscv64-unknown-elf-"; do \
+        if command -v "$${p}gcc" >/dev/null 2>&1; then printf '%s' "$$p"; break; fi; \
+    done)
+
 AVAILABLE_SLOTS = 1x1 0p5x1 1x0p5 0p5x0p5
 DEFAULT_SLOT = 1x1
 
@@ -99,6 +105,11 @@ sim: ## Run RTL simulation with cocotb (basic normal-mode test)
 	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_FILTER='test_chip_top_normal$$' $(PYTHON) chip_top_tb.py
 .PHONY: sim
 
+sim-capture-features: ## Run RTL sim capturing feature vectors to cocotb/sim/data/rtl_features.csv
+	$(MAKE) -C cocotb FW_VARIANT=test_top_normal RISCV_PREFIX=$(RISCV_PREFIX) firmware-rebuild
+	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb CHIP_TOPLEVEL=chip_top_sim_wrap PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} $(PYTHON) chip_top_rtl_features_tb.py
+.PHONY: sim-capture-features
+
 sim-full: ## Run RTL simulation with cocotb (full normal-mode test with extra checkers)
 	cd cocotb; PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_FILTER='test_chip_top_normal_full$$' $(PYTHON) chip_top_tb.py
 .PHONY: sim-full
@@ -161,7 +172,7 @@ sim-gl-regression: ## Run gate-level regression targets and continue after failu
 
 .PHONY: sim-gl-ml
 sim-gl-ml: ## Run gate-level ML pipeline smoke test (uses sensor bridge wrapper)
-	$(MAKE) -C cocotb FW_VARIANT=test_top_normal firmware-rebuild
+	$(MAKE) -C cocotb FW_VARIANT=test_top_normal RISCV_PREFIX=$(RISCV_PREFIX) firmware-rebuild
 	cd cocotb; GL=1 WAVES=$(GL_WAVES) CLK_FREQ_MHZ=$(GL_CLK_FREQ_MHZ) CHIP_TOPLEVEL=sim_chip_top_gl_sensor_bridge_env PYTHONPATH=$(MAKEFILE_DIR)/cocotb/sim/tb FINAL_DIR=$(FINAL_DIR) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} COCOTB_TEST_MODULE=chip_top_tb COCOTB_TEST_FILTER='test_chip_top_normal$$' $(PYTHON) chip_top_tb.py
 
 .PHONY: test-ml

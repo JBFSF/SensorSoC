@@ -13,6 +13,8 @@ Fabricated on the GF180MCU process via [wafer.space](https://wafer.space) MPW ru
 * `scripts/` - Utility scripts (padring flow, GDS rendering, ML model synthesis, Sesnor Model CSVs/Python Models)
 * `librelane/` - LibreLane PnR configuration and slot definitions
 * `ip/` - Custom IP blocks (chip ID, wafer.space logo)
+* `third_party` - Outside tools taken in for the project (RISCV compilation toolchain)
+* `final/` - The make librelane run from 
 
 ## Prerequisites
 
@@ -35,6 +37,8 @@ Run `nix-shell` in the root of this repository, then:
 ```
 make librelane
 ```
+
+We are using the default '1x1' slot size for our design.
 
 ## View the Design
 
@@ -113,29 +117,13 @@ make sim-view
 
 Waveform output: `cocotb/sim_build/chip_top.fst`
 
-## Slot Size
-
-We are using the default '1x1' slot size for our design.
-
-```
-SLOT=1x1 make librelane
-```
-
-## Standalone Padring (Analog Design)
-
-```
-make librelane-padring
-```
-
-## Precheck
-
-Run the [gf180mcu-precheck](https://github.com/wafer-space/gf180mcu-precheck) with your layout before submission.
-
 ## Dataset
 
 ML training data sourced from PhysioNet:
 
 Walch, Olivia. "Motion and heart rate from a wrist-worn wearable and labeled sleep from polysomnography" (version 1.0.0). PhysioNet (2019). https://doi.org/10.13026/hmhs-py35
+
+We adapted this feature set to end up with 4 features, time Delta HR, MSSD (Mean Square Successive Differences), and Accel Motion. After adapting, we add on the annotated Sleep stages as well from training. These end up in processed_sleep_dataset.csv in scripts/ml. After, 
 
 ## Pinout
 ### Normal Mode
@@ -168,9 +156,11 @@ Standard chip behavior when
 
 * `analog[1:0]` - unused
 
-### Test Modes
+### Test Modes 
 
-* `5'b00000` - normal mode on the onboard PLL clock; debug bus is disabled.
+See DFT_MODE_MATRIX.md
+
+<!-- * `5'b00000` - normal mode on the onboard PLL clock; debug bus is disabled.
 * `5'b00001` - drives `mssd_feat[15:0]` onto `bidir[22:7]`.
 * `5'b00010` - drives `delta_hr_feat[15:0]` onto `bidir[22:7]`.
 * `5'b00011` - drives `time_feat[15:0]` onto `bidir[22:7]`.
@@ -187,4 +177,4 @@ Standard chip behavior when
 * `5'b01110` - currently unused
 * `5'b01111` - currently unused
 * `5'b10000` - normal mode on the external test clock from `bidir[39]`; debug bus is disabled.
-* `5'b1xxxx` - same debug-bus mapping as `0xxxx`, but clocked from `bidir[39]` instead of `clk`.
+* `5'b1xxxx` - same debug-bus mapping as `0xxxx`, but clocked from `bidir[39]` instead of `clk`. -->

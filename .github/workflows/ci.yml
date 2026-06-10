@@ -82,7 +82,7 @@ jobs:
       - name: Build firmware
         run: |
           nix shell nixpkgs#pkgsCross.riscv64-embedded.buildPackages.gcc --command \
-            make -C cocotb FW_VARIANT=test_top_feature_ml_30logits firmware RISCV_PREFIX=riscv64-none-elf-
+            make -C cocotb FW_VARIANT=test_top_normal firmware RISCV_PREFIX=riscv64-none-elf-
       - name: Run RTL simulation
         run: |
           nix develop --command make sim
