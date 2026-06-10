@@ -1,20 +1,11 @@
 # DFT Mode Table
 
-This document is a first-pass coordination table for the chip debug / DFT test
+This document is a table for the chip debug / DFT test
 mode scheme in `chip_core.sv`.
-
-Purpose:
-
-- give one row per test mode
-- define what stimulus is needed
-- define what should appear on `bidir[22:7]`
-- define which components should be enabled in that mode
-- identify which modes need firmware and/or sensor models
-- provide a place to agree on golden outputs with Shane
 
 ## Current Table
 
-The expected enable posture comes from the current `top_fsm.v` test-mode overrides:
+The enable posture comes from the current `top_fsm.v` test-mode overrides:
 
 - `SLEEP`: `feat_en=0`, `ml_en=0`, `cpu_en=0`, `sleeping=1`
 - `FEAT_ONLY`: `feat_en=1`, `ml_en=0`, `cpu_en=0`, `sleeping=0`
@@ -22,14 +13,8 @@ The expected enable posture comes from the current `top_fsm.v` test-mode overrid
 - `ML_ONLY`: `feat_en=0`, `ml_en=1`, `cpu_en=0`, `sleeping=0`
 - `CPU_ONLY`: `feat_en=0`, `ml_en=0`, `cpu_en=1`, `sleeping=0`
 
-Important nuance for `00000`:
-
-- normal mode is not a fixed override
-- after reset it defaults to `SLEEP`
-- wake events then move it through the live FSM path (`SLEEP -> FEAT_ONLY -> ALL -> CPU_FEAT`)
-
-| Mode | Name | Clock | Stimulus Needed | Firmware Needed | Sensor Models Needed | Expected Enabled Components | Expected `bidir[22:7]` | Pass Condition |
-|---|---|---|---|---|---|---|---|---|---|
+| Mode | Name | Clock | Stimulus Needed | Firmware Needed | Sensor Models Needed | Enabled Components | `bidir[22:7]` | Pass Condition |
+|---|---|---|---|---|---|---|---|---|
 | `00000` | Normal | Internal | None | Yes | Maybe | Dynamic FSM path; after reset expect `SLEEP`, then wake-driven transitions into `FEAT_ONLY`, `ALL`, and `CPU_FEAT` | Debug bus disabled / zero | Debug bus inactive in normal mode |
 | `00001` | MSSD Feature | Internal | Let feature pipeline run | Yes | Yes | `FEAT_ONLY`: feature on, ML off, CPU off, not sleeping | `mssd_feat[15:0]` | Matches internal feature signal at sample point |
 | `00010` | Delta HR Feature | Internal | Let feature pipeline run | Yes | Yes | `FEAT_ONLY`: feature on, ML off, CPU off, not sleeping | `delta_hr_feat[15:0]` | Matches internal feature signal at sample point |
