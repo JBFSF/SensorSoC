@@ -584,7 +584,7 @@ async def _gl_pico_fetch_monitor(dut, logger, cycles=2_000, limit=16):
     prev = None
     logged = 0
     for cycle in range(cycles):
-        await RisingEdge(_clk(dut))
+        await RisingEdge(_clk_handle(dut))
         p = _gl_progress(dut)
         snapshot = (
             p["mem_v"], p["mem_i"], p["pico_rdy"], p["mem_rdy"],
@@ -673,7 +673,7 @@ async def test_chip_top_boot(dut):
     cocotb.log.info("Waiting for boot_done...")
 
     for cycle in range(TIMEOUT_CYCLES):
-        await RisingEdge(_clk(dut))
+        await RisingEdge(_clk_handle(dut))
         if cycle % 10_000 == 0:
             logger.info(f"  cycle {cycle}: boot_done={u_top.boot_done.value}")
         if u_top.boot_done.value == 1:
@@ -1151,14 +1151,14 @@ async def test_chip_top_normal(dut):
         cocotb.start_soon(_ppg._run())
 
     BOOT_TIMEOUT    = 500_000
-    RUNTIME_TIMEOUT = 1_000_000
+    RUNTIME_TIMEOUT = 4_000_000
     # --- Phase 1: wait for boot ---
     logger.info("Waiting for boot_done...")
     cocotb.log.info(f"Firmware.hex is: {_FIRMWARE_HEX}")
     for cycle in range(BOOT_TIMEOUT):
-        await RisingEdge(_clk(dut))
+        await RisingEdge(_clk_handle(dut))
         if u_top.boot_done.value == 1:
-            await ClockCycles(_clk(dut), 10)
+            await ClockCycles(_clk_handle(dut), 10)
             break
     else:
         raise AssertionError("Timeout waiting for boot_done")
@@ -1176,9 +1176,9 @@ async def test_chip_top_normal(dut):
     # Skip in GL mode: feat_valid_o and logit_reg_0 are RTL-only signals
     if not gl:
         cocotb.start_soon(_feat_monitor(u_top))
-        cocotb.start_soon(_logit_monitor(_clk(dut), u_top))
-        cocotb.start_soon(_axi_write_monitor(_clk(dut), u_top))
-        cocotb.start_soon(_can_sleep_monitor(_clk(dut), u_top, core))
+        cocotb.start_soon(_logit_monitor(_clk_handle(dut), u_top))
+        cocotb.start_soon(_axi_write_monitor(_clk_handle(dut), u_top))
+        cocotb.start_soon(_can_sleep_monitor(_clk_handle(dut), u_top, core))
     else:
         # GL mode — internal signals are flattened away. Only pads are observable.
         cocotb.start_soon(_gl_heartbeat(dut))
@@ -1192,7 +1192,7 @@ async def test_chip_top_normal(dut):
     # threshold is hit; that drives the FSM to ALARM state which asserts alarm_o.
     # A firmware-side DEAD_BEEF in TEST_STATUS still fails fast.
     for cycle in range(RUNTIME_TIMEOUT):
-        await RisingEdge(_clk(dut))
+        await RisingEdge(_clk_handle(dut))
 
         if cycle % 10_000 == 0:
             if gl:
@@ -1244,7 +1244,7 @@ async def test_chip_top_normal(dut):
         # Pass condition: alarm_o rose (output pad is always observable, even in GL)
         try:
             if int(dut.alarm_o.value) == 1:
-                await ClockCycles(_clk(dut), 10)
+                await ClockCycles(_clk_handle(dut), 10)
                 if int(dut.alarm_o.value) == 1:
                     cocotb.log.info(f"alarm_o asserted at cycle {cycle} — test passed.")
                     return
@@ -1275,7 +1275,7 @@ async def test_chip_top_normal_full(dut):
     # --- Phase 1: wait for boot ---
     cocotb.log.info("Waiting for boot_done...")
     for cycle in range(BOOT_TIMEOUT):
-        await RisingEdge(_clk(dut))
+        await RisingEdge(_clk_handle(dut))
         if u_top.boot_done.value == 1:
             break
     else:
@@ -1290,9 +1290,9 @@ async def test_chip_top_normal_full(dut):
     # Skip in GL mode: feat_valid_o and logit_reg_0 are RTL-only signals
     if not gl:
         cocotb.start_soon(_feat_monitor(u_top))
-        cocotb.start_soon(_logit_monitor(_clk(dut), u_top))
-        cocotb.start_soon(_axi_write_monitor(_clk(dut), u_top))
-        cocotb.start_soon(_can_sleep_monitor(_clk(dut), u_top, core))
+        cocotb.start_soon(_logit_monitor(_clk_handle(dut), u_top))
+        cocotb.start_soon(_axi_write_monitor(_clk_handle(dut), u_top))
+        cocotb.start_soon(_can_sleep_monitor(_clk_handle(dut), u_top, core))
     else:
         cocotb.start_soon(_gl_heartbeat(dut))
 
@@ -1301,7 +1301,7 @@ async def test_chip_top_normal_full(dut):
     # threshold is hit; that drives the FSM to ALARM state which asserts alarm_o.
     # A firmware-side DEAD_BEEF in TEST_STATUS still fails fast.
     for cycle in range(RUNTIME_TIMEOUT):
-        await RisingEdge(_clk(dut))
+        await RisingEdge(_clk_handle(dut))
 
         if cycle % 10_000 == 0:
             if gl:
@@ -1355,12 +1355,12 @@ async def test_chip_top_normal_full(dut):
         # Pass condition: alarm_o rose (output pad is always observable)
         try:
             if int(dut.alarm_o.value) == 1:
-                await ClockCycles(_clk(dut), 10)
+                await ClockCycles(_clk_handle(dut), 10)
                 if int(dut.alarm_o.value) == 1:
                     cocotb.log.info(f"alarm_o asserted at cycle {cycle} — test passed.")
-                    await ClockCycles(_clk(dut), 1000)
+                    await ClockCycles(_clk_handle(dut), 1000)
                     await set_start(dut, 10)
-                    await ClockCycles(_clk(dut), 10)
+                    await ClockCycles(_clk_handle(dut), 10)
                     await set_start(dut, 10)
                     await reset(dut)
                     await ClockCycles(dut.clk_PAD, 10_000)

@@ -1,0 +1,4 @@
+sec,rst_n,boot,fsm,alarm_o,motion,time,delta_hr,mssd,logit_reg0,logit_reg1,dbg_logit0,dbg_logit1
+0,1,1,CPU_INIT,0,0,0,0,0,0x00000000,0x00000000,X,X
+1,1,1,FEAT_ONLY,0,0,0,0,0,0x00000000,0x00000000,X,X
+2,1,1,FEAT_ONLY,0,17,1,3,-1,0xFFFA0005,0x00000000,5,-6
