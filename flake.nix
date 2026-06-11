@@ -47,6 +47,17 @@
         let
           pkgs = (self.legacyPackages.${system});
           callPackage = lib.callPackageWith pkgs;
+          cocotb-bus = pkgs.python3.pkgs.buildPythonPackage rec {
+            pname = "cocotb-bus";
+            version = "0.3.0";
+            format = "wheel";
+            src = pkgs.fetchurl {
+              url = "https://files.pythonhosted.org/packages/ea/43/8b3f96cf401c2a7f6e907ccc86d3b73433eeaf5525df90b630d8c112474b/cocotb_bus-${version}-py3-none-any.whl";
+              hash = "sha256-tPBsziRiqPlIe0LEaw/zr9JT8PpPZ6DDguvgumFCKes=";
+            };
+            propagatedBuildInputs = with pkgs.python3.pkgs; [ cocotb ];
+            doCheck = false;
+          };
           cocotbext-i2c = pkgs.python3.pkgs.buildPythonPackage rec {
             pname = "cocotbext-i2c";
             version = "0.1.2";
@@ -66,7 +77,7 @@
               url = "https://files.pythonhosted.org/packages/29/eb/d1c1f727a52ef2b7d0a2e4ff31817add1ccd42155642ba971b49d9ee089c/cocotbext_axi-${version}-py3-none-any.whl";
               hash = "sha256-r/iLUocz5OWTWfBrjMMFJMx1vzHulR7YpXNpSyaBbrI=";
             };
-            propagatedBuildInputs = with pkgs.python3.pkgs; [ cocotb numpy ];
+            propagatedBuildInputs = with pkgs.python3.pkgs; [ cocotb numpy cocotb-bus ];
             doCheck = false;
           };
         in
@@ -91,8 +102,11 @@
               ps: with ps; [
                 # Verification
                 cocotb
+                cocotb-bus
                 cocotbext-i2c
                 cocotbext-axi
+                scipy
+                pytest
 
                 # For KLayout Python DRC runner
                 docopt
