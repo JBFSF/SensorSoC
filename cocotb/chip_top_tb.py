@@ -8,6 +8,7 @@ from pathlib import Path
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import Timer, RisingEdge, ClockCycles, ReadOnly
+from cocotb.handle import Force
 from cocotb_tools.runner import get_runner
 from cocotbext.i2c import I2cDevice
 
@@ -640,7 +641,7 @@ async def test_chip_top_smoke(dut):
     core = _core(dut)
     logger.info("Checking normal-mode wiring...")
 
-    assert _rst_n(dut).value == 1, "reset should be deasserted after startup"
+    assert _rst_handle(dut).value == 1, "reset should be deasserted after startup"
     if not gl:
         assert core.test_mode_w.value.integer == 0, "chip should be in normal mode"
         assert core.core_clk_w.value == core.clk.value, \
@@ -799,39 +800,45 @@ async def _can_sleep_monitor(clk, u_top, core):
 async def _gl_heartbeat(dut):
     """GL-friendly progress beat — only watches pads, which survive flattening.
     Tracks SPI activity (toggle count on bidir[1] = boot_spi_clk) and alarm.
+    Also tracks sensor SCL (bidir[23]) to diagnose I2C sensor communication.
     """
     cycles = 0
     spi_clk_toggles = 0
+    sensor_scl_toggles = 0
     last_spi_clk = None
+    last_sensor_scl = None
     last_alarm = None
     while True:
         await ClockCycles(_clk_handle(dut), 1)
         cycles += 1
-        # Sample SPI clock and alarm
         try:
             bpad = dut.bidir_PAD.value
-            # bidir_PAD[1] is boot SPI clock pre-boot_done; weight SPI after
-            spi_clk_now = int(bpad[1])
-            alarm_now   = int(bpad[0])
+            spi_clk_now    = int(bpad[1])
+            alarm_now      = int(bpad[0])
+            sensor_scl_now = int(bpad[23])
         except Exception:
-            spi_clk_now = None
-            alarm_now   = None
+            spi_clk_now    = None
+            alarm_now      = None
+            sensor_scl_now = None
 
         if last_spi_clk is not None and spi_clk_now != last_spi_clk:
             spi_clk_toggles += 1
         last_spi_clk = spi_clk_now
 
-        # Print alarm transitions immediately
+        if last_sensor_scl is not None and sensor_scl_now != last_sensor_scl:
+            sensor_scl_toggles += 1
+        last_sensor_scl = sensor_scl_now
+
         if alarm_now is not None and alarm_now != last_alarm:
             print(f"[gl_hb @{cycles:8d}] alarm_o transition: {last_alarm} -> {alarm_now}",
                   flush=True)
             last_alarm = alarm_now
 
-        # Heartbeat every 25k cycles with rolling counts
         if cycles % 25_000 == 0:
             print(
                 f"[gl_hb @{cycles:8d}]  alarm_o={alarm_now}  "
-                f"spi_clk_toggles_so_far={spi_clk_toggles}",
+                f"spi_clk_toggles={spi_clk_toggles}  "
+                f"sensor_scl_toggles={sensor_scl_toggles}",
                 flush=True,
             )
 
@@ -1262,12 +1269,77 @@ async def test_chip_top_normal_full(dut):
 
     # ALL mode: features + ML + CPU all active; bypasses SLEEP state in sim.
     await set_defaults(dut)
-    #dut.input_PAD.value = 0b00100000 #0b00000101
     await start_clock(_clk_handle(dut))
-    await reset(dut)
 
     core  = _core(dut)
     u_top = _top(dut)
+
+    if gl:
+        # Same GL force-init as test_chip_top_normal: prevents X-lock on
+        # dffq_1 flops (no async reset) and the icgtp_1 ICG that gates cpu_clk.
+        _rst_handle(dut).value = 0
+        await ClockCycles(_clk_handle(dut), 5)
+        scope = _gl_chip_inst(dut)
+        u_top.cpu_clk_en_lat.value = Force(1)
+        forced_fsm_bits = []
+        for n in range(10):
+            try:
+                h = _flat_gl_bit(scope, f"i_chip_core.u_top.fsm.state_q[{n}]")
+                h.value = Force(1 if n == 0 else 0)
+                forced_fsm_bits.append(n)
+            except AttributeError:
+                pass
+        _gl_force_bit_zero(scope, "i_chip_core.u_top.fsm.cpu_idle_seen_r", "fsm.cpu_idle_seen_r")
+        _gl_force_bit_zero(scope, "i_chip_core.u_top.fsm.cpu_clk_en_r",    "fsm.cpu_clk_en_r")
+        _gl_force_bit_zero(scope, "i_chip_core.u_top.fsm.sleep_req_d_r",   "fsm.sleep_req_d_r")
+        forced_irq_pend    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.pending",        32, "irqc.pending")
+        forced_irq_mask    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.mask",           32, "irqc.mask")
+        forced_irq_wake_en = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.wake_en",        32, "irqc.wake_en")
+        forced_irq_src_d   = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.src_d",          32, "irqc.src_d")
+        forced_irq_active  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.active",         32, "irqc.active")
+        forced_irq_wake_pd = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.wake_pending_d", 32, "irqc.wake_pending_d")
+        forced_tim_ctrl    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_timer.ctrl_r",  32, "timer.ctrl_r")
+        forced_tim_count   = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_timer.count_r", 32, "timer.count_r")
+        _gl_force_bit_zero(scope, "i_chip_core.u_top.u_timer.event_latched", "timer.event_latched")
+        _gl_force_bit_zero(scope, "i_chip_core.u_top.u_pwr.sleep_req_o", "pwr.sleep_req_o")
+        forced_pwr_wake_st  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_pwr.wake_status", 32, "pwr.wake_status")
+        forced_pwr_wake_rsn = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_pwr.wake_reason", 32, "pwr.wake_reason")
+        _gl_force_bit_zero(scope, "i_chip_core.u_top.u_pwr.cpu_awake_d", "pwr.cpu_awake_d")
+        forced_wf_state  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.state",       4,  "wflash.state")
+        forced_wf_logit0 = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_0", 32, "wflash.logit_reg_0")
+        forced_wf_logit1 = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", 32, "wflash.logit_reg_1")
+        forced_wf_feat0  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_0",  32, "wflash.feat_reg_0")
+        forced_wf_feat1  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_1",  32, "wflash.feat_reg_1")
+        await ClockCycles(dut.clk_PAD, 5)
+        _rst_handle(dut).value = 1
+        await ClockCycles(_clk_handle(dut), 2)
+        await reset(dut)
+        for n in forced_fsm_bits:
+            _gl_release_bit(scope, f"i_chip_core.u_top.fsm.state_q[{n}]")
+        _gl_release_bit(scope, "i_chip_core.u_top.fsm.cpu_idle_seen_r")
+        _gl_release_bit(scope, "i_chip_core.u_top.fsm.cpu_clk_en_r")
+        _gl_release_bit(scope, "i_chip_core.u_top.fsm.sleep_req_d_r")
+        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.pending",        forced_irq_pend)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.mask",           forced_irq_mask)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.wake_en",        forced_irq_wake_en)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.src_d",          forced_irq_src_d)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.active",         forced_irq_active)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.wake_pending_d", forced_irq_wake_pd)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_timer.ctrl_r",  forced_tim_ctrl)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_timer.count_r", forced_tim_count)
+        _gl_release_bit(scope, "i_chip_core.u_top.u_timer.event_latched")
+        _gl_release_bit(scope, "i_chip_core.u_top.u_pwr.sleep_req_o")
+        _gl_release_vector(scope, "i_chip_core.u_top.u_pwr.wake_status", forced_pwr_wake_st)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_pwr.wake_reason", forced_pwr_wake_rsn)
+        _gl_release_bit(scope, "i_chip_core.u_top.u_pwr.cpu_awake_d")
+        _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.state",       forced_wf_state)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_0", forced_wf_logit0)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", forced_wf_logit1)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_0",  forced_wf_feat0)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_1",  forced_wf_feat1)
+        cocotb.log.info("Released all force-init nets")
+    else:
+        await reset(dut)
 
     if hdl_toplevel == _GL_SENSOR_BRIDGE:
         from test_chip_top_i2c_pads import (
