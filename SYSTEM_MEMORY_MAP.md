@@ -131,18 +131,6 @@ It has three roles:
 - `taketwo` AXI reads outside that window go to the dedicated weight SPI flash
 - `taketwo` AXI writes at `LOGIT_OFFSET` are snooped into the CPU-visible logit registers
 
-### Important Architecture Note
-
-This block no longer behaves like the old fully shared `weight_ram_axi`.
-
-Current reality:
-
-- feature input storage is small and register-backed
-- weight reads are flash-backed
-- final logits are register-captured
-
-So older firmware/tests that assume generic writable/readable WRAM semantics across the whole page are stale.
-
 ## Firmware SPI Master Page
 
 Base: `0x0300_A000`
@@ -170,34 +158,6 @@ Base: `0x0300_F000`
 | `0x1C` | `0x0300_F01C` | `CFG_POLICY` | `RO` | Wake policy |
 | `0x20` | `0x0300_F020` | `ML_SCORE` | `RW` | Score/confidence proxy |
 
-## Host I2C Register Map
-
-This is not memory-mapped into the CPU address space. It is the byte-oriented register map used by the host-facing I2C target in [host_i2c_bridge_regs.v].
-
-Important byte offsets:
-
-| Byte Offset | Name | Meaning |
-|---|---|---|
-| `0x00` | `WHOAMI` | Fixed ID |
-| `0x01` | `VERSION` | Register-map version |
-| `0x02` | `STATUS` | General status |
-| `0x03` | `CTRL` | General control |
-| `0x04` | `IRQ_KICK` | Trigger/bridge action |
-| `0x20` | `IRQC_OFF` | IRQC sideband offset |
-| `0x21`-`0x24` | `IRQC_W0..W3` | IRQC sideband write data |
-| `0x25` | `IRQC_CMD` | IRQC GO / WE |
-| `0x26` | `IRQC_STAT` | IRQC sideband status |
-| `0x28`-`0x2B` | `IRQC_R0..R3` | IRQC sideband readback |
-| `0x30` | `CONF_THR_L` | Confidence threshold low byte |
-| `0x31` | `CONF_THR_H` | Confidence threshold high byte |
-| `0x32` | `CONF_CTRL` | Confidence control |
-| `0x33` | `CONF_STAT` | Confidence state |
-| `0x34` | `LOGIT0_L` | Logit0 low byte |
-| `0x35` | `LOGIT0_H` | Logit0 high byte |
-| `0x36` | `LOGIT1_L` | Logit1 low byte |
-| `0x37` | `LOGIT1_H` | Logit1 high byte |
-| `0x38` | `CONF_ABS_L` | `abs(logit0-logit1)` low byte |
-| `0x39` | `CONF_ABS_H` | `abs(logit0-logit1)` high byte |
 
 ## Current Debugging Notes
 
