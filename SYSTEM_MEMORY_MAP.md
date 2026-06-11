@@ -131,18 +131,6 @@ It has three roles:
 - `taketwo` AXI reads outside that window go to the dedicated weight SPI flash
 - `taketwo` AXI writes at `LOGIT_OFFSET` are snooped into the CPU-visible logit registers
 
-### Important Architecture Note
-
-This block no longer behaves like the old fully shared `weight_ram_axi`.
-
-Current reality:
-
-- feature input storage is small and register-backed
-- weight reads are flash-backed
-- final logits are register-captured
-
-So older firmware/tests that assume generic writable/readable WRAM semantics across the whole page are stale.
-
 ## Firmware SPI Master Page
 
 Base: `0x0300_A000`

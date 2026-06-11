@@ -6,7 +6,7 @@ The goal is a custom ASIC SoC that intakes accelerometer and PPG sensor data, pr
 
 Fabricated on the GF180MCU process via [wafer.space](https://wafer.space) MPW runs.
 
-## Usuage
+## Usage
 
 Connecting the Chip to these 2 Sensor Models:
 * [Accelerometer](https://www.st.com/en/mems-and-sensors/lis2dw12.html)
@@ -18,17 +18,19 @@ The chip is intended to be worn while sleeping. Through the programmable Flash m
 
 At a high level, our project:
 1. Loads CPU instruction memory from the [SPI flash memory](https://www.mouser.com/new/infineon/cypress-s25fl-mirrorbit-flash/?srsltid=AfmBOopFM04QP2PCEYxch_qfuaAEGl7-i86BYyoPRtVD-AA0aJcyBhdZ), before idling itself. This flash also contains the ML weights, after boot the interface is passed off to the ML
-2. After receiving the start singal, Initates a CPU boot set up to set system parameters, including time to sleep overnight
+2. After receiving the start signal, it initiates a CPU boot set up to set system parameters, including time to sleep overnight
 3. Sleeps until the watchdog timer signals the sleep interval has passed.
-4. Using sensor data, begins to generate features for our Machine Learning Model, creating a heartrate baseline during this time as well as assembling the mothion data and Delta HR and MSSD HR for that epoch (~ 1min).
+4. Using sensor data, begins to generate features for our Machine Learning Model, creating a heartrate baseline during this time as well as assembling the motion data and Delta HR and MSSD HR for that epoch (~ 1min).
 5. Once the feature for the epoch is created, the CPU is woken and writes the features into the ML, which is also woken at this time
-    * Since NNGen generates a 2 way AXI interface, we also use the block weight_flash_axi, which converts the CPUs requests into AXI writes to the ML.
-    * This block also serves to let the ML access its weights, converting the AXI-Lite Reads from the ML to SPI commands to the flash.
+    * Since NNGen generates a 2 way AXI interface, we also use the block weight_flash_axi, which converts the CPUs requests into AXI-Lite writes to the ML.
+    * This block also serves to let the ML access its weights, converting the AXI Reads from the ML to SPI commands to the flash.
 6. After the ML generates an inference based off this, it is put back to sleep
 7. The CPU intakes that inference and makes a decision:
-    * We've seen enough vaild wakes, signal the alarm to wake the user
+    * We've seen enough valid wakes, signal the alarm to wake the user
     * We haven't, go back to sleep and wait for the next feature set
 8. Once Alarm is reached, the wait for the user to signal the start signal again, to turn off alarm signal, then wait for the signal once again to start the next night.
+
+See SYSTEM_MEMORY_MAP.md for the full MMIO address map that the CPU uses.
 
 ## Diagrams
 
@@ -43,11 +45,11 @@ As well as the Power gating State Machine we use:
 
 * `src/` - All RTL sources (SystemVerilog/Verilog)
 * `cocotb/` - Simulation testbenches (cocotb + Icarus Verilog)
-* `scripts/` - Utility scripts (padring flow, GDS rendering, ML model synthesis, Sesnor Model CSVs/Python Models)
+* `scripts/` - Utility scripts (padring flow, GDS rendering, ML model synthesis, Sensor Model CSVs/Python Models)
 * `librelane/` - LibreLane PnR configuration and slot definitions
 * `ip/` - Custom IP blocks (chip ID, wafer.space logo)
 * `third_party` - Outside tools taken in for the project (RISCV compilation toolchain)
-* `final/` - The make librelane run from 
+* `final/` - The run directory from running `make librelane` referenced below
 
 ## Prerequisites
 
@@ -59,18 +61,20 @@ To clone the latest PDK version, run:
 make clone-pdk
 ```
 
+Install LibreLane by following the Nix-based installation instructions: https://librelane.readthedocs.io/en/latest/installation/nix_installation/index.html
+
 Check requirements.txt for the dependencies needed.
 
 ## Generating the ML Model
 
+We use an extremely small ML model, 16 nodes wide and 3 layers deep, using ReLU as it's activation function due to hardware simplicity. We trained it on a 30 subject split, roughly 70-30 train/test. We ran it for around ~50 epochs to get the most even split on accurate wake ups vs accurate non-wakes. To many epochs rails it to always guess wake, too little makes it too inaccurate for usuability.
+
 The version we used is already contained within src/. To generate it as we did, in scripts/ml/:
-* taketwo.py trains then generates the 3-Layer MLP as an .onnx file
+* mlp_on_rtl.py trains then generates the 3-Layer MLP as an .onnx file
 * writeverilog.py generates the ML model as a netlist using [NNGen](https://github.com/NNgen/nngen), also tests the weight accessing in a testbench it writes out.
 * Move the model into /src, and the weights into cocotb/sim/tb/ml for testing
 
 From there the model is simulatable, but for synthesis, we had to replace the internal memory models it uses by hand, so it now uses the GF180MCU's memory blocks.
-
-Install LibreLane by following the Nix-based installation instructions: https://librelane.readthedocs.io/en/latest/installation/nix_installation/index.html
 
 ## Implement the Design
 
@@ -194,7 +198,10 @@ Standard chip behavior when
 * `bidir[37]` - force Pico IRQ input used in test modes `5'b01010` and `5'b11010`
 * `bidir[38]` - force wake source input used in test modes `5'b01011` and `5'b11011`
 * `bidir[39]` - external test clock input used by the `1xxxx` test-mode bank
-* `bidir[36:23]` - unused
+* `bidir[36:5]` - unused
+
+#### Analog Pins (2) 
+* `analog[1:0]` - unused
 
 ### Test Modes 
 
@@ -203,22 +210,25 @@ See DFT_MODE_MATRIX.md
 ## Results
 
 ### Sim Testing
-Taking a majority of our time, `make sim` , `make sim-full`, and `make repro-firmware-flow` passes as our RTL sim tests. these tests test our chips DFT test modes, reset assertion, boot, a 1 night normal test, and a test to make sure the chip properly resets after setting alarm.
+Taking a majority of our time, `make sim` , `make sim-full`, and `make repro-firmware-flow` passes as our RTL sim tests. these tests test our chips DFT test modes, reset assertion, boot, a 1 night normal test, and a test to make sure the chip properly resets after setting alarm, proving multi night uses are possible.
 
 ### MLP Model
 Our ML model once retrained on the feature pipeline dataset, and after we had to change the feature set to reduce on feature pipeline size, experienced a drop off in accuracy, from around 85% to 75%. Most of the missed classifications are due in part to increasing the epoch size a little as well, the ML model struggled a little more to notice trends. Logits vary slightly, we believe the truncation o the weights to 16bit is largely to blame for this as well. 
 
 ### Chip Statistics
-Our chip was quite bulky, utilizing around 70% of the 1x1 chip slot. We also registered a 5.91mW power usuage, without plugging in any switching statistics. If we account for the power gating our chip conducts, we believe the average power intake to be lower. We were also able to get rid of all of our timing violations through librelane, no setup or hold.
+Our chip was quite bulky, utilizing around 70% of the 1x1 chip slot. We also registered a 5.91mW power usage (tt nomial corner), without plugging in any switching statistics. If we account for the power gating our chip conducts, we believe the average power intake to be lower. We were also able to get rid of all of our timing violations through librelane, no setup or hold.
 
-#### Cell Statistics
+#### Statistics
 * 11k Sequential Cells
 * 52K Combinational Cells
 * 28 gf180mcu 512x8 SRAM Macros
+* 10MHz clock frequency
 
 ## Limitations/Shortcomings
-Due to time, we were unable to create and validate testing infrastructure for the DFT test modes in gate level, as well as an SDF back annotated version for our one night sim test. To fit the Chip slot size, we had to reduce the feature pipeline and ML model by a bit which hurts the accuracy. The conjestion/heat map for our chip is also incredibly dense, which hurts our design for noise and power consumption. Also, due to the pad ring we have XXXX Max Cap violations, as well as XXXX Slew violations due to the distribution of fsm enables, which have to drive huge signals across our chip.
+Due to time, we were unable to create and validate testing infrastructure for the DFT test modes in gate level, as well as an SDF back annotated version for our one night sim test. To fit the Chip slot size, we had to reduce the feature pipeline and ML model by a bit which hurts the accuracy. The congestion/heat map for our chip is also incredibly dense, which hurts our design for noise and power consumption. Also, due to the pad ring we have XXXX Max Cap violations, as well as XXXX Slew violations due to the distribution of fsm enables, which have to drive huge signals across our chip. Due to NNGen's synthesis process as well, our ML model had to be extremely small, as NNGen is a synthesis tool designed for FPGAs, it creates a lot of bulk. Given another chance, we would make a custom ASIC ml model, optimized for space. 
+
 Though now beyond the scope of this class, we would still like to:
 * Run more through Gate Level Testing
 * Make a back annotated SDF target
 * Fix our Violations
+
