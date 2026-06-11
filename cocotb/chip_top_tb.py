@@ -1049,6 +1049,18 @@ async def test_chip_top_normal(dut):
     forced_wf_feat0 = []
     forced_wf_feat1 = []
     forced_wf_state = []
+    forced_acc_state   = []
+    forced_acc_poll    = []
+    forced_acc_timeout = []
+    forced_acc_rbuf    = []
+    forced_acc_ridx    = []
+    forced_i2c_state   = []
+    forced_i2c_timer   = []
+    forced_i2c_sr      = []
+    forced_i2c_byte    = []
+    forced_i2c_bcnt    = []
+    forced_ppg_state   = []
+    forced_ppg_poll    = []
 
     if gl:
         # Bypass ICG X-propagation if icgtp_1 was not yet re-synthesized.
@@ -1105,6 +1117,25 @@ async def test_chip_top_normal(dut):
         forced_wf_feat0  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_0",  32, "wflash.feat_reg_0")
         forced_wf_feat1  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_1",  32, "wflash.feat_reg_1")
 
+        # --- accel_reader: state machine + counters + read buffer
+        forced_acc_state   = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_accel_reader.state_r",        3,  "accel.state_r")
+        forced_acc_poll    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_accel_reader.poll_cnt_r",      32, "accel.poll_cnt_r")
+        forced_acc_timeout = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_accel_reader.timeout_cnt_r",   32, "accel.timeout_cnt_r")
+        forced_acc_rbuf    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_accel_reader.read_buf_r",      48, "accel.read_buf_r")
+        forced_acc_ridx    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_accel_reader.read_idx_r",      3,  "accel.read_idx_r")
+        _gl_force_bit_zero(scope, "i_chip_core.u_top.u_accel_reader.init_done_o", "accel.init_done_o")
+
+        # --- i2c_master: state machine + timer + shift register + byte/bit counters
+        forced_i2c_state   = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_i2c_master.state_r",    5, "i2c.state_r")
+        forced_i2c_timer   = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_i2c_master.timer_r",    6, "i2c.timer_r")
+        forced_i2c_sr      = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_i2c_master.sr_r",       8, "i2c.sr_r")
+        forced_i2c_byte    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_i2c_master.byte_cnt_r", 8, "i2c.byte_cnt_r")
+        forced_i2c_bcnt    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_i2c_master.bit_cnt_r",  3, "i2c.bit_cnt_r")
+
+        # --- ppg_fifo_reader: state machine + poll counter (shares I2C bus with accel)
+        forced_ppg_state   = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_ppg_fifo_reader.state_r",   4,  "ppg.state_r")
+        forced_ppg_poll    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_ppg_fifo_reader.poll_cnt_r", 32, "ppg.poll_cnt_r")
+
     # Hold reset asserted for a few more cycles so the forced values propagate
     await ClockCycles(dut.clk_PAD, 5)
 
@@ -1143,6 +1174,22 @@ async def test_chip_top_normal(dut):
         _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", forced_wf_logit1)
         _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_0",  forced_wf_feat0)
         _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_1",  forced_wf_feat1)
+
+        _gl_release_vector(scope, "i_chip_core.u_top.u_accel_reader.state_r",        forced_acc_state)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_accel_reader.poll_cnt_r",      forced_acc_poll)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_accel_reader.timeout_cnt_r",   forced_acc_timeout)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_accel_reader.read_buf_r",      forced_acc_rbuf)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_accel_reader.read_idx_r",      forced_acc_ridx)
+        _gl_release_bit(scope, "i_chip_core.u_top.u_accel_reader.init_done_o")
+
+        _gl_release_vector(scope, "i_chip_core.u_top.u_i2c_master.state_r",    forced_i2c_state)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_i2c_master.timer_r",    forced_i2c_timer)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_i2c_master.sr_r",       forced_i2c_sr)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_i2c_master.byte_cnt_r", forced_i2c_byte)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_i2c_master.bit_cnt_r",  forced_i2c_bcnt)
+
+        _gl_release_vector(scope, "i_chip_core.u_top.u_ppg_fifo_reader.state_r",   forced_ppg_state)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_ppg_fifo_reader.poll_cnt_r", forced_ppg_poll)
 
         cocotb.log.info("Released all force-init nets — chip should run with defined initial state")
 
@@ -1323,6 +1370,22 @@ async def test_chip_top_normal_full(dut):
         forced_wf_logit1 = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", 32, "wflash.logit_reg_1")
         forced_wf_feat0  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_0",  32, "wflash.feat_reg_0")
         forced_wf_feat1  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_1",  32, "wflash.feat_reg_1")
+        # --- accel_reader: state machine + counters + read buffer
+        forced_acc_state   = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_accel_reader.state_r",        3,  "accel.state_r")
+        forced_acc_poll    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_accel_reader.poll_cnt_r",      32, "accel.poll_cnt_r")
+        forced_acc_timeout = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_accel_reader.timeout_cnt_r",   32, "accel.timeout_cnt_r")
+        forced_acc_rbuf    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_accel_reader.read_buf_r",      48, "accel.read_buf_r")
+        forced_acc_ridx    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_accel_reader.read_idx_r",      3,  "accel.read_idx_r")
+        _gl_force_bit_zero(scope, "i_chip_core.u_top.u_accel_reader.init_done_o", "accel.init_done_o")
+        # --- i2c_master: state machine + timer + shift register + byte/bit counters
+        forced_i2c_state   = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_i2c_master.state_r",    5, "i2c.state_r")
+        forced_i2c_timer   = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_i2c_master.timer_r",    6, "i2c.timer_r")
+        forced_i2c_sr      = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_i2c_master.sr_r",       8, "i2c.sr_r")
+        forced_i2c_byte    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_i2c_master.byte_cnt_r", 8, "i2c.byte_cnt_r")
+        forced_i2c_bcnt    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_i2c_master.bit_cnt_r",  3, "i2c.bit_cnt_r")
+        # --- ppg_fifo_reader: state machine + poll counter (shares I2C bus with accel)
+        forced_ppg_state   = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_ppg_fifo_reader.state_r",   4,  "ppg.state_r")
+        forced_ppg_poll    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_ppg_fifo_reader.poll_cnt_r", 32, "ppg.poll_cnt_r")
         await ClockCycles(dut.clk_PAD, 5)
         _rst_handle(dut).value = 1
         await ClockCycles(_clk_handle(dut), 2)
@@ -1350,6 +1413,19 @@ async def test_chip_top_normal_full(dut):
         _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", forced_wf_logit1)
         _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_0",  forced_wf_feat0)
         _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_1",  forced_wf_feat1)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_accel_reader.state_r",        forced_acc_state)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_accel_reader.poll_cnt_r",      forced_acc_poll)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_accel_reader.timeout_cnt_r",   forced_acc_timeout)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_accel_reader.read_buf_r",      forced_acc_rbuf)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_accel_reader.read_idx_r",      forced_acc_ridx)
+        _gl_release_bit(scope, "i_chip_core.u_top.u_accel_reader.init_done_o")
+        _gl_release_vector(scope, "i_chip_core.u_top.u_i2c_master.state_r",    forced_i2c_state)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_i2c_master.timer_r",    forced_i2c_timer)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_i2c_master.sr_r",       forced_i2c_sr)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_i2c_master.byte_cnt_r", forced_i2c_byte)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_i2c_master.bit_cnt_r",  forced_i2c_bcnt)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_ppg_fifo_reader.state_r",   forced_ppg_state)
+        _gl_release_vector(scope, "i_chip_core.u_top.u_ppg_fifo_reader.poll_cnt_r", forced_ppg_poll)
         cocotb.log.info("Released all force-init nets")
     else:
         await reset(dut)
