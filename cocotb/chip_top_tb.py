@@ -469,11 +469,12 @@ async def _gl_force_fsm_to_all(scope, clk):
             h.value = Release()
         return False
 
-    # Force the CPU clock enable path: the FSM flop (cpu_clk_en_r) and the ICG
-    # latch (cpu_clk_en_lat).  Without this the ICG stays disabled even though
-    # state_q is ALL — forcing state_q alone doesn't reliably re-enable the CPU
-    # clock in the synthesised netlist.
-    for net in ["i_chip_core.u_top.fsm.cpu_clk_en_r",
+    # Force the CPU clock enable path.  The synthesised name differs from RTL:
+    #   RTL top_fsm.sv cpu_clk_en_r → flat net i_chip_core.u_top.cpu_clk_en
+    #   RTL top.sv cpu_clk_en_lat   → absorbed into dlyc_1/buf_2, no separate net
+    # Try all known candidate names; missing ones are silently skipped.
+    for net in ["i_chip_core.u_top.cpu_clk_en",
+                "i_chip_core.u_top.fsm.cpu_clk_en_r",
                 "i_chip_core.u_top.cpu_clk_en_lat"]:
         try:
             h = _flat_gl_bit(scope, net)
