@@ -551,6 +551,11 @@ def _gl_progress(dut):
         # ---------- Alarm ----------
         "cpu_alarm":    _flat_gl_raw(scope, "i_chip_core.u_top.cpu_alarm_w"),
         "fsm_alarm_o":  _flat_gl_raw(scope, "i_chip_core.u_top.fsm.alarm_o"),
+
+        # ---------- I2C / sensor health ----------
+        "sensor_scl_w": _flat_gl_raw(scope, "i_chip_core.u_top.sensor_scl_w"),
+        "feat_en_top":  _flat_gl_raw(scope, "i_chip_core.u_top.feat_en"),
+        "i2c_en":       _flat_gl_raw(scope, "i_chip_core.u_top.u_i2c_master.en_i"),
     }
 
 
@@ -1210,11 +1215,12 @@ async def test_chip_top_normal(dut):
                 try:
                     p = _gl_progress(dut)
                     print(f"[GL @{cycle:7d}] rst_n={p['rst_n']} reset_i={p['reset_i']} core_clk={p['core_clk']} cpu_clk={p['cpu_clk']}", flush=True)
-                    print(f"[GL @{cycle:7d}] fsm={p['fsm']} boot={p['boot']} start={p['fsm_starti']} feat_v={p['fsm_featvi']} ml_irq={p['fsm_mlirq']} alarm={p['fsm_alarm_o']}", flush=True)
+                    print(f"[GL @{cycle:7d}] fsm={p['fsm']} boot={p['boot']} feat_en={p['feat_en']} ml_en={p['ml_en']} cpu_en={p['cpu_en']} tmode={p['fsm_tmode']} start={p['fsm_starti']} feat_v={p['fsm_featvi']} ml_irq={p['fsm_mlirq']} alarm={p['fsm_alarm_o']}", flush=True)
                     print(f"[GL @{cycle:7d}] cpu_sleep={p['sleep']} trap={p['trap']} status={p['status']} code={p['code']}", flush=True)
                     print(f"[GL @{cycle:7d}] timer_evt={p['tim_evt']} tim_ctrl={p['tim_ctrl']} tim_count={p['tim_count']}", flush=True)
                     print(f"[GL @{cycle:7d}] irq_pend={p['irq_pend']} wake_en={p['irq_wake_en']} wake_req={p['irq_wake_req']}", flush=True)
                     print(f"[GL @{cycle:7d}] accel_v={p['accel_v']} ppg_v={p['ppg_v']} feat_valid={p['feat_valid']} logit0={p['logit0']} logit1={p['logit1']}", flush=True)
+                    print(f"[GL @{cycle:7d}] sensor_scl={p['sensor_scl_w']} feat_en_top={p['feat_en_top']} i2c_en={p['i2c_en']}", flush=True)
                     print(f"[GL @{cycle:7d}] pad_alarm={dut.alarm_o.value}", flush=True)
                 except Exception as e:
                     print(f"[GL @{cycle:7d}] _gl_progress ERROR: {e}", flush=True)
