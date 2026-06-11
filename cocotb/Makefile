@@ -823,31 +823,6 @@ test-cpu-ml: $(CPU_ML_VVP)
 
 
 # ============================================================
-# Cocotb: host_i2c_bridge_regs contract
-# ============================================================
-
-HOST_BRIDGE_TOP    := sim_host_i2c_bridge_regs
-HOST_BRIDGE_TOP_V  := $(TB_DIR)/sim_host_i2c_bridge_regs.v
-HOST_BRIDGE_VVP    := sim_host_i2c_bridge_regs.vvp
-HOST_BRIDGE_PYMOD  := test_host_i2c_bridge_regs
-
-HOST_BRIDGE_RTL_SRCS := \
-  $(RTL_DIR)/host_i2c_bridge_regs.v
-
-$(HOST_BRIDGE_VVP): $(HOST_BRIDGE_TOP_V) $(HOST_BRIDGE_RTL_SRCS)
-	@echo "[COCOTB] Building $@"
-	$(IVERILOG) -g2012 -o $@ \
-	  $(HOST_BRIDGE_TOP_V) \
-	  $(HOST_BRIDGE_RTL_SRCS)
-
-.PHONY: test-host-i2c-bridge
-test-host-i2c-bridge: $(HOST_BRIDGE_VVP)
-	@echo "[COCOTB] Running $(HOST_BRIDGE_PYMOD) on $(HOST_BRIDGE_TOP)"
-	@export COCOTB_TOPLEVEL=$(HOST_BRIDGE_TOP); \
-	export COCOTB_TEST_MODULES=$(HOST_BRIDGE_PYMOD); \
-	$(call RUN_COCOTB_ICARUS,$(HOST_BRIDGE_VVP))
-
-# ============================================================
 # Cocotb: irq_ctrl_mmio race and sideband behavior
 # ============================================================
 

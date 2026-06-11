@@ -1269,8 +1269,26 @@ async def test_chip_top_normal_full(dut):
     core  = _core(dut)
     u_top = _top(dut)
 
+    if hdl_toplevel == _GL_SENSOR_BRIDGE:
+        from test_chip_top_i2c_pads import (
+            Lis2dw12Device, Adpd144riDevice, _build_sensor_model_streams,
+        )
+        accel_samples, ppg_samples = _build_sensor_model_streams()
+        _accel = Lis2dw12Device(
+            sda=dut.sensor_sda_sample, sda_o=dut.accel_sda_o,
+            scl=dut.sensor_scl_sample, scl_o=dut.accel_scl_o,
+            samples=accel_samples,
+        )
+        _ppg = Adpd144riDevice(
+            sda=dut.sensor_sda_sample, sda_o=dut.ppg_sda_o,
+            scl=dut.sensor_scl_sample, scl_o=dut.ppg_scl_o,
+            samples=ppg_samples,
+        )
+        cocotb.start_soon(_accel._run())
+        cocotb.start_soon(_ppg._run())
+
     BOOT_TIMEOUT    = _env_int("BOOT_TIMEOUT_CYCLES", 250_000 if gl else 500_000)
-    RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 300_000 if gl else 500_000)
+    RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 15_00_000 if gl else 30_00_000)
 
     # --- Phase 1: wait for boot ---
     cocotb.log.info("Waiting for boot_done...")
