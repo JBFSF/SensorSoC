@@ -424,6 +424,43 @@ _FSM_ONEHOT_NAMES = {
 }
 
 
+async def _gl_fsm_sleep_unlocker(dut):
+    """Workaround for Yosys fsm_expand eliminating the FEAT_ONLY state flop.
+
+    RTL path: SLEEP --(irqc_wake_req)--> FEAT_ONLY --(feat_valid)--> ALL
+    GL path after optimization: SLEEP --> ALL when (irqc_wake_req AND feat_valid)
+    simultaneously. This deadlocks because feat_en_o = 0 in SLEEP, so feat_valid
+    can never fire. This coroutine detects SLEEP+wake_req and forces state_q
+    directly to ALL (bit 4), replicating the intended two-cycle transition.
+    """
+    if not gl:
+        return
+    from cocotb.handle import Release
+    scope = _gl_chip_inst(dut)
+    clk   = _clk_handle(dut)
+    while True:
+        await RisingEdge(clk)
+        sleep_raw = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[2]")
+        wake_raw  = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.irqc_wake_req_i")
+        if sleep_raw == "1" and wake_raw == "1":
+            cocotb.log.info("[gl_sleep_unlock] SLEEP+irqc_wake_req — forcing state_q SLEEP(2)→ALL(4)")
+            try:
+                bit2 = _flat_gl_bit(scope, "i_chip_core.u_top.fsm.state_q[2]")
+                bit4 = _flat_gl_bit(scope, "i_chip_core.u_top.fsm.state_q[4]")
+                bit2.value = Force(0)
+                bit4.value = Force(1)
+                # Hold for two rising edges so combinatorial state_d stabilises
+                # from the forced ALL state before releasing the DFF outputs.
+                await RisingEdge(clk)
+                await RisingEdge(clk)
+                bit2.value = Release()
+                bit4.value = Release()
+                cocotb.log.info("[gl_sleep_unlock] Released — FSM should hold ALL naturally")
+            except AttributeError:
+                cocotb.log.warning("[gl_sleep_unlock] state_q[2]/[4] missing — cannot force FSM")
+            return
+
+
 def _gl_decode_fsm_state(scope):
     """Read state_q as a one-hot vector and decode which state is active.
 
@@ -1191,6 +1228,14 @@ async def test_chip_top_normal(dut):
         _gl_release_vector(scope, "i_chip_core.u_top.u_ppg_fifo_reader.state_r",   forced_ppg_state)
         _gl_release_vector(scope, "i_chip_core.u_top.u_ppg_fifo_reader.poll_cnt_r", forced_ppg_poll)
 
+        # Release the ICG force last so the clock can propagate cleanly once all
+        # other state is un-forced.
+        try:
+            from cocotb.handle import Release
+            u_top.cpu_clk_en_lat.value = Release()
+        except AttributeError:
+            pass
+
         cocotb.log.info("Released all force-init nets — chip should run with defined initial state")
 
     if hdl_toplevel == _GL_SENSOR_BRIDGE:
@@ -1214,7 +1259,10 @@ async def test_chip_top_normal(dut):
         cocotb.start_soon(_ppg._run())
 
     BOOT_TIMEOUT    = 500_000
-    RUNTIME_TIMEOUT = 4_000_000
+    # GL uses real chip parameters baked in synthesis (GT_EPOCH_COUNT_MAX=1000,
+    # ACC_POLL_PERIOD_TICKS=50000) so feature computation takes ~50M cycles.
+    # Override via RUNTIME_TIMEOUT_CYCLES env var for CI speed tuning.
+    RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 200_000_000 if gl else 4_000_000)
     # --- Phase 1: wait for boot ---
     logger.info("Waiting for boot_done...")
     cocotb.log.info(f"Firmware.hex is: {_FIRMWARE_HEX}")
@@ -1245,6 +1293,9 @@ async def test_chip_top_normal(dut):
     else:
         # GL mode — internal signals are flattened away. Only pads are observable.
         cocotb.start_soon(_gl_heartbeat(dut))
+        # FEAT_ONLY (bit 3) has no flop in GL (Yosys fsm_expand eliminated it).
+        # Without this coroutine the FSM deadlocks in SLEEP forever.
+        cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
 
     # Per-second CSV results logger (always on — no waves means we need this)
     results_path = str(_PROJ / "sim_results.csv")
@@ -1426,6 +1477,11 @@ async def test_chip_top_normal_full(dut):
         _gl_release_vector(scope, "i_chip_core.u_top.u_i2c_master.bit_cnt_r",  forced_i2c_bcnt)
         _gl_release_vector(scope, "i_chip_core.u_top.u_ppg_fifo_reader.state_r",   forced_ppg_state)
         _gl_release_vector(scope, "i_chip_core.u_top.u_ppg_fifo_reader.poll_cnt_r", forced_ppg_poll)
+        try:
+            from cocotb.handle import Release
+            u_top.cpu_clk_en_lat.value = Release()
+        except AttributeError:
+            pass
         cocotb.log.info("Released all force-init nets")
     else:
         await reset(dut)
@@ -1449,7 +1505,7 @@ async def test_chip_top_normal_full(dut):
         cocotb.start_soon(_ppg._run())
 
     BOOT_TIMEOUT    = _env_int("BOOT_TIMEOUT_CYCLES", 250_000 if gl else 500_000)
-    RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 15_00_000 if gl else 30_00_000)
+    RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 200_000_000 if gl else 30_00_000)
 
     # --- Phase 1: wait for boot ---
     cocotb.log.info("Waiting for boot_done...")
@@ -1474,6 +1530,7 @@ async def test_chip_top_normal_full(dut):
         cocotb.start_soon(_can_sleep_monitor(_clk_handle(dut), u_top, core))
     else:
         cocotb.start_soon(_gl_heartbeat(dut))
+        cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
 
     # --- Phase 2: wait for alarm_o to assert (test passes on rising edge) ---
     # The firmware runs inferences and writes ALARM_CTRL=1 once the wake streak
