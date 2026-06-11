@@ -424,36 +424,72 @@ _FSM_ONEHOT_NAMES = {
 }
 
 
+def _gl_force_vector_to_val(scope, base_name, width, value):
+    """Force each bit of a vector register to represent the given integer value.
+    Returns the list of forced bit indices (only the ones found in the netlist)."""
+    forced = []
+    for bit in range(width):
+        try:
+            h = _flat_gl_bit(scope, f"{base_name}[{bit}]")
+            h.value = Force((value >> bit) & 1)
+            forced.append(bit)
+        except AttributeError:
+            pass
+    return forced
+
+
 async def _gl_force_fsm_to_all(scope, clk):
-    """Force one-hot FSM to ALL (bit 4) for 2 cycles then release.
+    """Force one-hot FSM to ALL (bit 4) and re-enable the CPU clock, then release.
 
     Clears bits 0,2,5,6,7,8,9 (all non-ALL states that exist as flops),
-    forces bit 4 (ALL) high, holds for 2 rising edges so combinatorial
-    state_d stabilises, then releases everything.
+    forces bit 4 (ALL) high, and also forces cpu_clk_en_r + cpu_clk_en_lat to 1
+    so the ICG enables the CPU clock immediately.  Holds for 3 rising edges so
+    the DFF pipeline and ICG latch both propagate, then releases everything.
     Returns True on success, False if state_q[4] is missing from the netlist.
     """
     from cocotb.handle import Release
-    to_clear = []
+    to_force_zero = []
+    to_force_one  = []
+
     for n in [0, 2, 5, 6, 7, 8, 9]:
         try:
             h = _flat_gl_bit(scope, f"i_chip_core.u_top.fsm.state_q[{n}]")
             h.value = Force(0)
-            to_clear.append(h)
+            to_force_zero.append(h)
         except AttributeError:
             pass
+
     try:
         h4 = _flat_gl_bit(scope, "i_chip_core.u_top.fsm.state_q[4]")
         h4.value = Force(1)
+        to_force_one.append(h4)
     except AttributeError:
         cocotb.log.warning("[gl_force_fsm_to_all] state_q[4] missing — cannot force ALL")
-        for h in to_clear:
+        for h in to_force_zero:
             h.value = Release()
         return False
+
+    # Force the CPU clock enable path: the FSM flop (cpu_clk_en_r) and the ICG
+    # latch (cpu_clk_en_lat).  Without this the ICG stays disabled even though
+    # state_q is ALL — forcing state_q alone doesn't reliably re-enable the CPU
+    # clock in the synthesised netlist.
+    for net in ["i_chip_core.u_top.fsm.cpu_clk_en_r",
+                "i_chip_core.u_top.cpu_clk_en_lat"]:
+        try:
+            h = _flat_gl_bit(scope, net)
+            h.value = Force(1)
+            to_force_one.append(h)
+        except AttributeError:
+            pass
+
+    # 3 edges: 1 for DFF capture, 1 for ICG latch propagation, 1 guard
     await RisingEdge(clk)
     await RisingEdge(clk)
-    for h in to_clear:
+    await RisingEdge(clk)
+    for h in to_force_zero:
         h.value = Release()
-    h4.value = Release()
+    for h in to_force_one:
+        h.value = Release()
     return True
 
 
@@ -525,6 +561,56 @@ async def _gl_fsm_sleep_unlocker(dut):
                 feat_ml_count = 0
         else:
             feat_ml_count = 0
+
+
+async def _gl_fast_epoch_forward(dut):
+    """Skip the 50 000-cycle inter-poll wait so epochs complete in ~10 M cycles.
+
+    In the real chip ACC_POLL_PERIOD_TICKS=50 000 (baked into GL synthesis), so
+    one epoch of 1000 accel samples takes ~50 M cycles — far too slow for GL sim.
+    This coroutine continuously forces poll_cnt_r=49 999 (=ACC_POLL_PERIOD_TICKS-1)
+    whenever the FSM is in a pipeline-active state (ALL / CPU_FEAT / FEAT_ONLY).
+    The accel_reader sees the counter at max on every IDLE cycle and starts the
+    next I2C transaction immediately, reducing the inter-poll wait from 50 000
+    cycles to ~1 cycle.  Each I2C read still takes its natural ~8 000–10 000
+    cycles at 10 MHz / 100 kHz I2C, so 1000 polls per epoch ≈ 8–10 M cycles.
+    """
+    if not gl:
+        return
+    scope = _gl_chip_inst(dut)
+    clk   = _clk_handle(dut)
+    from cocotb.handle import Release
+
+    ACC_POLL_MAX   = 49_999   # ACC_POLL_PERIOD_TICKS - 1 baked from chip_top.sv
+    POLL_CNT_NET   = "i_chip_core.u_top.u_accel_reader.poll_cnt_r"
+    POLL_CNT_WIDTH = 32
+
+    forced_bits    = []
+    in_ff          = False
+
+    while True:
+        await RisingEdge(clk)
+        s6  = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[6]")   # FEAT_ML
+        s4  = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[4]")   # ALL
+        s5  = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]")   # CPU_FEAT
+        # Activate fast-forward once in a good pipeline state (not stuck in FEAT_ML)
+        active = (s4 == "1" or s5 == "1") and s6 != "1"
+
+        if active and not in_ff:
+            forced_bits = _gl_force_vector_to_val(
+                scope, POLL_CNT_NET, POLL_CNT_WIDTH, ACC_POLL_MAX
+            )
+            if forced_bits:
+                cocotb.log.info(
+                    f"[gl_fast_epoch] poll_cnt_r forced to {ACC_POLL_MAX}: "
+                    f"inter-poll wait compressed ({len(forced_bits)}/{POLL_CNT_WIDTH} bits)"
+                )
+            in_ff = True
+        elif not active and in_ff:
+            _gl_release_vector(scope, POLL_CNT_NET, forced_bits)
+            forced_bits = []
+            in_ff = False
+            cocotb.log.info("[gl_fast_epoch] poll_cnt_r released (FSM left pipeline)")
 
 
 def _gl_decode_fsm_state(scope):
@@ -1329,6 +1415,9 @@ async def test_chip_top_normal(dut):
     # synthesis artifact during Phase 1, before Phase 2 ever starts.
     if gl:
         cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
+        # Compress the 50K-cycle inter-poll wait so epochs complete in ~10M cycles
+        # instead of 50M (ACC_POLL_PERIOD_TICKS=50000 is baked into the GL netlist).
+        cocotb.start_soon(_gl_fast_epoch_forward(dut))
 
     BOOT_TIMEOUT    = 500_000
     # GL uses real chip parameters baked in synthesis (GT_EPOCH_COUNT_MAX=1000,
@@ -1578,6 +1667,7 @@ async def test_chip_top_normal_full(dut):
     # Start GL FSM monitor early (same reason as test_chip_top_normal).
     if gl:
         cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
+        cocotb.start_soon(_gl_fast_epoch_forward(dut))
 
     BOOT_TIMEOUT    = _env_int("BOOT_TIMEOUT_CYCLES", 250_000 if gl else 500_000)
     RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 200_000_000 if gl else 30_00_000)
