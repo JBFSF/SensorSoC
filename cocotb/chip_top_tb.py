@@ -1046,8 +1046,12 @@ async def test_chip_top_normal(dut):
     forced_wf_state = []
 
     if gl:
-        # Bypass ICG X-propagation until icgtp_1 fix is re-synthesized.
-        u_top.cpu_clk_en_lat.value = Force(1)
+        # Bypass ICG X-propagation if icgtp_1 was not yet re-synthesized.
+        # Net is absent in netlists where the fix is already in — skip silently.
+        try:
+            u_top.cpu_clk_en_lat.value = Force(1)
+        except AttributeError:
+            cocotb.log.info("cpu_clk_en_lat not in netlist — ICG fix present, skipping force")
 
         # Yosys mapped sync-reset RTL to plain dffq_1 cells (no reset port).
         # In GL sim, flops power up to X and the sync-reset combo path computes
@@ -1280,7 +1284,10 @@ async def test_chip_top_normal_full(dut):
         _rst_handle(dut).value = 0
         await ClockCycles(_clk_handle(dut), 5)
         scope = _gl_chip_inst(dut)
-        u_top.cpu_clk_en_lat.value = Force(1)
+        try:
+            u_top.cpu_clk_en_lat.value = Force(1)
+        except AttributeError:
+            cocotb.log.info("cpu_clk_en_lat not in netlist — ICG fix present, skipping force")
         forced_fsm_bits = []
         for n in range(10):
             try:
