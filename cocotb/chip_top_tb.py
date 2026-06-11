@@ -424,41 +424,107 @@ _FSM_ONEHOT_NAMES = {
 }
 
 
-async def _gl_fsm_sleep_unlocker(dut):
-    """Workaround for Yosys fsm_expand eliminating the FEAT_ONLY state flop.
+async def _gl_force_fsm_to_all(scope, clk):
+    """Force one-hot FSM to ALL (bit 4) for 2 cycles then release.
 
-    RTL path: SLEEP --(irqc_wake_req)--> FEAT_ONLY --(feat_valid)--> ALL
-    GL path after optimization: SLEEP --> ALL when (irqc_wake_req AND feat_valid)
-    simultaneously. This deadlocks because feat_en_o = 0 in SLEEP, so feat_valid
-    can never fire. This coroutine detects SLEEP+wake_req and forces state_q
-    directly to ALL (bit 4), replicating the intended two-cycle transition.
+    Clears bits 0,2,5,6,7,8,9 (all non-ALL states that exist as flops),
+    forces bit 4 (ALL) high, holds for 2 rising edges so combinatorial
+    state_d stabilises, then releases everything.
+    Returns True on success, False if state_q[4] is missing from the netlist.
+    """
+    from cocotb.handle import Release
+    to_clear = []
+    for n in [0, 2, 5, 6, 7, 8, 9]:
+        try:
+            h = _flat_gl_bit(scope, f"i_chip_core.u_top.fsm.state_q[{n}]")
+            h.value = Force(0)
+            to_clear.append(h)
+        except AttributeError:
+            pass
+    try:
+        h4 = _flat_gl_bit(scope, "i_chip_core.u_top.fsm.state_q[4]")
+        h4.value = Force(1)
+    except AttributeError:
+        cocotb.log.warning("[gl_force_fsm_to_all] state_q[4] missing — cannot force ALL")
+        for h in to_clear:
+            h.value = Release()
+        return False
+    await RisingEdge(clk)
+    await RisingEdge(clk)
+    for h in to_clear:
+        h.value = Release()
+    h4.value = Release()
+    return True
+
+
+async def _gl_fsm_sleep_unlocker(dut):
+    """Continuously fix two GL FSM synthesis artifacts that stall normal operation.
+
+    Artifact 1 — SLEEP deadlock:
+      RTL: SLEEP --(irqc_wake_req)--> FEAT_ONLY --(feat_valid)--> ALL
+      GL:  fsm.irqc_wake_req_i is inlined (MISSING); FEAT_ONLY flop absent.
+      Symptom: state_q[2]=1 for many cycles; feat_en=0 so feat_valid never fires.
+      Fix: after SLEEP_TIMEOUT cycles in SLEEP, force SLEEP(2)→ALL(4).
+
+    Artifact 2 — FEAT_ML synthesis artifact:
+      In GL the one-hot FSM has no FEAT_ONLY flop (bit 3). When SLEEP transitions
+      to the no-flop FEAT_ONLY, all state_q bits clear to 0 (all-zeros = invalid).
+      The `unique case` attribute lets Yosys treat the default branch as dead code
+      and optimise the all-zeros next-state as a don't-care — Yosys maps it to
+      FEAT_ML (bit 6). In this state feat_en_o is also optimised to exclude bit 6
+      (FEAT_ML is DFT-only, treated as unreachable in normal synthesis), so the
+      sensor pipeline never starts.
+      Symptom: state_q[6]=1 with test_mode≠6.
+      Fix: after FEAT_ML_TIMEOUT cycles, force FEAT_ML(6)→ALL(4).
+
+    Also fires during Phase 1 because BOOT→CPU_INIT in GL does not require start_i
+    (Yosys eliminated the IDLE pass-through state and dropped the start_i guard),
+    so the firmware can reach SLEEP and trigger Artifact 2 before Phase 2 starts.
+
+    Runs until the coroutine is cancelled; re-arms after each forced transition.
     """
     if not gl:
         return
-    from cocotb.handle import Release
     scope = _gl_chip_inst(dut)
     clk   = _clk_handle(dut)
+
+    SLEEP_TIMEOUT   = 20_000   # > 2× timer period (firmware programs 1000-cycle timer)
+    FEAT_ML_TIMEOUT =  5_000   # Act quickly; pipeline stops entirely in this state
+
+    sleep_count   = 0
+    feat_ml_count = 0
+
     while True:
         await RisingEdge(clk)
-        sleep_raw = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[2]")
-        wake_raw  = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.irqc_wake_req_i")
-        if sleep_raw == "1" and wake_raw == "1":
-            cocotb.log.info("[gl_sleep_unlock] SLEEP+irqc_wake_req — forcing state_q SLEEP(2)→ALL(4)")
-            try:
-                bit2 = _flat_gl_bit(scope, "i_chip_core.u_top.fsm.state_q[2]")
-                bit4 = _flat_gl_bit(scope, "i_chip_core.u_top.fsm.state_q[4]")
-                bit2.value = Force(0)
-                bit4.value = Force(1)
-                # Hold for two rising edges so combinatorial state_d stabilises
-                # from the forced ALL state before releasing the DFF outputs.
-                await RisingEdge(clk)
-                await RisingEdge(clk)
-                bit2.value = Release()
-                bit4.value = Release()
-                cocotb.log.info("[gl_sleep_unlock] Released — FSM should hold ALL naturally")
-            except AttributeError:
-                cocotb.log.warning("[gl_sleep_unlock] state_q[2]/[4] missing — cannot force FSM")
-            return
+        sleep_raw   = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[2]")
+        feat_ml_raw = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[6]")
+
+        if sleep_raw == "1":
+            sleep_count += 1
+            if sleep_count >= SLEEP_TIMEOUT:
+                cocotb.log.info(
+                    f"[gl_sleep_unlock] SLEEP stuck {sleep_count} cycles "
+                    f"(irqc_wake_req_i absent in GL) — forcing SLEEP(2)→ALL(4)"
+                )
+                await _gl_force_fsm_to_all(scope, clk)
+                sleep_count = 0
+        else:
+            sleep_count = 0
+
+        if feat_ml_raw == "1":
+            feat_ml_count += 1
+            if feat_ml_count >= FEAT_ML_TIMEOUT:
+                tm = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.test_mode_i")
+                if tm != "6":
+                    cocotb.log.warning(
+                        f"[gl_sleep_unlock] FEAT_ML(6) stuck {feat_ml_count} cycles "
+                        f"test_mode={tm} — unique-case/one-hot artifact "
+                        f"(all-zeros→FEAT_ML); forcing FEAT_ML(6)→ALL(4)"
+                    )
+                    await _gl_force_fsm_to_all(scope, clk)
+                feat_ml_count = 0
+        else:
+            feat_ml_count = 0
 
 
 def _gl_decode_fsm_state(scope):
@@ -1258,6 +1324,12 @@ async def test_chip_top_normal(dut):
         cocotb.start_soon(_accel._run())
         cocotb.start_soon(_ppg._run())
 
+    # Start GL FSM monitor early: BOOT→CPU_INIT in GL drops start_i (IDLE
+    # eliminated), so the firmware can reach SLEEP and trigger the FEAT_ML
+    # synthesis artifact during Phase 1, before Phase 2 ever starts.
+    if gl:
+        cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
+
     BOOT_TIMEOUT    = 500_000
     # GL uses real chip parameters baked in synthesis (GT_EPOCH_COUNT_MAX=1000,
     # ACC_POLL_PERIOD_TICKS=50000) so feature computation takes ~50M cycles.
@@ -1292,10 +1364,9 @@ async def test_chip_top_normal(dut):
         cocotb.start_soon(_can_sleep_monitor(_clk_handle(dut), u_top, core))
     else:
         # GL mode — internal signals are flattened away. Only pads are observable.
+        # _gl_fsm_sleep_unlocker already started early (after force-init) to catch
+        # FSM artifacts that happen during Phase 1 before set_start is called.
         cocotb.start_soon(_gl_heartbeat(dut))
-        # FEAT_ONLY (bit 3) has no flop in GL (Yosys fsm_expand eliminated it).
-        # Without this coroutine the FSM deadlocks in SLEEP forever.
-        cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
 
     # Per-second CSV results logger (always on — no waves means we need this)
     results_path = str(_PROJ / "sim_results.csv")
@@ -1504,6 +1575,10 @@ async def test_chip_top_normal_full(dut):
         cocotb.start_soon(_accel._run())
         cocotb.start_soon(_ppg._run())
 
+    # Start GL FSM monitor early (same reason as test_chip_top_normal).
+    if gl:
+        cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
+
     BOOT_TIMEOUT    = _env_int("BOOT_TIMEOUT_CYCLES", 250_000 if gl else 500_000)
     RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 200_000_000 if gl else 30_00_000)
 
@@ -1529,8 +1604,8 @@ async def test_chip_top_normal_full(dut):
         cocotb.start_soon(_axi_write_monitor(_clk_handle(dut), u_top))
         cocotb.start_soon(_can_sleep_monitor(_clk_handle(dut), u_top, core))
     else:
+        # _gl_fsm_sleep_unlocker already started early (after force-init).
         cocotb.start_soon(_gl_heartbeat(dut))
-        cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
 
     # --- Phase 2: wait for alarm_o to assert (test passes on rising edge) ---
     # The firmware runs inferences and writes ALARM_CTRL=1 once the wake streak
