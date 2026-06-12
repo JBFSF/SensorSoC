@@ -564,6 +564,70 @@ async def _gl_fsm_sleep_unlocker(dut):
             feat_ml_count = 0
 
 
+async def _gl_keep_cpu_clk_active(dut):
+    """GL artifact fix: the cpu_clk_en_r DFF D-input (_003902_) is permanently
+    stuck at 0 because a NOR gate upstream (net36868 / AOI211 chain) prevents
+    cpu_clk_en_next from reaching 1, even when the FSM is in ALL state.
+
+    Root cause (confirmed via netlist trace):
+      _003902_ = NOR(net36868, _035876_)
+      net36868 or _035876_ is held high by a synthesis-time optimisation that
+      treats the one-hot all-zeros encoding as a don't-care, causing the DFF to
+      always capture 0.
+
+    Fix: force the ICG E pin (net42357, the gate that produces cpu_clk) to 1
+    whenever the FSM is in a CPU-active state.  The ICG E pin is connected to
+    cpu_clk_en through a 4-buffer chain:
+      cpu_clk_en → net18720 → net42359 → net42358 → net42357 → ICG .E
+    Forcing it directly bypasses the broken DFF D-input path and mirrors the
+    RTL intent of cpu_clk_en_r.
+
+    Runs forever alongside _gl_fsm_sleep_unlocker; self-arms on each transition.
+    """
+    if not gl:
+        return
+    from cocotb.handle import Release
+    scope = _gl_chip_inst(dut)
+    clk   = _clk_handle(dut)
+
+    # net42357 is declared as a plain (non-escaped) identifier in chip_top.
+    # Try the escaped form first (for simulator compatibility), then plain name.
+    icg_e = _flat_gl_handle(scope, "net42357")
+    if icg_e is None:
+        try:
+            icg_e = scope._id("net42357", extended=False)
+        except AttributeError:
+            icg_e = None
+    if icg_e is None:
+        cocotb.log.warning(
+            "[gl_cpu_clk] net42357 (ICG E pin) not found — "
+            "cpu_clk stuck-at-0 artifact will persist"
+        )
+        return
+
+    cocotb.log.info("[gl_cpu_clk] net42357 found — persistent cpu_clk fix active")
+
+    # States where the RTL asserts cpu_clk_en_r (cpu_en_o):
+    # ALL=4, CPU_FEAT=5, CPU_ONLY=7, CPU_INIT=9
+    CPU_ACTIVE = [4, 5, 7, 9]
+    forced = False
+
+    while True:
+        await RisingEdge(clk)
+        cpu_active = any(
+            _flat_gl_raw(scope, f"i_chip_core.u_top.fsm.state_q[{n}]") == "1"
+            for n in CPU_ACTIVE
+        )
+        if cpu_active and not forced:
+            icg_e.value = Force(1)
+            forced = True
+            cocotb.log.info("[gl_cpu_clk] CPU-active state — forcing ICG E (net42357)=1")
+        elif not cpu_active and forced:
+            icg_e.value = Release()
+            forced = False
+            cocotb.log.info("[gl_cpu_clk] CPU-inactive state — releasing ICG E force")
+
+
 async def _gl_fast_epoch_forward(dut):
     """Skip the 50 000-cycle inter-poll wait so epochs complete in ~10 M cycles.
 
@@ -1416,6 +1480,7 @@ async def test_chip_top_normal(dut):
     # synthesis artifact during Phase 1, before Phase 2 ever starts.
     if gl:
         cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
+        cocotb.start_soon(_gl_keep_cpu_clk_active(dut))
         # Compress the 50K-cycle inter-poll wait so epochs complete in ~10M cycles
         # instead of 50M (ACC_POLL_PERIOD_TICKS=50000 is baked into the GL netlist).
         cocotb.start_soon(_gl_fast_epoch_forward(dut))
@@ -1668,6 +1733,7 @@ async def test_chip_top_normal_full(dut):
     # Start GL FSM monitor early (same reason as test_chip_top_normal).
     if gl:
         cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
+        cocotb.start_soon(_gl_keep_cpu_clk_active(dut))
         cocotb.start_soon(_gl_fast_epoch_forward(dut))
 
     BOOT_TIMEOUT    = _env_int("BOOT_TIMEOUT_CYCLES", 250_000 if gl else 500_000)
