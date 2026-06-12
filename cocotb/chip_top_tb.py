@@ -678,6 +678,75 @@ async def _gl_fast_epoch_forward(dut):
             cocotb.log.info("[gl_fast_epoch] poll_cnt_r released (FSM left pipeline)")
 
 
+async def _gl_fast_feat_valid(dut):
+    """GL speedup: collapse the 1000-poll epoch to ~20K warmup cycles.
+
+    In GL, ACC_EPOCH_COUNT=1000 is baked into synthesis, so reaching feat_valid
+    naturally requires ~9M cycles (1000 polls × ~9K cycles each of real I2C).
+    This coroutine:
+      1. Waits for FSM to enter a feat-pipeline-active state (ALL / CPU_FEAT)
+      2. Lets 20K cycles of real I2C polling run (proves the sensor pipeline
+         is actually wired up and functioning in GL)
+      3. Forces the epoch-end strobe for exactly 1 clock cycle, which propagates
+         to feat_valid_w and triggers the ML engine to start inference
+
+    Net priority order:
+      i_chip_core.u_top.epoch_end_w  — upstream epoch trigger (preferred)
+      i_chip_core.feat_valid_w       — direct strobe at chip_core scope
+      i_chip_core.u_top.feat_valid_w — strobe inside u_top
+    """
+    if not gl:
+        return
+    from cocotb.handle import Release
+    scope = _gl_chip_inst(dut)
+    clk   = _clk_handle(dut)
+
+    # ALL=4, CPU_FEAT=5 are the states where the feature pipeline is active.
+    # FEAT_ONLY(3) DFF was optimized away in GL — it's transient and immediately
+    # becomes ALL on the next cycle, so we only need to wait for ALL/CPU_FEAT.
+    FEAT_ACTIVE = [4, 5]
+    for _ in range(500_000):
+        await RisingEdge(clk)
+        if any(_flat_gl_raw(scope, f"i_chip_core.u_top.fsm.state_q[{n}]") == "1"
+               for n in FEAT_ACTIVE):
+            break
+    else:
+        cocotb.log.warning("[gl_feat_valid] never entered feat-active state — epoch speedup inactive")
+        return
+
+    # Let a handful of real I2C transactions run before injecting feat_valid.
+    # 20K cycles ≈ 2 full I2C read polls at 100 kHz — enough to prove connectivity.
+    cocotb.log.info("[gl_feat_valid] feat-active — 20K warmup cycles (real I2C polling)")
+    for _ in range(20_000):
+        await RisingEdge(clk)
+
+    # Find the first available strobe net
+    net_candidates = [
+        "i_chip_core.u_top.epoch_end_w",
+        "i_chip_core.feat_valid_w",
+        "i_chip_core.u_top.feat_valid_w",
+    ]
+    sig = None
+    chosen = None
+    for name in net_candidates:
+        sig = _flat_gl_handle(scope, name)
+        if sig is not None:
+            chosen = name
+            break
+    if sig is None:
+        cocotb.log.warning(
+            "[gl_feat_valid] none of epoch_end_w / feat_valid_w found "
+            "— epoch will run to natural completion (~9M cycles)"
+        )
+        return
+
+    cocotb.log.info(f"[gl_feat_valid] using '{chosen}' — forcing feat_valid=1 for 1 cycle")
+    sig.value = Force(1)
+    await RisingEdge(clk)
+    sig.value = Release()
+    cocotb.log.info("[gl_feat_valid] feat_valid released — ML engine should start inference")
+
+
 def _gl_decode_fsm_state(scope):
     """Read state_q as a one-hot vector and decode which state is active.
 
@@ -1481,15 +1550,15 @@ async def test_chip_top_normal(dut):
     if gl:
         cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
         cocotb.start_soon(_gl_keep_cpu_clk_active(dut))
-        # Compress the 50K-cycle inter-poll wait so epochs complete in ~10M cycles
-        # instead of 50M (ACC_POLL_PERIOD_TICKS=50000 is baked into the GL netlist).
         cocotb.start_soon(_gl_fast_epoch_forward(dut))
+        # Collapse 1000-poll epoch (~9M cycles) to ~20K warmup + 1-cycle force
+        cocotb.start_soon(_gl_fast_feat_valid(dut))
 
     BOOT_TIMEOUT    = 500_000
-    # GL uses real chip parameters baked in synthesis (GT_EPOCH_COUNT_MAX=1000,
-    # ACC_POLL_PERIOD_TICKS=50000) so feature computation takes ~50M cycles.
+    # With _gl_fast_feat_valid the epoch completes in ~20K cycles; ML inference
+    # may add another 100K–1M cycles. 20M is a generous but realistic GL ceiling.
     # Override via RUNTIME_TIMEOUT_CYCLES env var for CI speed tuning.
-    RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 200_000_000 if gl else 4_000_000)
+    RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 20_000_000 if gl else 4_000_000)
     # --- Phase 1: wait for boot ---
     logger.info("Waiting for boot_done...")
     cocotb.log.info(f"Firmware.hex is: {_FIRMWARE_HEX}")
@@ -1735,9 +1804,10 @@ async def test_chip_top_normal_full(dut):
         cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
         cocotb.start_soon(_gl_keep_cpu_clk_active(dut))
         cocotb.start_soon(_gl_fast_epoch_forward(dut))
+        cocotb.start_soon(_gl_fast_feat_valid(dut))
 
     BOOT_TIMEOUT    = _env_int("BOOT_TIMEOUT_CYCLES", 250_000 if gl else 500_000)
-    RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 200_000_000 if gl else 30_00_000)
+    RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 20_000_000 if gl else 30_00_000)
 
     # --- Phase 1: wait for boot ---
     cocotb.log.info("Waiting for boot_done...")
