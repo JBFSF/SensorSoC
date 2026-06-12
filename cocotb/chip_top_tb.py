@@ -720,11 +720,14 @@ async def _gl_fast_feat_valid(dut):
     for _ in range(20_000):
         await RisingEdge(clk)
 
-    # Find the first available strobe net
+    # Find the first available strobe net.
+    # Priority: inside u_top first — that's what feat_latched_valid_r and the
+    # ML engine actually read.  i_chip_core.feat_valid_w is only the chip_core
+    # boundary observation wire and forcing it has no effect on the DFF inside u_top.
     net_candidates = [
-        "i_chip_core.u_top.epoch_end_w",
-        "i_chip_core.feat_valid_w",
-        "i_chip_core.u_top.feat_valid_w",
+        "i_chip_core.u_top.feat_valid_w",   # primary — sets feat_latched_valid_r
+        "i_chip_core.u_top.epoch_end_w",    # upstream trigger (may not survive GL opt)
+        "i_chip_core.feat_valid_w",          # chip_core boundary only — last resort
     ]
     sig = None
     chosen = None
@@ -740,11 +743,13 @@ async def _gl_fast_feat_valid(dut):
         )
         return
 
-    cocotb.log.info(f"[gl_feat_valid] using '{chosen}' — forcing feat_valid=1 for 1 cycle")
+    # Hold for 5 cycles so feat_latched_valid_r DFF reliably captures the 1.
+    cocotb.log.info(f"[gl_feat_valid] using '{chosen}' — forcing feat_valid=1 for 5 cycles")
     sig.value = Force(1)
-    await RisingEdge(clk)
+    for _ in range(5):
+        await RisingEdge(clk)
     sig.value = Release()
-    cocotb.log.info("[gl_feat_valid] feat_valid released — ML engine should start inference")
+    cocotb.log.info("[gl_feat_valid] feat_valid released — feat_latched_valid_r should be 1")
 
 
 def _gl_decode_fsm_state(scope):
