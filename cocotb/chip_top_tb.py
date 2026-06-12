@@ -679,21 +679,23 @@ async def _gl_fast_epoch_forward(dut):
 
 
 async def _gl_fast_feat_valid(dut):
-    """GL speedup: collapse the 1000-poll epoch to ~20K warmup cycles.
+    """GL speedup: collapse the 1000-poll epoch to ~150K warmup + forced strobe.
 
     In GL, ACC_EPOCH_COUNT=1000 is baked into synthesis, so reaching feat_valid
     naturally requires ~9M cycles (1000 polls × ~9K cycles each of real I2C).
     This coroutine:
       1. Waits for FSM to enter a feat-pipeline-active state (ALL / CPU_FEAT)
-      2. Lets 20K cycles of real I2C polling run (proves the sensor pipeline
-         is actually wired up and functioning in GL)
-      3. Forces the epoch-end strobe for exactly 1 clock cycle, which propagates
-         to feat_valid_w and triggers the ML engine to start inference
+      2. Lets 150K cycles of real I2C polling run (~30 real sensor reads)
+      3. Forces epoch_end_d (feature_engine.enable_i) for 10 cycles; this
+         propagates: epoch_end_d=1 → feat_valid_o=1 → feat_latched_valid_r=1
+         AND loads feature latches with partial real sensor data.
 
-    Net priority order:
-      i_chip_core.u_top.epoch_end_w  — upstream epoch trigger (preferred)
-      i_chip_core.feat_valid_w       — direct strobe at chip_core scope
-      i_chip_core.u_top.feat_valid_w — strobe inside u_top
+    Net priority order (confirmed from chip_top.pnl.v grep):
+      i_chip_core.u_top.epoch_end_d         — direct feature_engine enable (primary)
+      i_chip_core.epoch_end_w               — one stage upstream (chip_core scope)
+      i_chip_core.u_top.feat_latched_valid_r — sticky DFF fallback (long hold)
+    NOTE: i_chip_core.u_top.epoch_end_w and i_chip_core.u_top.feat_valid_w do
+    NOT exist in the GL netlist (optimised away or merged into chip_core scope).
     """
     if not gl:
         return
@@ -714,42 +716,62 @@ async def _gl_fast_feat_valid(dut):
         cocotb.log.warning("[gl_feat_valid] never entered feat-active state — epoch speedup inactive")
         return
 
-    # Let a handful of real I2C transactions run before injecting feat_valid.
-    # 20K cycles ≈ 2 full I2C read polls at 100 kHz — enough to prove connectivity.
-    cocotb.log.info("[gl_feat_valid] feat-active — 20K warmup cycles (real I2C polling)")
-    for _ in range(20_000):
+    # Let real I2C sensor reads accumulate before injecting the epoch end strobe.
+    # 150K cycles ≈ 30 full I2C read polls — gives non-trivial partial feature
+    # statistics so ML inference has meaningful data to classify.
+    cocotb.log.info("[gl_feat_valid] feat-active — 150K warmup cycles (real I2C polling)")
+    for _ in range(150_000):
         await RisingEdge(clk)
 
-    # Find the first available strobe net.
-    # Priority: inside u_top first — that's what feat_latched_valid_r and the
-    # ML engine actually read.  i_chip_core.feat_valid_w is only the chip_core
-    # boundary observation wire and forcing it has no effect on the DFF inside u_top.
+    # Find the first available net to force, confirmed from GL netlist grep:
+    #
+    #   wire \i_chip_core.u_top.epoch_end_d          (line 59624 chip_top.pnl.v)
+    #     → direct feature_engine.enable_i; forcing 10 cycles propagates:
+    #       epoch_end_d=1 → feat_valid_o=1 (1 cycle later) → feat_latched_valid_r=1
+    #       AND feature latches capture partial sensor stats from 30 real reads.
+    #
+    #   wire \i_chip_core.epoch_end_w                (line 57011 chip_top.pnl.v)
+    #     → one pipeline stage upstream of epoch_end_d; also works, 10-cycle hold.
+    #     NOTE: i_chip_core.u_top.epoch_end_w does NOT exist (merged into chip_core
+    #     scope by Yosys); i_chip_core.u_top.feat_valid_w also optimised away.
+    #
+    #   wire \i_chip_core.u_top.feat_latched_valid_r (line 59648 chip_top.pnl.v)
+    #     → last resort: DFF Q reverts to 0 on Release() (D input = epoch logic = 0),
+    #       so hold for 2M cycles to cover the CPU polling window. Feature latches
+    #       stay zero (no feat_valid_o fired), so ML gets zero features — still lets
+    #       the test reach an ML result, even if the logits are degenerate.
     net_candidates = [
-        "i_chip_core.u_top.feat_valid_w",   # primary — sets feat_latched_valid_r
-        "i_chip_core.u_top.epoch_end_w",    # upstream trigger (may not survive GL opt)
-        "i_chip_core.feat_valid_w",          # chip_core boundary only — last resort
+        ("i_chip_core.u_top.epoch_end_d",          10),
+        ("i_chip_core.epoch_end_w",                10),
+        ("i_chip_core.u_top.feat_latched_valid_r", 2_000_000),
     ]
     sig = None
     chosen = None
-    for name in net_candidates:
+    hold_cycles = 10
+    for name, cycles in net_candidates:
         sig = _flat_gl_handle(scope, name)
         if sig is not None:
             chosen = name
+            hold_cycles = cycles
             break
     if sig is None:
         cocotb.log.warning(
-            "[gl_feat_valid] none of epoch_end_w / feat_valid_w found "
+            "[gl_feat_valid] no epoch_end / feat_latched net found "
             "— epoch will run to natural completion (~9M cycles)"
         )
         return
 
-    # Hold for 5 cycles so feat_latched_valid_r DFF reliably captures the 1.
-    cocotb.log.info(f"[gl_feat_valid] using '{chosen}' — forcing feat_valid=1 for 5 cycles")
+    cocotb.log.info(
+        f"[gl_feat_valid] using '{chosen}' — forcing to 1 for {hold_cycles} cycles"
+    )
     sig.value = Force(1)
-    for _ in range(5):
+    for _ in range(hold_cycles):
         await RisingEdge(clk)
     sig.value = Release()
-    cocotb.log.info("[gl_feat_valid] feat_valid released — feat_latched_valid_r should be 1")
+    cocotb.log.info(
+        f"[gl_feat_valid] '{chosen}' released — "
+        "feat_latched_valid_r should be 1, feature latches populated"
+    )
 
 
 def _gl_decode_fsm_state(scope):
