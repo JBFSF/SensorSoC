@@ -469,19 +469,13 @@ async def _gl_force_fsm_to_all(scope, clk):
             h.value = Release()
         return False
 
-    # Force the CPU clock enable path.  The synthesised name differs from RTL:
-    #   RTL top_fsm.sv cpu_clk_en_r → flat net i_chip_core.u_top.cpu_clk_en
-    #   RTL top.sv cpu_clk_en_lat   → absorbed into dlyc_1/buf_2, no separate net
-    # Try all known candidate names; missing ones are silently skipped.
-    for net in ["i_chip_core.u_top.cpu_clk_en",
-                "i_chip_core.u_top.fsm.cpu_clk_en_r",
-                "i_chip_core.u_top.cpu_clk_en_lat"]:
-        try:
-            h = _flat_gl_bit(scope, net)
-            h.value = Force(1)
-            to_force_one.append(h)
-        except AttributeError:
-            pass
+    # NOTE: cpu_clk_en is intentionally NOT forced here.
+    # _gl_keep_cpu_clk_active is the sole owner of cpu_clk_en forcing.
+    # In Verilog simulation, a single `release` undoes ALL prior `force` calls on
+    # a net — including those from other coroutines. If we forced cpu_clk_en here
+    # and then Released it after 3 cycles, that Release would also undo
+    # _gl_keep_cpu_clk_active's Force, permanently dropping cpu_clk_en to 0 even
+    # though _gl_keep_cpu_clk_active still believed forced=True.
 
     # 3 edges: 1 for DFF capture, 1 for ICG latch propagation, 1 guard
     await RisingEdge(clk)
@@ -636,16 +630,22 @@ async def _gl_keep_cpu_clk_active(dut):
             _flat_gl_raw(scope, f"i_chip_core.u_top.fsm.state_q[{n}]") == "1"
             for n in CPU_ACTIVE
         )
-        if cpu_active and not forced:
+        if cpu_active:
+            # Re-apply Force every cycle, not just on transition.
+            # Another coroutine (_gl_force_fsm_to_all) may call Release() on the
+            # same net, which in Verilog simulation undoes ALL prior force calls
+            # regardless of origin. Re-applying here ensures the force is restored
+            # on the very next rising edge after any such Release.
             icg_e.value = Force(1)
             for h in cpu_en_handles:
                 h.value = Force(1)
-            forced = True
-            cocotb.log.info(
-                "[gl_cpu_clk] CPU-active state — forcing ICG E (net42357)=1 "
-                f"and {len(cpu_en_handles)} cpu_en net(s)=1 (bus_valid fix)"
-            )
-        elif not cpu_active and forced:
+            if not forced:
+                forced = True
+                cocotb.log.info(
+                    "[gl_cpu_clk] CPU-active state — forcing ICG E (net42357)=1 "
+                    f"and {len(cpu_en_handles)} cpu_en net(s)=1 (bus_valid fix)"
+                )
+        elif forced:
             icg_e.value = Release()
             for h in cpu_en_handles:
                 h.value = Release()
@@ -704,23 +704,22 @@ async def _gl_fast_epoch_forward(dut):
 
 
 async def _gl_fast_feat_valid(dut):
-    """GL speedup: directly force feat_latched_valid_r=1 to trigger ML inference.
+    """GL speedup: force feat_latched_valid_r=1 and bypass ML inference via
+    forced ml_irq_w + WAKE-predicting logit registers.
 
-    In GL, sleep_req_i is synthesized away so the FSM never leaves ALL(4) via the
-    CPU-sleep path — SLEEP(2) is never reached.  The previous epoch-injection
-    approach via SLEEP-exit detection therefore never fires.
+    Without the ml_irq bypass each ML inference requires ~3 M cycles of SPI
+    weight fetches (~4.7 h at 187 sim-cycles/s on the GL netlist).  With the
+    bypass each iteration costs ~350 K cycles (~30 min), total ~1 h instead
+    of ~30 h.
 
-    Instead, we force feat_latched_valid_r=1 directly and hold the force until the
-    FSM enters CPU_FEAT(5), which means the CPU saw the latch, wrote features to
-    taketwo, and started ML inference.  We then release so the CPU can clear it
-    normally via the MMIO write-to-clear path.
+    Logit convention (from logit_monitor): WAKE if logit0 >= logit1.
+    We force logit_reg_0=0x0100, logit_reg_1=0x0000 for a deterministic WAKE.
 
-    WAKE_STREAK_REQ=2 requires two consecutive WAKE predictions, so we inject
-    twice with ML inference (CPU_FEAT) in between.
+    WAKE_STREAK_REQ=2 → two consecutive WAKE injections needed.
 
     GL coroutines start ~137K cycles before Phase 2 (boot takes that long).
-    We wait 200K cycles so Phase 2 is ~63K cycles in with real I2C sensor data
-    before the first injection.
+    WARMUP_CYCLES=200K runs concurrently with boot so the net post-boot
+    settle is ~63K cycles before the first injection.
     """
     if not gl:
         return
@@ -738,79 +737,123 @@ async def _gl_fast_feat_valid(dut):
         cocotb.log.warning("[gl_feat_valid] feat_latched_valid_r MISSING — cannot inject")
         return
 
-    async def _force_feat_latched(label: str) -> bool:
-        """Hold feat_latched_valid_r=1 until ML inference completes, then release.
+    ml_irq_sig = _flat_gl_handle(scope, "i_chip_core.ml_irq_w")
+    if ml_irq_sig is None:
+        cocotb.log.warning(
+            "[gl_feat_valid] ml_irq_w MISSING — ML bypass disabled; "
+            "expect ~3 M-cycle wait per iteration (very slow)"
+        )
 
-        Two modes depending on whether the FSM is already in CPU_FEAT:
+    async def _fire_ml_inference(label: str) -> bool:
+        """Inject one WAKE-predicting ML inference cycle.
 
-        Normal (FSM in ALL): wait for ml_irq → CPU_FEAT entry; release then wait
-          for CPU_FEAT exit.  sleep_req_i may be synthesized away so CPU_FEAT can
-          stay active indefinitely — the 2M wait exits on timeout (returning True),
-          leaving iter-2 to run within the same CPU_FEAT epoch.
-
-        Already-in-CPU_FEAT (iter-2 when can_sleep_w=0 keeps FSM in CPU_FEAT):
-          The force must be held until CPU_FEAT exits (ALARM fires after wake_streak
-          reaches 2), otherwise the 1-cycle release races with firmware polling.
-          Release happens when state_q[5] goes to 0.
+        1. Force feat_latched_valid_r=1 and WAKE-favoring logit registers.
+        2. Wait 30K cycles for firmware timer ISR to fire and send ML START.
+        3. Force ml_irq_w=1 for 10 cycles (bypass SPI weight fetch ~3 M cycles).
+        4. Wait up to 100K cycles for FSM to enter CPU_FEAT (ALL→CPU_FEAT).
+        5. Release feat_latched; hold logit forces while CPU reads and decides.
+        6. Release logits when CPU_FEAT exits or after 200K hold cycles.
         """
         already_in_cpu_feat = (
             _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]") == "1"
         )
-
         cocotb.log.info(
-            f"[gl_feat_valid] {label}: forcing feat_latched_valid_r=1 "
+            f"[gl_feat_valid] {label}: forcing feat_latched=1 + WAKE logits "
             f"(already_in_cpu_feat={already_in_cpu_feat})"
         )
         feat_latched_sig.value = Force(1)
 
-        if already_in_cpu_feat:
-            # Hold until CPU_FEAT exits (alarm fires → CPU_FEAT→ALARM transition)
-            for _ in range(5_000_000):
-                await RisingEdge(clk)
-                if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]") != "1":
-                    cocotb.log.info(
-                        f"[gl_feat_valid] {label}: CPU_FEAT exited — releasing feat_latched"
-                    )
-                    feat_latched_sig.value = Release()
-                    return True
-            cocotb.log.warning(
-                f"[gl_feat_valid] {label}: CPU_FEAT never exited (alarm timeout) — releasing"
-            )
-            feat_latched_sig.value = Release()
-            return False
+        # WAKE outcome: logit0=+256 > logit1=0 → "good time to wake"
+        L0_VAL = 0x0100
+        L1_VAL = 0x0000
+        logit0_bits = _gl_force_vector_to_val(
+            scope, "i_chip_core.u_top.u_weight_flash.logit_reg_0", 32, L0_VAL
+        )
+        logit1_bits = _gl_force_vector_to_val(
+            scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", 32, L1_VAL
+        )
 
-        # Wait for CPU_FEAT entry (ml_irq fires after ML inference starts)
-        for _ in range(5_000_000):
+        # Give firmware time to process feat_latched=1 and initiate taketwo.
+        # Timer period ≈1000 cycles; 30K cycles guarantees ≥30 timer fires.
+        CPU_PROCESS_CYCLES = 30_000
+        for _ in range(CPU_PROCESS_CYCLES):
             await RisingEdge(clk)
-            if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]") == "1":
-                break
-        else:
-            cocotb.log.warning(f"[gl_feat_valid] {label}: CPU_FEAT never seen — releasing")
+
+        if ml_irq_sig is not None:
+            # Wait for FSM in ALL(4) or CPU_FEAT(5) before asserting ml_irq.
+            # _gl_fsm_sleep_unlocker ensures ALL within 5K cycles.
+            for _ in range(10_000):
+                await RisingEdge(clk)
+                s4 = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[4]")
+                s5 = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]")
+                if s4 == "1" or s5 == "1":
+                    break
+            cocotb.log.info(
+                f"[gl_feat_valid] {label}: forcing ml_irq=1 (bypass SPI weight fetch)"
+            )
+            ml_irq_sig.value = Force(1)
+            for _ in range(10):
+                await RisingEdge(clk)
+            ml_irq_sig.value = Release()
+            cocotb.log.info(f"[gl_feat_valid] {label}: ml_irq released")
+
+        if not already_in_cpu_feat:
+            # Wait for FSM ALL→CPU_FEAT triggered by ml_irq
+            for _ in range(100_000):
+                await RisingEdge(clk)
+                if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]") == "1":
+                    cocotb.log.info(f"[gl_feat_valid] {label}: CPU_FEAT entered")
+                    break
+            else:
+                cocotb.log.warning(
+                    f"[gl_feat_valid] {label}: CPU_FEAT never seen after ml_irq force — releasing"
+                )
+                feat_latched_sig.value = Release()
+                _gl_release_vector(
+                    scope, "i_chip_core.u_top.u_weight_flash.logit_reg_0", logit0_bits
+                )
+                _gl_release_vector(
+                    scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", logit1_bits
+                )
+                return False
             feat_latched_sig.value = Release()
-            return False
+            cocotb.log.info(
+                f"[gl_feat_valid] {label}: feat_latched released; holding logits for CPU read"
+            )
+        # already_in_cpu_feat path: feat_latched stays forced until CPU_FEAT exits
 
-        cocotb.log.info(f"[gl_feat_valid] {label}: CPU_FEAT seen — releasing feat_latched force")
-        feat_latched_sig.value = Release()
-
-        # Wait for CPU_FEAT to exit.  With can_sleep_w=0 (GL synthesis artifact),
-        # CPU_FEAT may never exit via FEAT_ONLY — time out after 2M cycles and
-        # return True so iter-2 can run within the same CPU_FEAT window.
-        for _ in range(2_000_000):
+        # Hold logit forces while CPU reads them and updates wake_streak.
+        # Exit early when CPU_FEAT leaves (alarm fired or sleep transition).
+        for i in range(200_000):
             await RisingEdge(clk)
             if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]") != "1":
+                cocotb.log.info(
+                    f"[gl_feat_valid] {label}: CPU_FEAT exited after {i} hold cycles"
+                )
                 break
+        else:
+            cocotb.log.info(f"[gl_feat_valid] {label}: logit-hold timeout (200K) — releasing")
+
+        _gl_release_vector(
+            scope, "i_chip_core.u_top.u_weight_flash.logit_reg_0", logit0_bits
+        )
+        _gl_release_vector(
+            scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", logit1_bits
+        )
+        if already_in_cpu_feat:
+            feat_latched_sig.value = Release()
         return True
 
-    ok = await _force_feat_latched("iter-1")
+    ok = await _fire_ml_inference("iter-1")
     if not ok:
         return
 
-    # Settle: let CPU return to ALL(4) and flush any pending state before iter-2
-    for _ in range(50_000):
+    # Settle: let CPU return to poll loop and re-arm timer before iter-2
+    for _ in range(20_000):
         await RisingEdge(clk)
 
-    await _force_feat_latched("iter-2")
-    cocotb.log.info("[gl_feat_valid] iter-2 complete — expecting ALARM after second CPU_FEAT")
+    await _fire_ml_inference("iter-2")
+    cocotb.log.info("[gl_feat_valid] iter-2 complete — alarm should fire after second WAKE")
 
 
 def _gl_decode_fsm_state(scope):
