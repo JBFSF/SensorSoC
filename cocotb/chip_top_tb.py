@@ -575,12 +575,16 @@ async def _gl_keep_cpu_clk_active(dut):
       treats the one-hot all-zeros encoding as a don't-care, causing the DFF to
       always capture 0.
 
-    Fix: force the ICG E pin (net42357, the gate that produces cpu_clk) to 1
-    whenever the FSM is in a CPU-active state.  The ICG E pin is connected to
-    cpu_clk_en through a 4-buffer chain:
-      cpu_clk_en → net18720 → net42359 → net42358 → net42357 → ICG .E
-    Forcing it directly bypasses the broken DFF D-input path and mirrors the
-    RTL intent of cpu_clk_en_r.
+    Two-part fix:
+      Fix 1 — ICG clock gate: force net42357 (the ICG E pin, 4 buffers from
+        cpu_clk_en) to 1.  This opens the clock gate so PicoRV32 gets a clock.
+        Buffer chain: cpu_clk_en → net18720 → net42359 → net42358 → net42357 → ICG.E
+
+      Fix 2 — bus_valid gate: force cpu_clk_en (= cpu_clk_en_lat in GL, since
+        cpu_clk_en_lat is absorbed into the buffer tree and shares the same source
+        net) to 1.  Without this, bus_valid = mem_valid && cpu_clk_en_lat = 0
+        even though the ICG is open, so PicoRV32 gets a clock but can never
+        complete any memory access and stalls on the very first instruction fetch.
 
     Runs forever alongside _gl_fsm_sleep_unlocker; self-arms on each transition.
     """
@@ -605,7 +609,21 @@ async def _gl_keep_cpu_clk_active(dut):
         )
         return
 
-    cocotb.log.info("[gl_cpu_clk] net42357 found — persistent cpu_clk fix active")
+    # Also find cpu_clk_en to fix bus_valid = mem_valid && cpu_clk_en_lat.
+    # Try candidate names in priority order; missing ones are silently skipped.
+    # (Matches the search list in _gl_force_fsm_to_all for consistency.)
+    cpu_en_handles = []
+    for net in ["i_chip_core.u_top.cpu_clk_en",
+                "i_chip_core.u_top.fsm.cpu_clk_en_r",
+                "i_chip_core.u_top.cpu_clk_en_lat"]:
+        h = _flat_gl_handle(scope, net)
+        if h is not None:
+            cpu_en_handles.append(h)
+
+    cocotb.log.info(
+        f"[gl_cpu_clk] net42357 found — persistent cpu_clk + bus_valid fix active "
+        f"({len(cpu_en_handles)} cpu_en net(s) will be forced alongside ICG E)"
+    )
 
     # States where the RTL asserts cpu_clk_en_r (cpu_en_o):
     # ALL=4, CPU_FEAT=5, CPU_ONLY=7, CPU_INIT=9
@@ -620,12 +638,19 @@ async def _gl_keep_cpu_clk_active(dut):
         )
         if cpu_active and not forced:
             icg_e.value = Force(1)
+            for h in cpu_en_handles:
+                h.value = Force(1)
             forced = True
-            cocotb.log.info("[gl_cpu_clk] CPU-active state — forcing ICG E (net42357)=1")
+            cocotb.log.info(
+                "[gl_cpu_clk] CPU-active state — forcing ICG E (net42357)=1 "
+                f"and {len(cpu_en_handles)} cpu_en net(s)=1 (bus_valid fix)"
+            )
         elif not cpu_active and forced:
             icg_e.value = Release()
+            for h in cpu_en_handles:
+                h.value = Release()
             forced = False
-            cocotb.log.info("[gl_cpu_clk] CPU-inactive state — releasing ICG E force")
+            cocotb.log.info("[gl_cpu_clk] CPU-inactive state — releasing ICG E and cpu_en forces")
 
 
 async def _gl_fast_epoch_forward(dut):
@@ -714,14 +739,47 @@ async def _gl_fast_feat_valid(dut):
         return
 
     async def _force_feat_latched(label: str) -> bool:
-        """Hold feat_latched_valid_r=1 until CPU_FEAT starts, then release.
+        """Hold feat_latched_valid_r=1 until ML inference completes, then release.
 
-        Keeping the Force active until state_q[5]=1 ensures the CPU keeps
-        seeing feat_latched=1 even if it does a write-to-clear before ML starts.
+        Two modes depending on whether the FSM is already in CPU_FEAT:
+
+        Normal (FSM in ALL): wait for ml_irq → CPU_FEAT entry; release then wait
+          for CPU_FEAT exit.  sleep_req_i may be synthesized away so CPU_FEAT can
+          stay active indefinitely — the 2M wait exits on timeout (returning True),
+          leaving iter-2 to run within the same CPU_FEAT epoch.
+
+        Already-in-CPU_FEAT (iter-2 when can_sleep_w=0 keeps FSM in CPU_FEAT):
+          The force must be held until CPU_FEAT exits (ALARM fires after wake_streak
+          reaches 2), otherwise the 1-cycle release races with firmware polling.
+          Release happens when state_q[5] goes to 0.
         """
-        cocotb.log.info(f"[gl_feat_valid] {label}: forcing feat_latched_valid_r=1")
+        already_in_cpu_feat = (
+            _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]") == "1"
+        )
+
+        cocotb.log.info(
+            f"[gl_feat_valid] {label}: forcing feat_latched_valid_r=1 "
+            f"(already_in_cpu_feat={already_in_cpu_feat})"
+        )
         feat_latched_sig.value = Force(1)
 
+        if already_in_cpu_feat:
+            # Hold until CPU_FEAT exits (alarm fires → CPU_FEAT→ALARM transition)
+            for _ in range(5_000_000):
+                await RisingEdge(clk)
+                if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]") != "1":
+                    cocotb.log.info(
+                        f"[gl_feat_valid] {label}: CPU_FEAT exited — releasing feat_latched"
+                    )
+                    feat_latched_sig.value = Release()
+                    return True
+            cocotb.log.warning(
+                f"[gl_feat_valid] {label}: CPU_FEAT never exited (alarm timeout) — releasing"
+            )
+            feat_latched_sig.value = Release()
+            return False
+
+        # Wait for CPU_FEAT entry (ml_irq fires after ML inference starts)
         for _ in range(5_000_000):
             await RisingEdge(clk)
             if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]") == "1":
@@ -734,7 +792,9 @@ async def _gl_fast_feat_valid(dut):
         cocotb.log.info(f"[gl_feat_valid] {label}: CPU_FEAT seen — releasing feat_latched force")
         feat_latched_sig.value = Release()
 
-        # Wait for CPU_FEAT to exit (CPU reads logits, increments WAKE_STREAK)
+        # Wait for CPU_FEAT to exit.  With can_sleep_w=0 (GL synthesis artifact),
+        # CPU_FEAT may never exit via FEAT_ONLY — time out after 2M cycles and
+        # return True so iter-2 can run within the same CPU_FEAT window.
         for _ in range(2_000_000):
             await RisingEdge(clk)
             if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]") != "1":
@@ -1621,11 +1681,12 @@ async def test_chip_top_normal(dut):
             if gl:
                 try:
                     p = _gl_progress(dut)
-                    print(f"[GL @{cycle:7d}] rst_n={p['rst_n']} reset_i={p['reset_i']} core_clk={p['core_clk']} cpu_clk={p['cpu_clk']}", flush=True)
+                    print(f"[GL @{cycle:7d}] rst_n={p['rst_n']} reset_i={p['reset_i']} core_clk={p['core_clk']} cpu_clk={p['cpu_clk']} cpu_clk_lat={p['cpu_clk_lat']}", flush=True)
                     print(f"[GL @{cycle:7d}] fsm={p['fsm']} boot={p['boot']} feat_en={p['feat_en']} ml_en={p['ml_en']} cpu_en={p['cpu_en']} tmode={p['fsm_tmode']} start={p['fsm_starti']} feat_v={p['fsm_featvi']} ml_irq={p['fsm_mlirq']} alarm={p['fsm_alarm_o']}", flush=True)
                     print(f"[GL @{cycle:7d}] cpu_sleep={p['sleep']} trap={p['trap']} status={p['status']} code={p['code']}", flush=True)
+                    print(f"[GL @{cycle:7d}] mem_v={p['mem_v']} mem_rdy={p['mem_rdy']} mem_addr={p['mem_addr']} wflash={p['wflash_state']}", flush=True)
                     print(f"[GL @{cycle:7d}] timer_evt={p['tim_evt']} tim_ctrl={p['tim_ctrl']} tim_count={p['tim_count']}", flush=True)
-                    print(f"[GL @{cycle:7d}] irq_pend={p['irq_pend']} wake_en={p['irq_wake_en']} wake_req={p['irq_wake_req']}", flush=True)
+                    print(f"[GL @{cycle:7d}] irq_pend={p['irq_pend']} irq_mask={p['irq_mask']} irq_to_cpu={p['irq_to_cpu']} wake_en={p['irq_wake_en']} wake_req={p['irq_wake_req']} pwr_sleep={p['pwr_sleep_req']}", flush=True)
                     print(f"[GL @{cycle:7d}] accel_v={p['accel_v']} ppg_v={p['ppg_v']} feat_valid={p['feat_valid']} feat_latched={p['feat_latched']} logit0={p['logit0']} logit1={p['logit1']}", flush=True)
                     print(f"[GL @{cycle:7d}] sensor_scl={p['sensor_scl_w']} feat_en_top={p['feat_en_top']} i2c_en={p['i2c_en']}", flush=True)
                     print(f"[GL @{cycle:7d}] pad_alarm={dut.alarm_o.value}", flush=True)
