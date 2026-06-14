@@ -679,20 +679,23 @@ async def _gl_fast_epoch_forward(dut):
 
 
 async def _gl_fast_feat_valid(dut):
-    """GL speedup: inject epoch_end + pre-assert ml_update_gate to fire feat_valid.
+    """GL speedup: directly force feat_latched_valid_r=1 to trigger ML inference.
 
-    In GL, feat_valid_o = NAND(ml_update_gate_w, dlyc(epoch_end_d)) via _089443_.
-    Both inputs must be 1 simultaneously for feat_latched_valid_r to set.
-    ml_update_gate_w starts at 0 after reset (signal_quality requires a prior
-    epoch with sufficient PPG beats), so we force it alongside epoch_end_d.
+    In GL, sleep_req_i is synthesized away so the FSM never leaves ALL(4) via the
+    CPU-sleep path — SLEEP(2) is never reached.  The previous epoch-injection
+    approach via SLEEP-exit detection therefore never fires.
 
-    RTL sim confirmed: even with zero-valued features (first epoch), ML inference
-    produces a valid wake prediction. WAKE_STREAK_REQ=2 requires two consecutive
-    wake predictions, so we inject two epoch strobes with ML inference in between.
+    Instead, we force feat_latched_valid_r=1 directly and hold the force until the
+    FSM enters CPU_FEAT(5), which means the CPU saw the latch, wrote features to
+    taketwo, and started ML inference.  We then release so the CPU can clear it
+    normally via the MMIO write-to-clear path.
 
-    Net names confirmed from chip_top.pnl.v:
-      i_chip_core.u_top.epoch_end_d  — line 59624, DFF Q (feature_engine enable)
-      i_chip_core.ml_update_gate_w   — line 57064, chip_core scope (not u_top)
+    WAKE_STREAK_REQ=2 requires two consecutive WAKE predictions, so we inject
+    twice with ML inference (CPU_FEAT) in between.
+
+    GL coroutines start ~137K cycles before Phase 2 (boot takes that long).
+    We wait 200K cycles so Phase 2 is ~63K cycles in with real I2C sensor data
+    before the first injection.
     """
     if not gl:
         return
@@ -700,85 +703,54 @@ async def _gl_fast_feat_valid(dut):
     scope = _gl_chip_inst(dut)
     clk   = _clk_handle(dut)
 
-    # Detect FEAT_ONLY via SLEEP-exit: state_q[3] (FEAT_ONLY) is optimized away
-    # in GL (maps to X-NONE / all-zero), so we wait for SLEEP(2) to assert then
-    # deassert.  _gl_fsm_sleep_unlocker drives the SLEEP→FEAT_ONLY transition.
-    for _ in range(2_000_000):
+    WARMUP_CYCLES = 200_000
+    cocotb.log.info(f"[gl_feat_valid] waiting {WARMUP_CYCLES} warmup cycles before iter-1")
+    for _ in range(WARMUP_CYCLES):
         await RisingEdge(clk)
-        if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[2]") == "1":
-            break
-    else:
-        cocotb.log.warning("[gl_feat_valid] SLEEP state never seen — speedup inactive")
+
+    feat_latched_sig = _flat_gl_handle(scope, "i_chip_core.u_top.feat_latched_valid_r")
+    if feat_latched_sig is None:
+        cocotb.log.warning("[gl_feat_valid] feat_latched_valid_r MISSING — cannot inject")
         return
 
-    cocotb.log.info("[gl_feat_valid] SLEEP seen — waiting for FEAT_ONLY (SLEEP exit)")
-    for _ in range(5_000_000):
-        await RisingEdge(clk)
-        if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[2]") != "1":
-            break
-    else:
-        cocotb.log.warning("[gl_feat_valid] SLEEP never exited — speedup inactive")
-        return
+    async def _force_feat_latched(label: str) -> bool:
+        """Hold feat_latched_valid_r=1 until CPU_FEAT starts, then release.
 
-    cocotb.log.info("[gl_feat_valid] FEAT_ONLY — 150K warmup cycles (real I2C)")
-    for _ in range(150_000):
-        await RisingEdge(clk)
+        Keeping the Force active until state_q[5]=1 ensures the CPU keeps
+        seeing feat_latched=1 even if it does a write-to-clear before ML starts.
+        """
+        cocotb.log.info(f"[gl_feat_valid] {label}: forcing feat_latched_valid_r=1")
+        feat_latched_sig.value = Force(1)
 
-    epoch_sig   = _flat_gl_handle(scope, "i_chip_core.u_top.epoch_end_d")
-    ml_gate_sig = _flat_gl_handle(scope, "i_chip_core.ml_update_gate_w")
-
-    if epoch_sig is None or ml_gate_sig is None:
-        cocotb.log.warning(
-            f"[gl_feat_valid] net missing — "
-            f"epoch_end_d={'found' if epoch_sig else 'MISSING'}, "
-            f"ml_update_gate_w={'found' if ml_gate_sig else 'MISSING'} "
-            "— epoch will run to natural completion"
-        )
-        return
-
-    async def _fire_epoch(label: str) -> None:
-        """Assert ml_update_gate_w=1 then epoch_end_d=1 for 10 cycles, then release."""
-        ml_gate_sig.value = Force(1)
-        await RisingEdge(clk)
-        epoch_sig.value = Force(1)
-        for _ in range(10):
+        for _ in range(5_000_000):
             await RisingEdge(clk)
-        epoch_sig.value = Release()
-        for _ in range(3):
+            if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]") == "1":
+                break
+        else:
+            cocotb.log.warning(f"[gl_feat_valid] {label}: CPU_FEAT never seen — releasing")
+            feat_latched_sig.value = Release()
+            return False
+
+        cocotb.log.info(f"[gl_feat_valid] {label}: CPU_FEAT seen — releasing feat_latched force")
+        feat_latched_sig.value = Release()
+
+        # Wait for CPU_FEAT to exit (CPU reads logits, increments WAKE_STREAK)
+        for _ in range(2_000_000):
             await RisingEdge(clk)
-        ml_gate_sig.value = Release()
-        cocotb.log.info(
-            f"[gl_feat_valid] epoch injected ({label}) — "
-            "feat_latched_valid_r should latch 1 within ~2 cycles"
-        )
+            if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]") != "1":
+                break
+        return True
 
-    # Inject first epoch strobe → FSM: FEAT_ONLY→ALL→CPU_FEAT (ML inference 1)
-    await _fire_epoch("iter-1")
-
-    # Wait for ML inference to complete: FSM enters CPU_FEAT (state_q[5]=1)
-    for _ in range(5_000_000):
-        await RisingEdge(clk)
-        if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]") == "1":
-            break
-    else:
-        cocotb.log.warning("[gl_feat_valid] CPU_FEAT never seen after iter-1 — stopping")
+    ok = await _force_feat_latched("iter-1")
+    if not ok:
         return
 
-    cocotb.log.info("[gl_feat_valid] CPU_FEAT seen (iter-1 ML done) — waiting for exit")
-
-    # Wait for CPU_FEAT to exit (CPU requests sleep or raises alarm)
-    for _ in range(2_000_000):
-        await RisingEdge(clk)
-        if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]") != "1":
-            break
-
-    # Settle before second epoch
-    for _ in range(20_000):
+    # Settle: let CPU return to ALL(4) and flush any pending state before iter-2
+    for _ in range(50_000):
         await RisingEdge(clk)
 
-    # Inject second epoch strobe → FSM: FEAT_ONLY→ALL→CPU_FEAT (ML inference 2) → ALARM
-    await _fire_epoch("iter-2")
-    cocotb.log.info("[gl_feat_valid] iter-2 injected — expecting ALARM after second CPU_FEAT")
+    await _force_feat_latched("iter-2")
+    cocotb.log.info("[gl_feat_valid] iter-2 complete — expecting ALARM after second CPU_FEAT")
 
 
 def _gl_decode_fsm_state(scope):
@@ -1493,6 +1465,12 @@ async def test_chip_top_normal(dut):
         forced_ppg_state   = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_ppg_fifo_reader.state_r",   4,  "ppg.state_r")
         forced_ppg_poll    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_ppg_fifo_reader.poll_cnt_r", 32, "ppg.poll_cnt_r")
 
+        # ml_irq_w is the taketwo/weight_flash interrupt output.  Its DFF powers
+        # up to X, and that X propagates through irqc.src_d into irqc.pending,
+        # causing irq_pend=X.  Force it low during the reset window so the IRQ
+        # controller sees a clean initial state.
+        _gl_force_bit_zero(scope, "i_chip_core.ml_irq_w", "ml_irq_w")
+
     # Hold reset asserted for a few more cycles so the forced values propagate
     await ClockCycles(dut.clk_PAD, 5)
 
@@ -1547,6 +1525,8 @@ async def test_chip_top_normal(dut):
 
         _gl_release_vector(scope, "i_chip_core.u_top.u_ppg_fifo_reader.state_r",   forced_ppg_state)
         _gl_release_vector(scope, "i_chip_core.u_top.u_ppg_fifo_reader.poll_cnt_r", forced_ppg_poll)
+
+        _gl_release_bit(scope, "i_chip_core.ml_irq_w")
 
         # Release the ICG force last so the clock can propagate cleanly once all
         # other state is un-forced.
@@ -1646,7 +1626,7 @@ async def test_chip_top_normal(dut):
                     print(f"[GL @{cycle:7d}] cpu_sleep={p['sleep']} trap={p['trap']} status={p['status']} code={p['code']}", flush=True)
                     print(f"[GL @{cycle:7d}] timer_evt={p['tim_evt']} tim_ctrl={p['tim_ctrl']} tim_count={p['tim_count']}", flush=True)
                     print(f"[GL @{cycle:7d}] irq_pend={p['irq_pend']} wake_en={p['irq_wake_en']} wake_req={p['irq_wake_req']}", flush=True)
-                    print(f"[GL @{cycle:7d}] accel_v={p['accel_v']} ppg_v={p['ppg_v']} feat_valid={p['feat_valid']} logit0={p['logit0']} logit1={p['logit1']}", flush=True)
+                    print(f"[GL @{cycle:7d}] accel_v={p['accel_v']} ppg_v={p['ppg_v']} feat_valid={p['feat_valid']} feat_latched={p['feat_latched']} logit0={p['logit0']} logit1={p['logit1']}", flush=True)
                     print(f"[GL @{cycle:7d}] sensor_scl={p['sensor_scl_w']} feat_en_top={p['feat_en_top']} i2c_en={p['i2c_en']}", flush=True)
                     print(f"[GL @{cycle:7d}] pad_alarm={dut.alarm_o.value}", flush=True)
                 except Exception as e:
