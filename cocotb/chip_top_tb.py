@@ -893,9 +893,11 @@ async def _gl_fast_feat_valid(dut):
 
         # Hold logit forces while CPU reads them and updates wake_streak.
         # CPU_FEAT exits via: cpu_alarm_i (→ALARM) or feat_valid_i (→ALL).
-        # sleep_req_i MISSING in GL → can_sleep_w=0 → sleep exit never fires.
+        # In GL, cpu_alarm_i and feat_valid_i are dead ports (synthesis pruned them).
+        # CPU_FEAT can never exit naturally — keep this window short (5K not 100K)
+        # so we reach the cpu_alarm_w fallback quickly rather than burning ~17 min.
         cpu_feat_exited = False
-        for i in range(100_000):
+        for i in range(5_000):
             await RisingEdge(clk)
             if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]") != "1":
                 cocotb.log.info(
@@ -994,9 +996,8 @@ async def _gl_fast_feat_valid(dut):
 
     await _fire_ml_inference("iter-1")
 
-    # Settle: give CPU time to re-arm and sleep_unlocker time to correct FSM
-    # if iter-1 exited via a broken state (FEAT_ML artifact etc.)
-    for _ in range(20_000):
+    # Brief settle: FSM was forced to ALL(4) at end of iter-1, so state is clean.
+    for _ in range(2_000):
         await RisingEdge(clk)
 
     await _fire_ml_inference("iter-2")
