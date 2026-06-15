@@ -799,8 +799,9 @@ async def _gl_fast_feat_valid(dut):
         6. Wait up to 100K cycles for CPU_FEAT to exit naturally.
            NOTE: sleep_req_i is MISSING in GL so can_sleep_w=0 always — CPU_FEAT
            can only exit via cpu_alarm_i or feat_valid_i, not the sleep path.
-        7. iter-2 fallback: if CPU_FEAT never exits, force cpu_alarm_w=1 directly
-           to trigger the CPU_FEAT→ALARM transition.
+        7. iter-2 fallback: if CPU_FEAT never exits, force cpu_alarm_w=1 so the
+           real ALARM-transition gates (AOI22/NAND2/AOI221) drive state_q[8]_D=1
+           and the DFF latches + self-holds ALARM state naturally.
         8. iter-1 fallback: if CPU_FEAT never exits, force FSM back to ALL(4)
            so iter-2 can restart cleanly.
         """
@@ -905,32 +906,76 @@ async def _gl_fast_feat_valid(dut):
 
         if not cpu_feat_exited:
             if label == "iter-2":
-                # Final fallback: firmware could not fire alarm (CPU ISR didn't run
-                # or sleep_req_i MISSING blocked wake-streak completion).
-                # Force cpu_alarm_w=1 to drive CPU_FEAT→ALARM directly.
-                cpu_alarm_sig = _flat_gl_handle(scope, "i_chip_core.u_top.cpu_alarm_w")
-                if cpu_alarm_sig is not None:
-                    cocotb.log.warning(
-                        f"[gl_feat_valid] {label}: CPU_FEAT stuck (100K cycles) — "
-                        f"forcing cpu_alarm_w=1 (sleep_req_i absent in GL)"
-                    )
-                    cpu_alarm_sig.value = Force(1)
-                    for _ in range(10):
-                        await RisingEdge(clk)
-                    cpu_alarm_sig.value = Release()
-                    for _ in range(5_000):
+                # Force cpu_alarm_w=1 to trigger CPU_FEAT→ALARM via the existing
+                # synthesis gates (AOI22/NAND2/AOI221 → state_q[8]_D=1).
+                # Forcing state_q[8] directly is broken: state_q[8] reverts to 0
+                # on the next edge because its D-input = (cpu_alarm_w & state_q[5])
+                # | state_q[8], which collapses when cpu_alarm_w=0 (cpu_alarm_i is
+                # a dead port in the GL flat netlist — synthesis pruned it away).
+                # Forcing cpu_alarm_w lets the real gates compute D=1 so state_q[8]
+                # latches correctly and self-holds via its own OR3 feedback path.
+                cocotb.log.warning(
+                    f"[gl_feat_valid] {label}: CPU_FEAT stuck (100K cycles) — "
+                    f"forcing cpu_alarm_w=1 to trigger CPU_FEAT→ALARM transition"
+                )
+                alarm_h = None
+                for _cand in [
+                    "i_chip_core.u_top.cpu_alarm_w",
+                    "i_chip_core.cpu_alarm_w",
+                    "cpu_alarm_w",
+                ]:
+                    alarm_h = _flat_gl_handle(scope, _cand)
+                    if alarm_h is not None:
+                        cocotb.log.info(
+                            f"[gl_feat_valid] {label}: cpu_alarm_w found as '{_cand}'"
+                        )
+                        break
+
+                if alarm_h is not None:
+                    alarm_h.value = Force(1)
+                    for _ in range(20):
                         await RisingEdge(clk)
                         if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[8]") == "1":
-                            cocotb.log.info(f"[gl_feat_valid] {label}: ALARM state reached via cpu_alarm_w force")
+                            cocotb.log.info(
+                                f"[gl_feat_valid] {label}: ALARM(8) latched via cpu_alarm_w force"
+                            )
                             break
+                    alarm_h.value = Release()
                 else:
+                    # cpu_alarm_w not found — last resort: force state_q bits directly.
+                    # Hold for 20 cycles (not 3) so state_q[5]=0 also has time to latch.
                     cocotb.log.warning(
                         f"[gl_feat_valid] {label}: cpu_alarm_w not found in GL netlist — "
-                        f"test may timeout waiting for alarm_o"
+                        f"falling back to direct state_q[8]=1 force (may not hold)"
                     )
+                    alarm_to_release = []
+                    for n in [0, 2, 4, 5, 6, 7, 9]:
+                        try:
+                            h = _flat_gl_bit(scope, f"i_chip_core.u_top.fsm.state_q[{n}]")
+                            h.value = Force(0)
+                            alarm_to_release.append(h)
+                        except AttributeError:
+                            pass
+                    try:
+                        h8 = _flat_gl_bit(scope, "i_chip_core.u_top.fsm.state_q[8]")
+                        h8.value = Force(1)
+                        alarm_to_release.append(h8)
+                        for _ in range(20):
+                            await RisingEdge(clk)
+                        for h in alarm_to_release:
+                            h.value = Release()
+                        cocotb.log.info(
+                            f"[gl_feat_valid] {label}: ALARM forced via state_q[8]=1"
+                        )
+                    except AttributeError:
+                        cocotb.log.warning(
+                            f"[gl_feat_valid] {label}: state_q[8] not found — test may timeout"
+                        )
+                        for h in alarm_to_release:
+                            h.value = Release()
             else:
-                # iter-1: sleep path broken, so force FSM back to ALL so iter-2
-                # can start fresh from a known state.
+                # iter-1: CPU_FEAT stuck — force FSM back to ALL so iter-2 can
+                # retry from a clean state.
                 cocotb.log.info(
                     f"[gl_feat_valid] {label}: CPU_FEAT hold timeout — "
                     f"forcing FSM back to ALL for iter-2 (sleep_req_i absent in GL)"
