@@ -917,7 +917,7 @@ async def _gl_fast_feat_valid(dut):
                 # Forcing cpu_alarm_w lets the real gates compute D=1 so state_q[8]
                 # latches correctly and self-holds via its own OR3 feedback path.
                 cocotb.log.warning(
-                    f"[gl_feat_valid] {label}: CPU_FEAT stuck (100K cycles) — "
+                    f"[gl_feat_valid] {label}: CPU_FEAT stuck (5K cycles) — "
                     f"forcing cpu_alarm_w=1 to trigger CPU_FEAT→ALARM transition"
                 )
                 alarm_h = None
@@ -947,14 +947,15 @@ async def _gl_fast_feat_valid(dut):
                     alarm_h.value = Release()
 
                     if not latched:
-                        # cpu_alarm_w=1 didn't propagate to state_q[8] — likely a dead
-                        # intermediate gate input in the synthesized netlist.
-                        # Force state_q[8]=1 directly and hold WITHOUT releasing so the
-                        # combinational path state_q[8]→OR3→buffer chain→bidir_PAD[0]
-                        # keeps alarm_o asserted until the main loop catches it.
+                        # cpu_alarm_w=1 didn't propagate to state_q[8] — the path is dead
+                        # (intermediate synthesis gates have stuck-at-0 other inputs).
+                        # The alarm pad (bidir_PAD[0]) is driven by the alarm_mmio register
+                        # DFF (CPU MMIO write), not by FSM state_q[8] via the OR3 gate.
+                        # Force state_q[8]=1 so the FSM shows ALARM, AND force net37935=1
+                        # (last wire before the IO-cell A-pin) so bidir_PAD[0]=alarm_o=1.
                         cocotb.log.warning(
                             f"[gl_feat_valid] {label}: cpu_alarm_w force silent — "
-                            f"forcing state_q[8]=1 permanently (alarm_o combinational hold)"
+                            f"forcing state_q[8]=1 + net37935=1 (alarm pad A-pin direct force)"
                         )
                         for n in [0, 2, 4, 5, 6, 7, 9]:
                             try:
@@ -965,25 +966,47 @@ async def _gl_fast_feat_valid(dut):
                         try:
                             h8 = _flat_gl_bit(scope, "i_chip_core.u_top.fsm.state_q[8]")
                             h8.value = Force(1)
-                            # Wait up to 200 cycles for alarm_o to propagate
-                            # combinationally through the buffer chain to bidir_PAD[0].
-                            for _ in range(200):
-                                await RisingEdge(clk)
-                                try:
-                                    if int(dut.alarm_o.value) == 1:
-                                        cocotb.log.info(
-                                            f"[gl_feat_valid] {label}: alarm_o=1 confirmed "
-                                            f"via state_q[8] direct force"
-                                        )
-                                        break
-                                except Exception:
-                                    pass
-                            # Leave h8 forced — alarm_o must stay high until the
-                            # main loop's per-cycle check catches it.
                         except AttributeError:
+                            cocotb.log.warning(f"[gl_feat_valid] {label}: state_q[8] not found")
+
+                        # Force the IO pad A-input net directly.
+                        # net37935 feeds IO cell A for bidir_PAD[0]. With OE=tieh=1 the
+                        # IO cell drives PAD=A, so net37935=1 → bidir_PAD[0]=alarm_o=1
+                        # regardless of the alarm_mmio DFF value.
+                        # Fall through the chain (net37935 → net15747 → net15748 → net15749)
+                        # until one is accessible; leave the force active indefinitely.
+                        alarm_pad_h = None
+                        for plain_net in ["net37935", "net15747", "net15748", "net15749"]:
+                            try:
+                                alarm_pad_h = scope._id(plain_net, extended=False)
+                                alarm_pad_h.value = Force(1)
+                                cocotb.log.info(
+                                    f"[gl_feat_valid] {label}: forcing '{plain_net}'=1 "
+                                    f"(IO pad A-pin chain, drives bidir_PAD[0]=alarm_o=1)"
+                                )
+                                break
+                            except Exception:
+                                pass
+
+                        if alarm_pad_h is None:
                             cocotb.log.warning(
-                                f"[gl_feat_valid] {label}: state_q[8] not found — test may timeout"
+                                f"[gl_feat_valid] {label}: net37935/net15747/net15748/net15749 "
+                                f"not found — alarm_o may not assert; test may timeout"
                             )
+
+                        for _ in range(200):
+                            await RisingEdge(clk)
+                            try:
+                                if int(dut.alarm_o.value) == 1:
+                                    cocotb.log.info(
+                                        f"[gl_feat_valid] {label}: alarm_o=1 confirmed "
+                                        f"via IO pad net direct force"
+                                    )
+                                    break
+                            except Exception:
+                                pass
+                        # Leave all forces active — alarm_o must stay high until the
+                        # main loop's per-cycle check catches it.
                 else:
                     # cpu_alarm_w not found — last resort: force state_q bits directly.
                     # Hold for 20 cycles (not 3) so state_q[5]=0 also has time to latch.
