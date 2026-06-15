@@ -46,7 +46,7 @@ module top_fsm (
         CPU_INIT  = 4'd9
     } state_t;
 
-    state_t state_d, state_q;
+    (* fsm_encoding = "none" *) state_t state_d, state_q;
 
     logic cpu_clk_en_r;
     logic cpu_clk_en_next;
