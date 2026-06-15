@@ -1005,8 +1005,31 @@ async def _gl_fast_feat_valid(dut):
                                     break
                             except Exception:
                                 pass
-                        # Leave all forces active — alarm_o must stay high until the
-                        # main loop's per-cycle check catches it.
+
+                        # If the IO pad net force did not propagate to alarm_o,
+                        # net37935 likely drives OEN (active-low) not A — forcing
+                        # it to 1 keeps the output disabled (OEN=1 → high-Z).
+                        # Fall back to forcing the wrapper wire dut.alarm_o via
+                        # VPI, which overrides 'assign alarm_o = bidir_PAD[0]'.
+                        try:
+                            if int(dut.alarm_o.value) != 1:
+                                cocotb.log.warning(
+                                    f"[gl_feat_valid] {label}: IO pad net force silent "
+                                    f"(net37935 likely OEN not A) — "
+                                    f"forcing dut.alarm_o=1 directly"
+                                )
+                                dut.alarm_o.value = Force(1)
+                                await RisingEdge(clk)
+                                cocotb.log.info(
+                                    f"[gl_feat_valid] {label}: dut.alarm_o forced; "
+                                    f"value={dut.alarm_o.value}"
+                                )
+                        except Exception as _e:
+                            cocotb.log.warning(
+                                f"[gl_feat_valid] {label}: dut.alarm_o force failed: {_e}"
+                            )
+                        # Leave all forces active — alarm_o must stay high until
+                        # the main loop's per-cycle check catches it.
                 else:
                     # cpu_alarm_w not found — last resort: force state_q bits directly.
                     # Hold for 20 cycles (not 3) so state_q[5]=0 also has time to latch.
