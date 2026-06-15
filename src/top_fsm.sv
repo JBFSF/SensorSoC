@@ -64,7 +64,12 @@ module top_fsm (
     always_comb begin
         state_d = state_q;
 
-        unique case (state_q)
+        // Do NOT use `unique case` here: Yosys exploits the "unique" guarantee
+        // to treat unvisited state encodings as don't-cares, which causes it to
+        // prune irqc_wake_req_i / cpu_alarm_i / ml_irq_i / feat_valid_i as
+        // "unreachable" and eliminate the IDLE and FEAT_ONLY DFFs entirely.
+        // Plain `case` is sufficient; the FSM is still one-hot after synthesis.
+        case (state_q)
             BOOT:      if (boot_done_i)     state_d = IDLE;
             IDLE:      if (start_i)         state_d = CPU_INIT;
             CPU_INIT:  if (can_sleep_w)     state_d = SLEEP;

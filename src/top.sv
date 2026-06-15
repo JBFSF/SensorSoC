@@ -348,7 +348,7 @@ module top #(
 
     wire        ml_ready;
     wire [31:0] ml_rdata;
-    wire        ml_irq;
+    (* keep *) wire ml_irq;
 
     wire        weight_ready;
     wire [31:0] weight_rdata;
@@ -356,7 +356,7 @@ module top #(
     wire        irqc_ready;
     wire [31:0] irqc_rdata;
 
-    wire        irqc_wake_req;
+    (* keep *) wire irqc_wake_req;
 
     wire        test_ready;
     wire [31:0] test_rdata;
@@ -1210,7 +1210,7 @@ module top #(
                        mmio_ready ? mmio_rdata :
                        32'h0000_0000;
 
-    wire cpu_alarm_w;
+    (* keep *) wire cpu_alarm_w;
 
     // Sleep/wake control copied from soc_top.
     //JF: move this to top_fsm.v?

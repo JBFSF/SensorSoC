@@ -133,7 +133,7 @@ module chip_core #(
 
     logic [15:0] debug_bus_w;
 
-    logic feat_valid_w;
+    (* keep *) logic feat_valid_w;
     logic signed [15:0] time_feat_w;
     logic signed [15:0] motion_feat_w;
     logic signed [15:0] delta_hr_feat_w;
@@ -172,9 +172,9 @@ module chip_core #(
     logic        pico_sleeping_w;
     logic        test_force_irq_w;
     logic        test_force_wake_w;
-    logic        ml_irq_w;
+    (* keep *) logic ml_irq_w;
     logic        start_w;
-    logic        timer_event_w;
+    (* keep *) logic timer_event_w;
 
     `ifdef SIM
         logic       sim_req_w;
@@ -226,7 +226,11 @@ module chip_core #(
 
     always_comb begin
         debug_bus_w = '0;
-        unique case (test_mode_w)
+        // Do NOT use `unique case` here: same reason as top_fsm — Yosys exploits
+        // the "unique" guarantee to treat unspecified test_mode values as don't-
+        // cares, which can make debug_bus_w appear dead and cascade-prune the
+        // signals (feat_valid_w, ml_irq_w, timer_event_w) routed through it.
+        case (test_mode_w)
             5'b00000: begin
                 //normal mode, pll clock
                 debug_bus_w = '0;
