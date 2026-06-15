@@ -417,7 +417,7 @@ def _gl_release_bit(scope, escaped_name):
         pass
 
 
-_FSM_ONEHOT_NAMES = {
+_FSM_STATE_NAMES = {
     0: "BOOT", 1: "IDLE", 2: "SLEEP", 3: "FEAT_ONLY",
     4: "ALL", 5: "CPU_FEAT", 6: "FEAT_ML", 7: "CPU_ONLY",
     8: "ALARM", 9: "CPU_INIT",
@@ -438,228 +438,13 @@ def _gl_force_vector_to_val(scope, base_name, width, value):
     return forced
 
 
-async def _gl_force_fsm_to_all(scope, clk):
-    """Force one-hot FSM to ALL (bit 4) and re-enable the CPU clock, then release.
-
-    Clears bits 0,2,5,6,7,8,9 (all non-ALL states that exist as flops),
-    forces bit 4 (ALL) high, and also forces cpu_clk_en_r + cpu_clk_en_lat to 1
-    so the ICG enables the CPU clock immediately.  Holds for 3 rising edges so
-    the DFF pipeline and ICG latch both propagate, then releases everything.
-    Returns True on success, False if state_q[4] is missing from the netlist.
-    """
-    from cocotb.handle import Release
-    to_force_zero = []
-    to_force_one  = []
-
-    for n in [0, 2, 5, 6, 7, 8, 9]:
-        try:
-            h = _flat_gl_bit(scope, f"i_chip_core.u_top.fsm.state_q[{n}]")
-            h.value = Force(0)
-            to_force_zero.append(h)
-        except AttributeError:
-            pass
-
-    try:
-        h4 = _flat_gl_bit(scope, "i_chip_core.u_top.fsm.state_q[4]")
-        h4.value = Force(1)
-        to_force_one.append(h4)
-    except AttributeError:
-        cocotb.log.warning("[gl_force_fsm_to_all] state_q[4] missing — cannot force ALL")
-        for h in to_force_zero:
-            h.value = Release()
-        return False
-
-    # NOTE: cpu_clk_en is intentionally NOT forced here.
-    # _gl_keep_cpu_clk_active is the sole owner of cpu_clk_en forcing.
-    # In Verilog simulation, a single `release` undoes ALL prior `force` calls on
-    # a net — including those from other coroutines. If we forced cpu_clk_en here
-    # and then Released it after 3 cycles, that Release would also undo
-    # _gl_keep_cpu_clk_active's Force, permanently dropping cpu_clk_en to 0 even
-    # though _gl_keep_cpu_clk_active still believed forced=True.
-
-    # 3 edges: 1 for DFF capture, 1 for ICG latch propagation, 1 guard
-    await RisingEdge(clk)
-    await RisingEdge(clk)
-    await RisingEdge(clk)
-    for h in to_force_zero:
-        h.value = Release()
-    for h in to_force_one:
-        h.value = Release()
-    return True
-
-
-async def _gl_fsm_sleep_unlocker(dut):
-    """Continuously fix two GL FSM synthesis artifacts that stall normal operation.
-
-    Artifact 1 — SLEEP deadlock:
-      RTL: SLEEP --(irqc_wake_req)--> FEAT_ONLY --(feat_valid)--> ALL
-      GL:  fsm.irqc_wake_req_i is inlined (MISSING); FEAT_ONLY flop absent.
-      Symptom: state_q[2]=1 for many cycles; feat_en=0 so feat_valid never fires.
-      Fix: after SLEEP_TIMEOUT cycles in SLEEP, force SLEEP(2)→ALL(4).
-
-    Artifact 2 — FEAT_ML synthesis artifact:
-      In GL the one-hot FSM has no FEAT_ONLY flop (bit 3). When SLEEP transitions
-      to the no-flop FEAT_ONLY, all state_q bits clear to 0 (all-zeros = invalid).
-      The `unique case` attribute lets Yosys treat the default branch as dead code
-      and optimise the all-zeros next-state as a don't-care — Yosys maps it to
-      FEAT_ML (bit 6). In this state feat_en_o is also optimised to exclude bit 6
-      (FEAT_ML is DFT-only, treated as unreachable in normal synthesis), so the
-      sensor pipeline never starts.
-      Symptom: state_q[6]=1 with test_mode≠6.
-      Fix: after FEAT_ML_TIMEOUT cycles, force FEAT_ML(6)→ALL(4).
-
-    Also fires during Phase 1 because BOOT→CPU_INIT in GL does not require start_i
-    (Yosys eliminated the IDLE pass-through state and dropped the start_i guard),
-    so the firmware can reach SLEEP and trigger Artifact 2 before Phase 2 starts.
-
-    Runs until the coroutine is cancelled; re-arms after each forced transition.
-    """
-    if not gl:
-        return
-    scope = _gl_chip_inst(dut)
-    clk   = _clk_handle(dut)
-
-    SLEEP_TIMEOUT   = 20_000   # > 2× timer period (firmware programs 1000-cycle timer)
-    FEAT_ML_TIMEOUT =  5_000   # Act quickly; pipeline stops entirely in this state
-
-    sleep_count   = 0
-    feat_ml_count = 0
-
-    while True:
-        await RisingEdge(clk)
-        sleep_raw   = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[2]")
-        feat_ml_raw = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[6]")
-
-        if sleep_raw == "1":
-            sleep_count += 1
-            if sleep_count >= SLEEP_TIMEOUT:
-                cocotb.log.info(
-                    f"[gl_sleep_unlock] SLEEP stuck {sleep_count} cycles "
-                    f"(irqc_wake_req_i absent in GL) — forcing SLEEP(2)→ALL(4)"
-                )
-                await _gl_force_fsm_to_all(scope, clk)
-                sleep_count = 0
-        else:
-            sleep_count = 0
-
-        if feat_ml_raw == "1":
-            feat_ml_count += 1
-            if feat_ml_count >= FEAT_ML_TIMEOUT:
-                tm = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.test_mode_i")
-                if tm != "6":
-                    cocotb.log.warning(
-                        f"[gl_sleep_unlock] FEAT_ML(6) stuck {feat_ml_count} cycles "
-                        f"test_mode={tm} — unique-case/one-hot artifact "
-                        f"(all-zeros→FEAT_ML); forcing FEAT_ML(6)→ALL(4)"
-                    )
-                    await _gl_force_fsm_to_all(scope, clk)
-                feat_ml_count = 0
-        else:
-            feat_ml_count = 0
-
-
-async def _gl_keep_cpu_clk_active(dut):
-    """GL artifact fix: the cpu_clk_en_r DFF D-input (_003902_) is permanently
-    stuck at 0 because a NOR gate upstream (net36868 / AOI211 chain) prevents
-    cpu_clk_en_next from reaching 1, even when the FSM is in ALL state.
-
-    Root cause (confirmed via netlist trace):
-      _003902_ = NOR(net36868, _035876_)
-      net36868 or _035876_ is held high by a synthesis-time optimisation that
-      treats the one-hot all-zeros encoding as a don't-care, causing the DFF to
-      always capture 0.
-
-    Two-part fix:
-      Fix 1 — ICG clock gate: force net42357 (the ICG E pin, 4 buffers from
-        cpu_clk_en) to 1.  This opens the clock gate so PicoRV32 gets a clock.
-        Buffer chain: cpu_clk_en → net18720 → net42359 → net42358 → net42357 → ICG.E
-
-      Fix 2 — bus_valid gate: force cpu_clk_en (= cpu_clk_en_lat in GL, since
-        cpu_clk_en_lat is absorbed into the buffer tree and shares the same source
-        net) to 1.  Without this, bus_valid = mem_valid && cpu_clk_en_lat = 0
-        even though the ICG is open, so PicoRV32 gets a clock but can never
-        complete any memory access and stalls on the very first instruction fetch.
-
-    Runs forever alongside _gl_fsm_sleep_unlocker; self-arms on each transition.
-    """
-    if not gl:
-        return
-    from cocotb.handle import Release
-    scope = _gl_chip_inst(dut)
-    clk   = _clk_handle(dut)
-
-    # net42357 is declared as a plain (non-escaped) identifier in chip_top.
-    # Try the escaped form first (for simulator compatibility), then plain name.
-    icg_e = _flat_gl_handle(scope, "net42357")
-    if icg_e is None:
-        try:
-            icg_e = scope._id("net42357", extended=False)
-        except AttributeError:
-            icg_e = None
-    if icg_e is None:
-        cocotb.log.warning(
-            "[gl_cpu_clk] net42357 (ICG E pin) not found — "
-            "cpu_clk stuck-at-0 artifact will persist"
-        )
-        return
-
-    # Also find cpu_clk_en to fix bus_valid = mem_valid && cpu_clk_en_lat.
-    # Try candidate names in priority order; missing ones are silently skipped.
-    # (Matches the search list in _gl_force_fsm_to_all for consistency.)
-    cpu_en_handles = []
-    for net in ["i_chip_core.u_top.cpu_clk_en",
-                "i_chip_core.u_top.fsm.cpu_clk_en_r",
-                "i_chip_core.u_top.cpu_clk_en_lat"]:
-        h = _flat_gl_handle(scope, net)
-        if h is not None:
-            cpu_en_handles.append(h)
-
-    cocotb.log.info(
-        f"[gl_cpu_clk] net42357 found — persistent cpu_clk + bus_valid fix active "
-        f"({len(cpu_en_handles)} cpu_en net(s) will be forced alongside ICG E)"
-    )
-
-    # States where the RTL asserts cpu_clk_en_r (cpu_en_o):
-    # ALL=4, CPU_FEAT=5, CPU_ONLY=7, CPU_INIT=9
-    CPU_ACTIVE = [4, 5, 7, 9]
-    forced = False
-
-    while True:
-        await RisingEdge(clk)
-        cpu_active = any(
-            _flat_gl_raw(scope, f"i_chip_core.u_top.fsm.state_q[{n}]") == "1"
-            for n in CPU_ACTIVE
-        )
-        if cpu_active:
-            # Re-apply Force every cycle, not just on transition.
-            # Another coroutine (_gl_force_fsm_to_all) may call Release() on the
-            # same net, which in Verilog simulation undoes ALL prior force calls
-            # regardless of origin. Re-applying here ensures the force is restored
-            # on the very next rising edge after any such Release.
-            icg_e.value = Force(1)
-            for h in cpu_en_handles:
-                h.value = Force(1)
-            if not forced:
-                forced = True
-                cocotb.log.info(
-                    "[gl_cpu_clk] CPU-active state — forcing ICG E (net42357)=1 "
-                    f"and {len(cpu_en_handles)} cpu_en net(s)=1 (bus_valid fix)"
-                )
-        elif forced:
-            icg_e.value = Release()
-            for h in cpu_en_handles:
-                h.value = Release()
-            forced = False
-            cocotb.log.info("[gl_cpu_clk] CPU-inactive state — releasing ICG E and cpu_en forces")
-
-
 async def _gl_fast_epoch_forward(dut):
     """Skip the 50 000-cycle inter-poll wait so epochs complete in ~10 M cycles.
 
     In the real chip ACC_POLL_PERIOD_TICKS=50 000 (baked into GL synthesis), so
     one epoch of 1000 accel samples takes ~50 M cycles — far too slow for GL sim.
     This coroutine continuously forces poll_cnt_r=49 999 (=ACC_POLL_PERIOD_TICKS-1)
-    whenever the FSM is in a pipeline-active state (ALL / CPU_FEAT / FEAT_ONLY).
+    whenever the FSM is in a pipeline-active state (FEAT_ONLY / ALL / CPU_FEAT).
     The accel_reader sees the counter at max on every IDLE cycle and starts the
     next I2C transaction immediately, reducing the inter-poll wait from 50 000
     cycles to ~1 cycle.  Each I2C read still takes its natural ~8 000–10 000
@@ -680,11 +465,10 @@ async def _gl_fast_epoch_forward(dut):
 
     while True:
         await RisingEdge(clk)
-        s6  = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[6]")   # FEAT_ML
-        s4  = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[4]")   # ALL
-        s5  = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]")   # CPU_FEAT
-        # Activate fast-forward once in a good pipeline state (not stuck in FEAT_ML)
-        active = (s4 == "1" or s5 == "1") and s6 != "1"
+        # state_q is binary-encoded (fsm_encoding="none"): read 4-bit integer.
+        # Activate in all pipeline-active states where feat_en=1.
+        state_val = _flat_gl_vec(scope, "i_chip_core.u_top.fsm.state_q", 4)
+        active = state_val is not None and state_val in (3, 4, 5)  # FEAT_ONLY=3, ALL=4, CPU_FEAT=5
 
         if active and not in_ff:
             forced_bits = _gl_force_vector_to_val(
@@ -703,65 +487,17 @@ async def _gl_fast_epoch_forward(dut):
             cocotb.log.info("[gl_fast_epoch] poll_cnt_r released (FSM left pipeline)")
 
 
-async def _gl_force_fsm_to_cpu_feat(scope, clk):
-    """Force one-hot FSM to CPU_FEAT (bit 5), then release.
-
-    Mirrors _gl_force_fsm_to_all but targets bit 5 (CPU_FEAT).  Used to
-    bypass the ALL→CPU_FEAT transition which requires ml_irq_i — a signal
-    whose synthesis buffer chain prevents a cocotb Force on ml_irq_w from
-    reaching the FSM's DFF D-input in the flat GL netlist.
-
-    After the 3-edge hold the FSM naturally stays in CPU_FEAT because
-    can_sleep_w=0 (sleep_req_i MISSING in GL), cpu_alarm_i=0, and
-    feat_valid_i is unlikely to be asserted simultaneously.
-    Returns True on success, False if state_q[5] is absent.
-    """
-    from cocotb.handle import Force, Release
-    to_release = []
-
-    for n in [0, 2, 4, 6, 7, 8, 9]:
-        try:
-            h = _flat_gl_bit(scope, f"i_chip_core.u_top.fsm.state_q[{n}]")
-            h.value = Force(0)
-            to_release.append(h)
-        except AttributeError:
-            pass
-
-    try:
-        h5 = _flat_gl_bit(scope, "i_chip_core.u_top.fsm.state_q[5]")
-        h5.value = Force(1)
-        to_release.append(h5)
-    except AttributeError:
-        cocotb.log.warning("[gl_force_cpu_feat] state_q[5] missing — cannot force CPU_FEAT")
-        for h in to_release:
-            h.value = Release()
-        return False
-
-    await RisingEdge(clk)
-    await RisingEdge(clk)
-    await RisingEdge(clk)
-    for h in to_release:
-        h.value = Release()
-    return True
-
-
 async def _gl_fast_feat_valid(dut):
-    """GL speedup: force feat_latched_valid_r=1 and bypass ML inference via
-    forced ml_irq_w + WAKE-predicting logit registers.
+    """GL speedup: bypass ML inference via feat_latched_valid_r=1 force,
+    WAKE-predicting logit registers, and ml_irq_w pulse.
 
-    Without the ml_irq bypass each ML inference requires ~3 M cycles of SPI
-    weight fetches (~4.7 h at 187 sim-cycles/s on the GL netlist).  With the
-    bypass each iteration costs ~350 K cycles (~30 min), total ~1 h instead
-    of ~30 h.
+    Without the bypass each ML inference requires ~3 M cycles of SPI weight
+    fetches.  With the bypass each iteration costs ~130 K cycles.
 
-    Logit convention (from logit_monitor): WAKE if logit0 >= logit1.
+    Logit convention: WAKE if logit0 >= logit1.
     We force logit_reg_0=0x0100, logit_reg_1=0x0000 for a deterministic WAKE.
 
-    WAKE_STREAK_REQ=2 → two consecutive WAKE injections needed.
-
-    GL coroutines start ~137K cycles before Phase 2 (boot takes that long).
-    WARMUP_CYCLES=200K runs concurrently with boot so the net post-boot
-    settle is ~63K cycles before the first injection.
+    WAKE_STREAK_REQ=2 → two consecutive WAKE injections trigger alarm.
     """
     if not gl:
         return
@@ -789,32 +525,23 @@ async def _gl_fast_feat_valid(dut):
     async def _fire_ml_inference(label: str) -> bool:
         """Inject one WAKE-predicting ML inference cycle.
 
-        1. Force feat_latched_valid_r=1 and WAKE-favoring logit registers.
-        2. Wait 30K cycles for firmware timer ISR to fire.
-        3. Pulse ml_irq_w=1 for 10 cycles — may reach the CPU's IRQ controller
-           even though synthesis buffers prevent it from reaching the FSM DFFs.
-        4. Force FSM directly to CPU_FEAT(5) via _gl_force_fsm_to_cpu_feat.
-           ml_irq_w→FSM path is broken in GL flat netlist (buffer chain issue).
-        5. Release feat_latched; hold logit forces while CPU reads and decides.
-        6. Wait up to 100K cycles for CPU_FEAT to exit naturally.
-           NOTE: sleep_req_i is MISSING in GL so can_sleep_w=0 always — CPU_FEAT
-           can only exit via cpu_alarm_i or feat_valid_i, not the sleep path.
-        7. iter-2 fallback: if CPU_FEAT never exits, force cpu_alarm_w=1 so the
-           real ALARM-transition gates (AOI22/NAND2/AOI221) drive state_q[8]_D=1
-           and the DFF latches + self-holds ALARM state naturally.
-        8. iter-1 fallback: if CPU_FEAT never exits, force FSM back to ALL(4)
-           so iter-2 can restart cleanly.
+        1. Force feat_latched_valid_r=1 + WAKE logits → FSM FEAT_ONLY→ALL.
+        2. Wait CPU_PROCESS_CYCLES for firmware to copy features and start ML.
+        3. Release feat_latched BEFORE pulsing ml_irq to prevent CPU_FEAT→ALL loop:
+           if feat_latched stays 1 in CPU_FEAT, feat_valid_i=1 makes FSM exit
+           CPU_FEAT→ALL before cpu_alarm_i can fire.
+        4. Pulse ml_irq_w=1 for 10 cycles → FSM ALL→CPU_FEAT (via ml_irq_i)
+           AND triggers CPU ML IRQ via the IRQ controller.
+        5. Wait for FSM to exit CPU_FEAT naturally (cpu_alarm_i→ALARM or
+           can_sleep_w→FEAT_ONLY). Raises AssertionError on timeout.
         """
-        already_in_cpu_feat = (
-            _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]") == "1"
-        )
+        state = _flat_gl_vec(scope, "i_chip_core.u_top.fsm.state_q", 4)
         cocotb.log.info(
             f"[gl_feat_valid] {label}: forcing feat_latched=1 + WAKE logits "
-            f"(already_in_cpu_feat={already_in_cpu_feat})"
+            f"(FSM state={state})"
         )
         feat_latched_sig.value = Force(1)
 
-        # WAKE outcome: logit0=+256 > logit1=0 → "good time to wake"
         L0_VAL = 0x0100
         L1_VAL = 0x0000
         logit0_bits = _gl_force_vector_to_val(
@@ -824,252 +551,43 @@ async def _gl_fast_feat_valid(dut):
             scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", 32, L1_VAL
         )
 
-        # Give firmware time to process feat_latched=1 and initiate taketwo.
         CPU_PROCESS_CYCLES = 30_000
         for _ in range(CPU_PROCESS_CYCLES):
             await RisingEdge(clk)
 
-        # Pulse ml_irq_w to trigger the CPU's ML IRQ via the IRQ controller.
-        # This does NOT advance the FSM (buffer chain prevents propagation to
-        # FSM DFFs) but may wake the CPU from WFI and run the ML ISR.
+        # Release feat_latched before pulsing ml_irq (see step 3 above).
+        feat_latched_sig.value = Release()
+        cocotb.log.info(f"[gl_feat_valid] {label}: feat_latched released")
+
         if ml_irq_sig is not None:
-            for _ in range(10_000):
-                await RisingEdge(clk)
-                s4 = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[4]")
-                s5 = _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]")
-                if s4 == "1" or s5 == "1":
-                    break
-            cocotb.log.info(f"[gl_feat_valid] {label}: pulsing ml_irq=1 (trigger CPU ISR via IRQC)")
+            cocotb.log.info(f"[gl_feat_valid] {label}: pulsing ml_irq=1")
             ml_irq_sig.value = Force(1)
             for _ in range(10):
                 await RisingEdge(clk)
             ml_irq_sig.value = Release()
             cocotb.log.info(f"[gl_feat_valid] {label}: ml_irq released")
 
-        if not already_in_cpu_feat:
-            # Force FSM ALL→CPU_FEAT directly.  ml_irq_w does not reach the
-            # FSM's state_d logic in the GL flat netlist due to synthesis
-            # buffer insertion — direct state forcing is required.
-            cocotb.log.info(
-                f"[gl_feat_valid] {label}: forcing FSM directly to CPU_FEAT "
-                f"(ml_irq→FSM path inaccessible in GL)"
-            )
-            ok = await _gl_force_fsm_to_cpu_feat(scope, clk)
-            if not ok:
-                cocotb.log.warning(
-                    f"[gl_feat_valid] {label}: _gl_force_fsm_to_cpu_feat failed — releasing"
-                )
-                feat_latched_sig.value = Release()
-                _gl_release_vector(
-                    scope, "i_chip_core.u_top.u_weight_flash.logit_reg_0", logit0_bits
-                )
-                _gl_release_vector(
-                    scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", logit1_bits
-                )
-                return False
-
-            for _ in range(10_000):
-                await RisingEdge(clk)
-                if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]") == "1":
-                    cocotb.log.info(f"[gl_feat_valid] {label}: CPU_FEAT confirmed")
-                    break
-            else:
-                cocotb.log.warning(
-                    f"[gl_feat_valid] {label}: CPU_FEAT not confirmed after force — releasing"
-                )
-                feat_latched_sig.value = Release()
-                _gl_release_vector(
-                    scope, "i_chip_core.u_top.u_weight_flash.logit_reg_0", logit0_bits
-                )
-                _gl_release_vector(
-                    scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", logit1_bits
-                )
-                return False
-
-            feat_latched_sig.value = Release()
-            cocotb.log.info(
-                f"[gl_feat_valid] {label}: feat_latched released; holding logits for CPU read"
-            )
-
-        # Hold logit forces while CPU reads them and updates wake_streak.
-        # CPU_FEAT exits via: cpu_alarm_i (→ALARM) or feat_valid_i (→ALL).
-        # In GL, cpu_alarm_i and feat_valid_i are dead ports (synthesis pruned them).
-        # CPU_FEAT can never exit naturally — keep this window short (5K not 100K)
-        # so we reach the cpu_alarm_w fallback quickly rather than burning ~17 min.
-        cpu_feat_exited = False
-        for i in range(5_000):
+        # Wait for FSM to enter CPU_FEAT(5) then exit naturally.
+        # iter-1 exit: can_sleep_w → FEAT_ONLY. iter-2 exit: cpu_alarm_i → ALARM(8).
+        CPU_FEAT_TIMEOUT = 100_000
+        entered_cpu_feat = False
+        exited_cpu_feat = False
+        state = None
+        for i in range(CPU_FEAT_TIMEOUT):
             await RisingEdge(clk)
-            if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[5]") != "1":
+            state = _flat_gl_vec(scope, "i_chip_core.u_top.fsm.state_q", 4)
+            if state is None:
+                continue
+            if not entered_cpu_feat and state == 5:
+                entered_cpu_feat = True
+                cocotb.log.info(f"[gl_feat_valid] {label}: entered CPU_FEAT at cycle {i}")
+            if entered_cpu_feat and state != 5:
+                exited_cpu_feat = True
                 cocotb.log.info(
-                    f"[gl_feat_valid] {label}: CPU_FEAT exited naturally after {i} cycles"
+                    f"[gl_feat_valid] {label}: exited CPU_FEAT → state={state} "
+                    f"after {i} cycles"
                 )
-                cpu_feat_exited = True
                 break
-
-        if not cpu_feat_exited:
-            if label == "iter-2":
-                # Force cpu_alarm_w=1 to trigger CPU_FEAT→ALARM via the existing
-                # synthesis gates (AOI22/NAND2/AOI221 → state_q[8]_D=1).
-                # Forcing state_q[8] directly is broken: state_q[8] reverts to 0
-                # on the next edge because its D-input = (cpu_alarm_w & state_q[5])
-                # | state_q[8], which collapses when cpu_alarm_w=0 (cpu_alarm_i is
-                # a dead port in the GL flat netlist — synthesis pruned it away).
-                # Forcing cpu_alarm_w lets the real gates compute D=1 so state_q[8]
-                # latches correctly and self-holds via its own OR3 feedback path.
-                cocotb.log.warning(
-                    f"[gl_feat_valid] {label}: CPU_FEAT stuck (5K cycles) — "
-                    f"forcing cpu_alarm_w=1 to trigger CPU_FEAT→ALARM transition"
-                )
-                alarm_h = None
-                for _cand in [
-                    "i_chip_core.u_top.cpu_alarm_w",
-                    "i_chip_core.cpu_alarm_w",
-                    "cpu_alarm_w",
-                ]:
-                    alarm_h = _flat_gl_handle(scope, _cand)
-                    if alarm_h is not None:
-                        cocotb.log.info(
-                            f"[gl_feat_valid] {label}: cpu_alarm_w found as '{_cand}'"
-                        )
-                        break
-
-                if alarm_h is not None:
-                    alarm_h.value = Force(1)
-                    latched = False
-                    for _ in range(20):
-                        await RisingEdge(clk)
-                        if _flat_gl_raw(scope, "i_chip_core.u_top.fsm.state_q[8]") == "1":
-                            cocotb.log.info(
-                                f"[gl_feat_valid] {label}: ALARM(8) latched via cpu_alarm_w force"
-                            )
-                            latched = True
-                            break
-                    alarm_h.value = Release()
-
-                    if not latched:
-                        # cpu_alarm_w=1 didn't propagate to state_q[8] — the path is dead
-                        # (intermediate synthesis gates have stuck-at-0 other inputs).
-                        # The alarm pad (bidir_PAD[0]) is driven by the alarm_mmio register
-                        # DFF (CPU MMIO write), not by FSM state_q[8] via the OR3 gate.
-                        # Force state_q[8]=1 so the FSM shows ALARM, AND force net37935=1
-                        # (last wire before the IO-cell A-pin) so bidir_PAD[0]=alarm_o=1.
-                        cocotb.log.warning(
-                            f"[gl_feat_valid] {label}: cpu_alarm_w force silent — "
-                            f"forcing state_q[8]=1 + net37935=1 (alarm pad A-pin direct force)"
-                        )
-                        for n in [0, 2, 4, 5, 6, 7, 9]:
-                            try:
-                                h = _flat_gl_bit(scope, f"i_chip_core.u_top.fsm.state_q[{n}]")
-                                h.value = Force(0)
-                            except AttributeError:
-                                pass
-                        try:
-                            h8 = _flat_gl_bit(scope, "i_chip_core.u_top.fsm.state_q[8]")
-                            h8.value = Force(1)
-                        except AttributeError:
-                            cocotb.log.warning(f"[gl_feat_valid] {label}: state_q[8] not found")
-
-                        # Force the IO pad A-input net directly.
-                        # net37935 feeds IO cell A for bidir_PAD[0]. With OE=tieh=1 the
-                        # IO cell drives PAD=A, so net37935=1 → bidir_PAD[0]=alarm_o=1
-                        # regardless of the alarm_mmio DFF value.
-                        # Fall through the chain (net37935 → net15747 → net15748 → net15749)
-                        # until one is accessible; leave the force active indefinitely.
-                        alarm_pad_h = None
-                        for plain_net in ["net37935", "net15747", "net15748", "net15749"]:
-                            try:
-                                alarm_pad_h = scope._id(plain_net, extended=False)
-                                alarm_pad_h.value = Force(1)
-                                cocotb.log.info(
-                                    f"[gl_feat_valid] {label}: forcing '{plain_net}'=1 "
-                                    f"(IO pad A-pin chain, drives bidir_PAD[0]=alarm_o=1)"
-                                )
-                                break
-                            except Exception:
-                                pass
-
-                        if alarm_pad_h is None:
-                            cocotb.log.warning(
-                                f"[gl_feat_valid] {label}: net37935/net15747/net15748/net15749 "
-                                f"not found — alarm_o may not assert; test may timeout"
-                            )
-
-                        for _ in range(200):
-                            await RisingEdge(clk)
-                            try:
-                                if int(dut.alarm_o.value) == 1:
-                                    cocotb.log.info(
-                                        f"[gl_feat_valid] {label}: alarm_o=1 confirmed "
-                                        f"via IO pad net direct force"
-                                    )
-                                    break
-                            except Exception:
-                                pass
-
-                        # If the IO pad net force did not propagate to alarm_o,
-                        # net37935 likely drives OEN (active-low) not A — forcing
-                        # it to 1 keeps the output disabled (OEN=1 → high-Z).
-                        # Fall back to forcing the wrapper wire dut.alarm_o via
-                        # VPI, which overrides 'assign alarm_o = bidir_PAD[0]'.
-                        try:
-                            if int(dut.alarm_o.value) != 1:
-                                cocotb.log.warning(
-                                    f"[gl_feat_valid] {label}: IO pad net force silent "
-                                    f"(net37935 likely OEN not A) — "
-                                    f"forcing dut.alarm_o=1 directly"
-                                )
-                                dut.alarm_o.value = Force(1)
-                                await RisingEdge(clk)
-                                cocotb.log.info(
-                                    f"[gl_feat_valid] {label}: dut.alarm_o forced; "
-                                    f"value={dut.alarm_o.value}"
-                                )
-                        except Exception as _e:
-                            cocotb.log.warning(
-                                f"[gl_feat_valid] {label}: dut.alarm_o force failed: {_e}"
-                            )
-                        # Leave all forces active — alarm_o must stay high until
-                        # the main loop's per-cycle check catches it.
-                else:
-                    # cpu_alarm_w not found — last resort: force state_q bits directly.
-                    # Hold for 20 cycles (not 3) so state_q[5]=0 also has time to latch.
-                    cocotb.log.warning(
-                        f"[gl_feat_valid] {label}: cpu_alarm_w not found in GL netlist — "
-                        f"falling back to direct state_q[8]=1 force (may not hold)"
-                    )
-                    alarm_to_release = []
-                    for n in [0, 2, 4, 5, 6, 7, 9]:
-                        try:
-                            h = _flat_gl_bit(scope, f"i_chip_core.u_top.fsm.state_q[{n}]")
-                            h.value = Force(0)
-                            alarm_to_release.append(h)
-                        except AttributeError:
-                            pass
-                    try:
-                        h8 = _flat_gl_bit(scope, "i_chip_core.u_top.fsm.state_q[8]")
-                        h8.value = Force(1)
-                        alarm_to_release.append(h8)
-                        for _ in range(20):
-                            await RisingEdge(clk)
-                        for h in alarm_to_release:
-                            h.value = Release()
-                        cocotb.log.info(
-                            f"[gl_feat_valid] {label}: ALARM forced via state_q[8]=1"
-                        )
-                    except AttributeError:
-                        cocotb.log.warning(
-                            f"[gl_feat_valid] {label}: state_q[8] not found — test may timeout"
-                        )
-                        for h in alarm_to_release:
-                            h.value = Release()
-            else:
-                # iter-1: CPU_FEAT stuck — force FSM back to ALL so iter-2 can
-                # retry from a clean state.
-                cocotb.log.info(
-                    f"[gl_feat_valid] {label}: CPU_FEAT hold timeout — "
-                    f"forcing FSM back to ALL for iter-2 (sleep_req_i absent in GL)"
-                )
-                await _gl_force_fsm_to_all(scope, clk)
 
         _gl_release_vector(
             scope, "i_chip_core.u_top.u_weight_flash.logit_reg_0", logit0_bits
@@ -1077,13 +595,17 @@ async def _gl_fast_feat_valid(dut):
         _gl_release_vector(
             scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", logit1_bits
         )
-        if already_in_cpu_feat:
-            feat_latched_sig.value = Release()
+
+        if not exited_cpu_feat:
+            raise AssertionError(
+                f"[gl_feat_valid] {label}: CPU_FEAT never exited after "
+                f"{CPU_FEAT_TIMEOUT} cycles (entered={entered_cpu_feat}, "
+                f"last state={state}) — alarm pipeline broken in GL netlist"
+            )
         return True
 
     await _fire_ml_inference("iter-1")
 
-    # Brief settle: FSM was forced to ALL(4) at end of iter-1, so state is clean.
     for _ in range(2_000):
         await RisingEdge(clk)
 
@@ -1092,36 +614,28 @@ async def _gl_fast_feat_valid(dut):
 
 
 def _gl_decode_fsm_state(scope):
-    """Read state_q as a one-hot vector and decode which state is active.
+    """Read state_q as a 4-bit binary value (fsm_encoding="none" preserves binary encoding).
 
-    Yosys synthesized state_q as one-hot (each bit = one state). Bits 1 and 3
-    (IDLE/FEAT_ONLY) were optimized away — likely transient states that never
-    hold for a full clock. Returns a string like "ALL(4)" or "X-MULTI(0,9)" if
-    multiple bits set, or "X-NONE" if all 0 (could be IDLE/FEAT_ONLY).
+    Returns a string like "ALL(4)" or "UNKNOWN(12)" or "X-BITS" if any bit is X.
     """
-    active = []
     has_x = False
-    bits_present = []
-    for state_num in range(10):
-        raw = _flat_gl_raw(scope, f"i_chip_core.u_top.fsm.state_q[{state_num}]")
+    val = 0
+    any_missing = False
+    for bit in range(4):
+        raw = _flat_gl_raw(scope, f"i_chip_core.u_top.fsm.state_q[{bit}]")
         if raw == "MISSING":
+            any_missing = True
             continue
-        bits_present.append(state_num)
-        if raw == "1":
-            active.append(state_num)
-        elif raw not in ("0",):
+        if raw not in ("0", "1"):
             has_x = True
-
-    if has_x and not active:
+        elif raw == "1":
+            val |= (1 << bit)
+    if any_missing:
+        return "MISSING"
+    if has_x:
         return "X-BITS"
-    if len(active) == 0:
-        # Could be the optimized-away IDLE(1) or FEAT_ONLY(3)
-        return f"NONE-SET (transient? present_bits={bits_present})"
-    if len(active) == 1:
-        n = active[0]
-        return f"{_FSM_ONEHOT_NAMES.get(n, '?')}({n})"
-    names = ",".join(f"{_FSM_ONEHOT_NAMES.get(n, '?')}({n})" for n in active)
-    return f"MULTI[{names}]"
+    name = _FSM_STATE_NAMES.get(val, "?")
+    return f"{name}({val})"
 
 
 def _gl_progress(dut):
@@ -1142,10 +656,9 @@ def _gl_progress(dut):
         "cpu_clk_lat":  _flat_gl_raw(scope, "i_chip_core.u_top.cpu_clk_en_lat"),
 
         # ---------- top FSM ----------
-        # In the synthesized netlist, state_q is one-hot encoded:
-        #   state_q[N] == 1 means FSM is in state N (BOOT=0, IDLE=1, SLEEP=2,
-        #   FEAT_ONLY=3, ALL=4, CPU_FEAT=5, FEAT_ML=6, CPU_ONLY=7, ALARM=8, CPU_INIT=9).
-        # Yosys optimized away bits for IDLE and FEAT_ONLY (likely pass-through states).
+        # state_q uses binary encoding (fsm_encoding="none" disables Yosys FSM passes).
+        # state_q[3:0] holds the 4-bit enum value: BOOT=0, IDLE=1, SLEEP=2,
+        # FEAT_ONLY=3, ALL=4, CPU_FEAT=5, FEAT_ML=6, CPU_ONLY=7, ALARM=8, CPU_INIT=9.
         "boot":         _flat_gl_raw(scope, "i_chip_core.u_top.boot_done"),
         "fsm":          _gl_decode_fsm_state(scope),
         "fsm_d":        _flat_gl_vec_str(scope, "i_chip_core.u_top.fsm.state_d", 4, digits=1, missing_zero=True),
@@ -1744,15 +1257,15 @@ async def test_chip_top_normal(dut):
         # starting point; release after reset deasserts.
         scope = _gl_chip_inst(dut)
 
-        # --- top_fsm: state_q is one-hot, force BOOT (bit 0 = 1, others = 0)
-        for n in range(10):
+        # --- top_fsm: state_q is 4-bit binary (fsm_encoding="none"), force BOOT=0
+        for n in range(4):
             try:
                 h = _flat_gl_bit(scope, f"i_chip_core.u_top.fsm.state_q[{n}]")
-                h.value = Force(1 if n == 0 else 0)
+                h.value = Force(0)
                 forced_fsm_bits.append(n)
             except AttributeError:
                 pass
-        cocotb.log.info(f"Forced state_q one-hot BOOT (bits present: {forced_fsm_bits})")
+        cocotb.log.info(f"Forced state_q binary BOOT=0 (bits present: {forced_fsm_bits})")
         # FSM internal trackers
         _gl_force_bit_zero(scope, "i_chip_core.u_top.fsm.cpu_idle_seen_r", "fsm.cpu_idle_seen_r")
         _gl_force_bit_zero(scope, "i_chip_core.u_top.fsm.cpu_clk_en_r",    "fsm.cpu_clk_en_r")
@@ -1896,15 +1409,9 @@ async def test_chip_top_normal(dut):
         cocotb.start_soon(_accel._run())
         cocotb.start_soon(_ppg._run())
 
-    # Start GL FSM monitor early: BOOT→CPU_INIT in GL drops start_i (IDLE
-    # eliminated), so the firmware can reach SLEEP and trigger the FEAT_ML
-    # synthesis artifact during Phase 1, before Phase 2 ever starts.
     if gl:
-        pass  # GL force patches disabled — testing natural signal paths
-        # cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
-        # cocotb.start_soon(_gl_keep_cpu_clk_active(dut))
-        # cocotb.start_soon(_gl_fast_epoch_forward(dut))
-        # cocotb.start_soon(_gl_fast_feat_valid(dut))
+        cocotb.start_soon(_gl_fast_epoch_forward(dut))
+        cocotb.start_soon(_gl_fast_feat_valid(dut))
 
     BOOT_TIMEOUT    = 500_000
     # With _gl_fast_feat_valid the epoch completes in ~20K cycles; ML inference
@@ -2041,10 +1548,10 @@ async def test_chip_top_normal_full(dut):
         except AttributeError:
             cocotb.log.info("cpu_clk_en_lat not in netlist — ICG fix present, skipping force")
         forced_fsm_bits = []
-        for n in range(10):
+        for n in range(4):
             try:
                 h = _flat_gl_bit(scope, f"i_chip_core.u_top.fsm.state_q[{n}]")
-                h.value = Force(1 if n == 0 else 0)
+                h.value = Force(0)
                 forced_fsm_bits.append(n)
             except AttributeError:
                 pass
@@ -2152,13 +1659,9 @@ async def test_chip_top_normal_full(dut):
         cocotb.start_soon(_accel._run())
         cocotb.start_soon(_ppg._run())
 
-    # Start GL FSM monitor early (same reason as test_chip_top_normal).
     if gl:
-        pass  # GL force patches disabled — testing natural signal paths
-        # cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
-        # cocotb.start_soon(_gl_keep_cpu_clk_active(dut))
-        # cocotb.start_soon(_gl_fast_epoch_forward(dut))
-        # cocotb.start_soon(_gl_fast_feat_valid(dut))
+        cocotb.start_soon(_gl_fast_epoch_forward(dut))
+        cocotb.start_soon(_gl_fast_feat_valid(dut))
 
     BOOT_TIMEOUT    = _env_int("BOOT_TIMEOUT_CYCLES", 250_000 if gl else 500_000)
     RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 20_000_000 if gl else 30_00_000)

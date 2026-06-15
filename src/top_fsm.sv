@@ -68,7 +68,7 @@ module top_fsm (
         // to treat unvisited state encodings as don't-cares, which causes it to
         // prune irqc_wake_req_i / cpu_alarm_i / ml_irq_i / feat_valid_i as
         // "unreachable" and eliminate the IDLE and FEAT_ONLY DFFs entirely.
-        // Plain `case` is sufficient; the FSM is still one-hot after synthesis.
+        // Plain `case` is safe. fsm_encoding="none" above keeps binary encoding.
         case (state_q)
             BOOT:      if (boot_done_i)     state_d = IDLE;
             IDLE:      if (start_i)         state_d = CPU_INIT;
