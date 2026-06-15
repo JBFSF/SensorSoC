@@ -1900,11 +1900,11 @@ async def test_chip_top_normal(dut):
     # eliminated), so the firmware can reach SLEEP and trigger the FEAT_ML
     # synthesis artifact during Phase 1, before Phase 2 ever starts.
     if gl:
-        cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
-        cocotb.start_soon(_gl_keep_cpu_clk_active(dut))
-        cocotb.start_soon(_gl_fast_epoch_forward(dut))
-        # Collapse 1000-poll epoch (~9M cycles) to ~20K warmup + 1-cycle force
-        cocotb.start_soon(_gl_fast_feat_valid(dut))
+        pass  # GL force patches disabled — testing natural signal paths
+        # cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
+        # cocotb.start_soon(_gl_keep_cpu_clk_active(dut))
+        # cocotb.start_soon(_gl_fast_epoch_forward(dut))
+        # cocotb.start_soon(_gl_fast_feat_valid(dut))
 
     BOOT_TIMEOUT    = 500_000
     # With _gl_fast_feat_valid the epoch completes in ~20K cycles; ML inference
@@ -2154,10 +2154,11 @@ async def test_chip_top_normal_full(dut):
 
     # Start GL FSM monitor early (same reason as test_chip_top_normal).
     if gl:
-        cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
-        cocotb.start_soon(_gl_keep_cpu_clk_active(dut))
-        cocotb.start_soon(_gl_fast_epoch_forward(dut))
-        cocotb.start_soon(_gl_fast_feat_valid(dut))
+        pass  # GL force patches disabled — testing natural signal paths
+        # cocotb.start_soon(_gl_fsm_sleep_unlocker(dut))
+        # cocotb.start_soon(_gl_keep_cpu_clk_active(dut))
+        # cocotb.start_soon(_gl_fast_epoch_forward(dut))
+        # cocotb.start_soon(_gl_fast_feat_valid(dut))
 
     BOOT_TIMEOUT    = _env_int("BOOT_TIMEOUT_CYCLES", 250_000 if gl else 500_000)
     RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 20_000_000 if gl else 30_00_000)
