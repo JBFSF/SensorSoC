@@ -1,9 +1,11 @@
 `timescale 1ns/1ps
 
 module sim_chip_top_gl_sensor_bridge_env;
-  localparam integer SENSOR_SCL_PAD = 23;
-  localparam integer SENSOR_SDA_PAD = 24;
-  localparam integer HOST_SDA_PAD   = 6;
+  localparam integer SENSOR_SCL_PAD      = 23;
+  localparam integer SENSOR_SDA_PAD      = 24;
+  localparam integer HOST_SDA_PAD        = 6;
+  localparam integer TEST_FORCE_IRQ_PAD  = 37;
+  localparam integer TEST_FORCE_WAKE_PAD = 38;
 
   logic        clk_drv = 1'b0;
   logic        rst_n_drv = 1'b0;
@@ -40,6 +42,10 @@ module sim_chip_top_gl_sensor_bridge_env;
       if (i == SENSOR_SDA_PAD) begin : sensor_sda_drive
         assign bidir_PAD[i] = (sensor_sda_drive_low || !accel_sda_o || !ppg_sda_o) ? 1'b0 :
                               (bidir_oe[i] ? bidir_drv[i] : 1'bz);
+      end else if (i == TEST_FORCE_IRQ_PAD || i == TEST_FORCE_WAKE_PAD) begin : test_ctrl_drive
+        // Test-only input pads — tie to 0 so irq_sources[2:3] stay clean in GL sim.
+        // In RTL sim these are explicitly wired to 0 in chip_top_sim_wrap.
+        assign bidir_PAD[i] = 1'b0;
       end else begin : external_drive
         assign bidir_PAD[i] = bidir_oe[i] ? bidir_drv[i] : 1'bz;
       end

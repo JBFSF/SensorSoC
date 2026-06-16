@@ -1209,11 +1209,16 @@ async def test_chip_top_normal(dut):
     The only two GL-specific forces kept are:
       • cpu_clk_en_lat=1 during reset — ensures PicoRV32 gets cpu_clk during
         the reset window even if the ICG latch itself powers up to X.
-      • ml_irq_w=0 held until post-boot firmware init — irqc.wake_en initialises
-        to 0x7 after reset, so any residual X on ml_irq would propagate into
-        irqc.pending and freeze can_sleep_w.  Releasing after boot_done + 2000
-        cycles guarantees the firmware's IRQC_PENDING=0xFFFFFFFF and
-        IRQC_WAKE_EN=IRQ_TIMER_BIT writes have landed, clearing any X.
+      • ml_irq_w=0 held until after start_i + 5000 cycles — taketwo's done DFF
+        (dffq_1, no initial) powers up to X, which would inject X into
+        irqc.pending[1].  With irqc.wake_en[1]=1 (reset default), that X reaches
+        wake_req_o and corrupts can_sleep_w.  Holding ml_irq_w=0 until the
+        firmware's CPU_INIT IRQC sequence (W1C + wake_en=IRQ_TIMER_BIT) is safe
+        to release because by then wake_en[1]=0 and pending[1]=X won't propagate.
+
+    TEST_FORCE_WAKE_PAD (38) and TEST_FORCE_IRQ_PAD (37) are driven to 0 in
+    sim_chip_top_gl_sensor_bridge_env.sv, matching what chip_top_sim_wrap does
+    for RTL simulation (explicit zero tie on those test input ports).
 
     No behaviour-faking: feat_valid, logits, and ml_irq are never injected.
     _gl_fast_epoch_forward is kept as a legitimate simulation speedup (forcing
@@ -1305,22 +1310,23 @@ async def test_chip_top_normal(dut):
     if gl and gl_fetch_monitor:
         cocotb.start_soon(_gl_pico_fetch_monitor(dut, logger, cycles=5_000, limit=16))
 
-    if gl:
-        # Give the firmware ~2000 cycles to execute its CPU_INIT sequence:
-        #   IRQC_PENDING = 0xFFFFFFFF  (clears any X from pending via W1C)
-        #   IRQC_WAKE_EN = IRQ_TIMER_BIT  (drops bit-1 from wake_en → X in
-        #                                   pending[1] no longer reaches wake_req)
-        # After this, releasing ml_irq_w is safe even if taketwo's irq is still X,
-        # because (a) pending[1] was cleared by W1C, and (b) wake_en[1]=0 so the
-        # X does not reach wake_req_o.
-        await ClockCycles(_clk_handle(dut), 2_000)
-        _gl_release_bit(scope, "i_chip_core.ml_irq_w")
-        cocotb.log.info("[gl_reset] ml_irq_w force released — firmware irqc init complete")
-
     # Send start to kick the FSM out of IDLE → CPU_INIT.
     cocotb.log.info("Boot done. Sending start signal...")
     await set_start(dut, 10)
     logger.info(f"[gl={bool(gl)}] start_i pulsed; entering main loop")
+
+    if gl:
+        # Give the firmware ~5000 cycles to execute its CPU_INIT sequence:
+        #   IRQC_PENDING = 0xFFFFFFFF  (clears any X from pending via W1C)
+        #   IRQC_WAKE_EN = IRQ_TIMER_BIT  (drops bit-1 from wake_en → X in
+        #                                   pending[1] no longer reaches wake_req)
+        # ml_irq_w must stay forced=0 until AFTER the firmware's wake_en write so
+        # that the X from taketwo's DFF never reaches irqc.pending during the
+        # critical init window.  start_i must be sent BEFORE this wait so that
+        # CPU_INIT has actually started when the 5000 cycles elapse.
+        await ClockCycles(_clk_handle(dut), 5_000)
+        _gl_release_bit(scope, "i_chip_core.ml_irq_w")
+        cocotb.log.info("[gl_reset] ml_irq_w force released — firmware irqc init complete")
 
     if not gl:
         cocotb.start_soon(_feat_monitor(u_top))
