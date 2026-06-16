@@ -7,7 +7,7 @@ from pathlib import Path
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import Timer, RisingEdge, ClockCycles, ReadOnly
+from cocotb.triggers import Timer, RisingEdge, FallingEdge, ClockCycles, ReadOnly
 from cocotb.handle import Force
 from cocotb_tools.runner import get_runner
 from cocotbext.i2c import I2cDevice
@@ -1261,6 +1261,14 @@ async def test_chip_top_normal(dut):
     # Hold reset for enough cycles for all sync-reset chains to settle.
     await ClockCycles(_clk_handle(dut), 20)
 
+    if gl:
+        # Deassert reset on a falling edge so the ICG latch has a CLK=0 phase
+        # to capture E=0 (cpu_clk_en_r=0 in BOOT) before the next rising edge.
+        # Without this, the latch is still X when reset deasserts (SE→0 while
+        # CLK=1), causing cpu_clk to go 0→X on the next CLK rise — a spurious
+        # posedge that puts PicoRV32 into a stale fetch pending state.
+        await FallingEdge(_clk_handle(dut))
+
     # Deassert reset.
     _rst_handle(dut).value = 1
     cocotb.log.info("[gl_reset] rst_n deasserted")
@@ -1358,6 +1366,7 @@ async def test_chip_top_normal(dut):
                     print(f"[GL @{cycle:8d}] rst_n={p['rst_n']} reset_i={p['reset_i']} core_clk={p['core_clk']} cpu_clk={p['cpu_clk']}", flush=True)
                     print(f"[GL @{cycle:8d}] fsm={p['fsm']} boot={p['boot']} feat_en={p['feat_en']} ml_en={p['ml_en']} cpu_en={p['cpu_en']} start={p['fsm_starti']} feat_v={p['fsm_featvi']} ml_irq={p['fsm_mlirq']} alarm={p['fsm_alarm_o']}", flush=True)
                     print(f"[GL @{cycle:8d}] cpu_sleep={p['sleep']} trap={p['trap']} status={p['status']} code={p['code']}", flush=True)
+                    print(f"[GL @{cycle:8d}] mem_v={p['mem_v']} mem_rdy={p['pico_rdy']} mem_addr={p['mem_addr']} mem_i={p['mem_i']} sram_rdy={p['sram_ready']}", flush=True)
                     print(f"[GL @{cycle:8d}] irq_pend={p['irq_pend']} irq_mask={p['irq_mask']} wake_en={p['irq_wake_en']} wake_req={p['irq_wake_req']} pwr_sleep={p['pwr_sleep_req']}", flush=True)
                     print(f"[GL @{cycle:8d}] accel_v={p['accel_v']} ppg_v={p['ppg_v']} feat_valid={p['feat_valid']} feat_latched={p['feat_latched']} logit0={p['logit0']} logit1={p['logit1']}", flush=True)
                     print(f"[GL @{cycle:8d}] tim_evt={p['tim_evt']} tim_ctrl={p['tim_ctrl']} tim_count={p['tim_count']} pad_alarm={dut.alarm_o.value}", flush=True)
