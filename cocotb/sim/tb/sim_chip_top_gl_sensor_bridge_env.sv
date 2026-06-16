@@ -53,6 +53,38 @@ module sim_chip_top_gl_sensor_bridge_env;
   wire alarm_o;
   assign alarm_o = bidir_PAD[0];
 
+  // ----------------------------------------------------------------
+  // Verilog I2C slaves — raw SCL/SDA protocol, no Python overhead.
+  // These replace the Python cocotbext-i2c slaves for GL simulation.
+  // They monitor bidir_PAD[SENSOR_SCL_PAD] for SCL and drive
+  // accel_sda_o / ppg_sda_o (combined in the bidir_PAD assignment
+  // above) to pull SDA low when sending ACK or data.
+  // ----------------------------------------------------------------
+
+  wire clk_intern = clk_drv;    // system clock (same as chip drives internally)
+  wire rst_n_intern = rst_n_drv;
+
+  i2c_slave_lis2dw12_raw #(
+      .I2C_ADDR (7'h19)
+  ) u_accel_slave (
+      .clk     (clk_intern),
+      .resetn  (rst_n_intern),
+      .scl_i   (bidir_PAD[SENSOR_SCL_PAD]),
+      .sda_i   (bidir_PAD[SENSOR_SDA_PAD]),
+      .sda_o   (accel_sda_o)
+  );
+
+  i2c_slave_adpd144ri_raw #(
+      .I2C_ADDR  (7'h64),
+      .WATERMARK (8)
+  ) u_ppg_slave (
+      .clk     (clk_intern),
+      .resetn  (rst_n_intern),
+      .scl_i   (bidir_PAD[SENSOR_SCL_PAD]),
+      .sda_i   (bidir_PAD[SENSOR_SDA_PAD]),
+      .sda_o   (ppg_sda_o)
+  );
+
   chip_top
   `ifndef FUNCTIONAL
   // Parameter overrides only apply in RTL mode. In GL the netlist

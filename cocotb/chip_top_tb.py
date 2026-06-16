@@ -1198,307 +1198,178 @@ async def _logit_monitor(clk, u_top):
 
 @cocotb.test(skip=(hdl_toplevel not in {"chip_top_sim_wrap", _GL_SENSOR_BRIDGE}))
 async def test_chip_top_normal(dut):
-    """Full pipeline: sensor → features → ML inference → alarm output."""
+    """Full pipeline GL sim: sensor → features → ML inference → alarm output.
+
+    Reset strategy for GL: assert rst_n BEFORE starting the clock.  The first
+    rising edge of clk_PAD then sees a clean, settled reset signal through the
+    IO pad, so every sync-reset DFF (including taketwo's) captures its reset
+    value on that very first edge — eliminating X-lock without forcing any
+    internal state.
+
+    The only two GL-specific forces kept are:
+      • cpu_clk_en_lat=1 during reset — ensures PicoRV32 gets cpu_clk during
+        the reset window even if the ICG latch itself powers up to X.
+      • ml_irq_w=0 held until post-boot firmware init — irqc.wake_en initialises
+        to 0x7 after reset, so any residual X on ml_irq would propagate into
+        irqc.pending and freeze can_sleep_w.  Releasing after boot_done + 2000
+        cycles guarantees the firmware's IRQC_PENDING=0xFFFFFFFF and
+        IRQC_WAKE_EN=IRQ_TIMER_BIT writes have landed, clearing any X.
+
+    No behaviour-faking: feat_valid, logits, and ml_irq are never injected.
+    _gl_fast_epoch_forward is kept as a legitimate simulation speedup (forcing
+    the poll counter to its max is equivalent to waiting for it naturally; it
+    does not alter any observable output).
+    """
     logger = logging.getLogger("chip_top_normal")
 
     await set_defaults(dut)
+
+    # Assert reset BEFORE starting the clock.  This is the critical change vs.
+    # the previous version: setting rst_n_drv=0 here means the IO pad has time
+    # to propagate before the first rising edge, so every dffq_1 sync-reset cell
+    # computes D = (!resetn) ? 0 : q_next = 0 on the first edge — no X-lock.
+    _rst_handle(dut).value = 0
+    cocotb.log.info("[gl_reset] rst_n asserted before clock start")
+
     await start_clock(_clk_handle(dut))
 
-    # Assert reset (active low) BEFORE forcing so we can latch FSM state in
-    # one-hot BOOT during the reset window.
-    cocotb.log.info("Reset asserted (pre-force)")
-    _rst_handle(dut).value = 0
+    scope = _gl_chip_inst(dut) if gl else None
+
+    if gl:
+        # ICG (icgtp_1) powers up with its latch state at X.  During the reset
+        # window reset_i=1 already bypasses the ICG (cpu_clk = clk & (lat|rst)),
+        # but latch X would persist into the first post-reset low phase.  Forcing
+        # lat=1 here means the ICG settles 0 correctly once cpu_clk_en=0 (BOOT
+        # state) by the end of reset — avoids the 1-cycle X glitch on cpu_clk.
+        try:
+            _flat_gl_bit(scope, "i_chip_core.u_top.cpu_clk_en_lat").value = Force(1)
+            cocotb.log.info("[gl_reset] ICG held open (cpu_clk_en_lat=1)")
+        except AttributeError:
+            cocotb.log.info("[gl_reset] cpu_clk_en_lat not in netlist — skipping ICG force")
+
+        # taketwo's done DFF may not clear cleanly if the reset path has any
+        # residual X from the ICG glitch above.  Force ml_irq_w=0 for the entire
+        # reset window; we will hold it until after boot so irqc.pending never
+        # accumulates an X before the firmware's IRQC_PENDING clear runs.
+        _gl_force_bit_zero(scope, "i_chip_core.ml_irq_w", "ml_irq_w")
+
+    # Hold reset for enough cycles for all sync-reset chains to settle.
+    await ClockCycles(_clk_handle(dut), 20)
+
+    # Deassert reset.
+    _rst_handle(dut).value = 1
+    cocotb.log.info("[gl_reset] rst_n deasserted")
     await ClockCycles(_clk_handle(dut), 5)
+
+    if gl:
+        # Release ICG force — FSM is in BOOT, cpu_clk_en=0, latch has had two
+        # CLK-low phases to capture 0 cleanly.
+        try:
+            from cocotb.handle import Release
+            _flat_gl_bit(scope, "i_chip_core.u_top.cpu_clk_en_lat").value = Release()
+            cocotb.log.info("[gl_reset] ICG force released")
+        except AttributeError:
+            pass
+        # ml_irq_w stays forced to 0 until after boot_done (see Phase 1 below).
 
     core  = _core(dut)
     u_top = _top(dut)
 
-    forced_fsm_bits = []
-    forced_irq_pend = []
-    forced_irq_mask = []
-    forced_irq_wake_en = []
-    forced_irq_src_d = []
-    forced_irq_active = []
-    forced_irq_wake_pd = []
-    forced_tim_ctrl = []
-    forced_tim_count = []
-    forced_pwr_wake_st = []
-    forced_pwr_wake_rsn = []
-    forced_wf_logit0 = []
-    forced_wf_logit1 = []
-    forced_wf_feat0 = []
-    forced_wf_feat1 = []
-    forced_wf_state = []
-    forced_acc_state   = []
-    forced_acc_poll    = []
-    forced_acc_timeout = []
-    forced_acc_rbuf    = []
-    forced_acc_ridx    = []
-    forced_i2c_state   = []
-    forced_i2c_timer   = []
-    forced_i2c_sr      = []
-    forced_i2c_byte    = []
-    forced_i2c_bcnt    = []
-    forced_ppg_state   = []
-    forced_ppg_poll    = []
+    # In GL mode, the Verilog raw I2C slaves (u_accel_slave, u_ppg_slave)
+    # are instantiated inside sim_chip_top_gl_sensor_bridge_env.sv and
+    # respond to the chip's I2C master automatically — no Python slaves needed.
 
     if gl:
-        # Bypass ICG X-propagation if icgtp_1 was not yet re-synthesized.
-        # Net is absent in netlists where the fix is already in — skip silently.
-        try:
-            u_top.cpu_clk_en_lat.value = Force(1)
-        except AttributeError:
-            cocotb.log.info("cpu_clk_en_lat not in netlist — ICG fix present, skipping force")
-
-        # Yosys mapped sync-reset RTL to plain dffq_1 cells (no reset port).
-        # In GL sim, flops power up to X and the sync-reset combo path computes
-        # D = f(X) = X, locking the X forever. Force critical control flops to
-        # their reset values during the reset window so they have a defined
-        # starting point; release after reset deasserts.
-        scope = _gl_chip_inst(dut)
-
-        # --- top_fsm: state_q is 4-bit binary (fsm_encoding="none"), force BOOT=0
-        for n in range(4):
-            try:
-                h = _flat_gl_bit(scope, f"i_chip_core.u_top.fsm.state_q[{n}]")
-                h.value = Force(0)
-                forced_fsm_bits.append(n)
-            except AttributeError:
-                pass
-        cocotb.log.info(f"Forced state_q binary BOOT=0 (bits present: {forced_fsm_bits})")
-        # FSM internal trackers
-        _gl_force_bit_zero(scope, "i_chip_core.u_top.fsm.cpu_idle_seen_r", "fsm.cpu_idle_seen_r")
-        _gl_force_bit_zero(scope, "i_chip_core.u_top.fsm.cpu_clk_en_r",    "fsm.cpu_clk_en_r")
-        _gl_force_bit_zero(scope, "i_chip_core.u_top.fsm.sleep_req_d_r",   "fsm.sleep_req_d_r")
-
-        # --- irq_ctrl_mmio: pending, mask, wake_en, src_d, active, wake_pending_d
-        forced_irq_pend    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.pending",        32, "irqc.pending")
-        forced_irq_mask    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.mask",           32, "irqc.mask")
-        forced_irq_wake_en = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.wake_en",        32, "irqc.wake_en")
-        forced_irq_src_d   = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.src_d",          32, "irqc.src_d")
-        forced_irq_active  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.active",         32, "irqc.active")
-        forced_irq_wake_pd = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_irqc.wake_pending_d", 32, "irqc.wake_pending_d")
-
-        # --- timer_mmio: control + counter + event-latched
-        forced_tim_ctrl  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_timer.ctrl_r",  32, "timer.ctrl_r")
-        forced_tim_count = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_timer.count_r", 32, "timer.count_r")
-        _gl_force_bit_zero(scope, "i_chip_core.u_top.u_timer.event_latched", "timer.event_latched")
-
-        # --- pwrctrl_mmio: sleep_req, wake_status, wake_reason, cpu_awake_d
-        _gl_force_bit_zero(scope, "i_chip_core.u_top.u_pwr.sleep_req_o", "pwr.sleep_req_o")
-        forced_pwr_wake_st  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_pwr.wake_status", 32, "pwr.wake_status")
-        forced_pwr_wake_rsn = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_pwr.wake_reason", 32, "pwr.wake_reason")
-        _gl_force_bit_zero(scope, "i_chip_core.u_top.u_pwr.cpu_awake_d", "pwr.cpu_awake_d")
-
-        # --- weight_flash_axi: state machine + captured logits + feature regs
-        forced_wf_state  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.state",       4,  "wflash.state")
-        forced_wf_logit0 = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_0", 32, "wflash.logit_reg_0")
-        forced_wf_logit1 = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", 32, "wflash.logit_reg_1")
-        forced_wf_feat0  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_0",  32, "wflash.feat_reg_0")
-        forced_wf_feat1  = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_1",  32, "wflash.feat_reg_1")
-
-        # --- accel_reader: state machine + counters + read buffer
-        forced_acc_state   = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_accel_reader.state_r",        3,  "accel.state_r")
-        forced_acc_poll    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_accel_reader.poll_cnt_r",      32, "accel.poll_cnt_r")
-        forced_acc_timeout = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_accel_reader.timeout_cnt_r",   32, "accel.timeout_cnt_r")
-        forced_acc_rbuf    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_accel_reader.read_buf_r",      48, "accel.read_buf_r")
-        forced_acc_ridx    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_accel_reader.read_idx_r",      3,  "accel.read_idx_r")
-        _gl_force_bit_zero(scope, "i_chip_core.u_top.u_accel_reader.init_done_o", "accel.init_done_o")
-
-        # --- i2c_master: state machine + timer + shift register + byte/bit counters
-        forced_i2c_state   = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_i2c_master.state_r",    5, "i2c.state_r")
-        forced_i2c_timer   = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_i2c_master.timer_r",    6, "i2c.timer_r")
-        forced_i2c_sr      = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_i2c_master.sr_r",       8, "i2c.sr_r")
-        forced_i2c_byte    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_i2c_master.byte_cnt_r", 8, "i2c.byte_cnt_r")
-        forced_i2c_bcnt    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_i2c_master.bit_cnt_r",  3, "i2c.bit_cnt_r")
-
-        # --- ppg_fifo_reader: state machine + poll counter (shares I2C bus with accel)
-        forced_ppg_state   = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_ppg_fifo_reader.state_r",   4,  "ppg.state_r")
-        forced_ppg_poll    = _gl_force_vector_zero(scope, "i_chip_core.u_top.u_ppg_fifo_reader.poll_cnt_r", 32, "ppg.poll_cnt_r")
-
-        # ml_irq_w is the taketwo/weight_flash interrupt output.  Its DFF powers
-        # up to X, and that X propagates through irqc.src_d into irqc.pending,
-        # causing irq_pend=X.  Force it low during the reset window so the IRQ
-        # controller sees a clean initial state.
-        _gl_force_bit_zero(scope, "i_chip_core.ml_irq_w", "ml_irq_w")
-
-    # Hold reset asserted for a few more cycles so the forced values propagate
-    await ClockCycles(dut.clk_PAD, 5)
-
-    # Deassert reset (active low → high)
-    _rst_handle(dut).value = 1
-    await ClockCycles(_clk_handle(dut), 2)
-    cocotb.log.info("Reset deasserted")
-    await reset(dut)
-
-    if gl:
-        # Release all the forces so logic can run normally
-        for n in forced_fsm_bits:
-            _gl_release_bit(scope, f"i_chip_core.u_top.fsm.state_q[{n}]")
-        _gl_release_bit(scope, "i_chip_core.u_top.fsm.cpu_idle_seen_r")
-        _gl_release_bit(scope, "i_chip_core.u_top.fsm.cpu_clk_en_r")
-        _gl_release_bit(scope, "i_chip_core.u_top.fsm.sleep_req_d_r")
-
-        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.pending",        forced_irq_pend)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.mask",           forced_irq_mask)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.wake_en",        forced_irq_wake_en)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.src_d",          forced_irq_src_d)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.active",         forced_irq_active)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_irqc.wake_pending_d", forced_irq_wake_pd)
-
-        _gl_release_vector(scope, "i_chip_core.u_top.u_timer.ctrl_r",  forced_tim_ctrl)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_timer.count_r", forced_tim_count)
-        _gl_release_bit(scope, "i_chip_core.u_top.u_timer.event_latched")
-
-        _gl_release_bit(scope, "i_chip_core.u_top.u_pwr.sleep_req_o")
-        _gl_release_vector(scope, "i_chip_core.u_top.u_pwr.wake_status", forced_pwr_wake_st)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_pwr.wake_reason", forced_pwr_wake_rsn)
-        _gl_release_bit(scope, "i_chip_core.u_top.u_pwr.cpu_awake_d")
-
-        _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.state",       forced_wf_state)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_0", forced_wf_logit0)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.logit_reg_1", forced_wf_logit1)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_0",  forced_wf_feat0)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_weight_flash.feat_reg_1",  forced_wf_feat1)
-
-        _gl_release_vector(scope, "i_chip_core.u_top.u_accel_reader.state_r",        forced_acc_state)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_accel_reader.poll_cnt_r",      forced_acc_poll)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_accel_reader.timeout_cnt_r",   forced_acc_timeout)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_accel_reader.read_buf_r",      forced_acc_rbuf)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_accel_reader.read_idx_r",      forced_acc_ridx)
-        _gl_release_bit(scope, "i_chip_core.u_top.u_accel_reader.init_done_o")
-
-        _gl_release_vector(scope, "i_chip_core.u_top.u_i2c_master.state_r",    forced_i2c_state)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_i2c_master.timer_r",    forced_i2c_timer)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_i2c_master.sr_r",       forced_i2c_sr)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_i2c_master.byte_cnt_r", forced_i2c_byte)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_i2c_master.bit_cnt_r",  forced_i2c_bcnt)
-
-        _gl_release_vector(scope, "i_chip_core.u_top.u_ppg_fifo_reader.state_r",   forced_ppg_state)
-        _gl_release_vector(scope, "i_chip_core.u_top.u_ppg_fifo_reader.poll_cnt_r", forced_ppg_poll)
-
-        _gl_release_bit(scope, "i_chip_core.ml_irq_w")
-
-        # Release the ICG force last so the clock can propagate cleanly once all
-        # other state is un-forced.
-        try:
-            from cocotb.handle import Release
-            u_top.cpu_clk_en_lat.value = Release()
-        except AttributeError:
-            pass
-
-        cocotb.log.info("Released all force-init nets — chip should run with defined initial state")
-
-    if hdl_toplevel == _GL_SENSOR_BRIDGE:
-        # Drive real sensor I2C pads with Python slave models.
-        # The bridge wrapper exposes scl/sda hooks regardless of RTL or GL.
-        from test_chip_top_i2c_pads import (
-            Lis2dw12Device, Adpd144riDevice, _build_sensor_model_streams,
-        )
-        accel_samples, ppg_samples = _build_sensor_model_streams()
-        _accel = Lis2dw12Device(
-            sda=dut.sensor_sda_sample, sda_o=dut.accel_sda_o,
-            scl=dut.sensor_scl_sample, scl_o=dut.accel_scl_o,
-            samples=accel_samples,
-        )
-        _ppg = Adpd144riDevice(
-            sda=dut.sensor_sda_sample, sda_o=dut.ppg_sda_o,
-            scl=dut.sensor_scl_sample, scl_o=dut.ppg_scl_o,
-            samples=ppg_samples,
-        )
-        cocotb.start_soon(_accel._run())
-        cocotb.start_soon(_ppg._run())
-
-    if gl:
+        # Compress the 50 000-cycle inter-poll idle wait so one accel epoch
+        # takes ~10 M cycles instead of ~50 M.  This is a legitimate speedup:
+        # the accel reader triggers on poll_cnt_r == ACC_POLL_PERIOD_TICKS-1;
+        # forcing the counter to that value every active cycle is equivalent to
+        # the counter reaching it naturally — it does not alter any output.
         cocotb.start_soon(_gl_fast_epoch_forward(dut))
-        cocotb.start_soon(_gl_fast_feat_valid(dut))
 
-    BOOT_TIMEOUT    = 500_000
-    # With _gl_fast_feat_valid the epoch completes in ~20K cycles; ML inference
-    # may add another 100K–1M cycles. 20M is a generous but realistic GL ceiling.
-    # Override via RUNTIME_TIMEOUT_CYCLES env var for CI speed tuning.
-    RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 20_000_000 if gl else 4_000_000)
-    # --- Phase 1: wait for boot ---
-    logger.info("Waiting for boot_done...")
-    cocotb.log.info(f"Firmware.hex is: {_FIRMWARE_HEX}")
+    # --- Phase 1: wait for boot_done ---
+    BOOT_TIMEOUT = _env_int("BOOT_TIMEOUT_CYCLES", 500_000)
+    logger.info(f"Waiting for boot_done (timeout={BOOT_TIMEOUT})... firmware={_FIRMWARE_HEX}")
     for cycle in range(BOOT_TIMEOUT):
         await RisingEdge(_clk_handle(dut))
         if u_top.boot_done.value == 1:
             await ClockCycles(_clk_handle(dut), 10)
             break
     else:
-        raise AssertionError("Timeout waiting for boot_done")
-    #assert core.pico_trap_w.value == 0, "CPU trapped during boot"
+        raise AssertionError(f"Timeout waiting for boot_done after {BOOT_TIMEOUT} cycles")
+
+    logger.info(f"Boot complete (~{cycle} cycles).")
 
     if gl and gl_sram_probes:
         _log_gl_sram_macros(dut, logger, "after boot_done")
     if gl and gl_fetch_monitor:
         cocotb.start_soon(_gl_pico_fetch_monitor(dut, logger, cycles=5_000, limit=16))
 
-    cocotb.log.info("Boot done. Waiting for alarm_o...")
+    if gl:
+        # Give the firmware ~2000 cycles to execute its CPU_INIT sequence:
+        #   IRQC_PENDING = 0xFFFFFFFF  (clears any X from pending via W1C)
+        #   IRQC_WAKE_EN = IRQ_TIMER_BIT  (drops bit-1 from wake_en → X in
+        #                                   pending[1] no longer reaches wake_req)
+        # After this, releasing ml_irq_w is safe even if taketwo's irq is still X,
+        # because (a) pending[1] was cleared by W1C, and (b) wake_en[1]=0 so the
+        # X does not reach wake_req_o.
+        await ClockCycles(_clk_handle(dut), 2_000)
+        _gl_release_bit(scope, "i_chip_core.ml_irq_w")
+        cocotb.log.info("[gl_reset] ml_irq_w force released — firmware irqc init complete")
+
+    # Send start to kick the FSM out of IDLE → CPU_INIT.
+    cocotb.log.info("Boot done. Sending start signal...")
     await set_start(dut, 10)
     logger.info(f"[gl={bool(gl)}] start_i pulsed; entering main loop")
-    # Start background monitor — prints features + stale logits on every feat_valid_o
-    # Skip in GL mode: feat_valid_o and logit_reg_0 are RTL-only signals
+
     if not gl:
         cocotb.start_soon(_feat_monitor(u_top))
         cocotb.start_soon(_logit_monitor(_clk_handle(dut), u_top))
         cocotb.start_soon(_axi_write_monitor(_clk_handle(dut), u_top))
         cocotb.start_soon(_can_sleep_monitor(_clk_handle(dut), u_top, core))
     else:
-        # GL mode — internal signals are flattened away. Only pads are observable.
-        # _gl_fsm_sleep_unlocker already started early (after force-init) to catch
-        # FSM artifacts that happen during Phase 1 before set_start is called.
         cocotb.start_soon(_gl_heartbeat(dut))
 
-    # Per-second CSV results logger (always on — no waves means we need this)
     results_path = str(_PROJ / "sim_results.csv")
     cocotb.start_soon(_sec_results_logger(dut, results_path))
 
-    # --- Phase 2: wait for alarm_o to assert (test passes on rising edge) ---
-    # The firmware runs inferences and writes ALARM_CTRL=1 once the wake streak
-    # threshold is hit; that drives the FSM to ALARM state which asserts alarm_o.
-    # A firmware-side DEAD_BEEF in TEST_STATUS still fails fast.
+    # --- Phase 2: wait for alarm_o ---
+    # Budget (GL with _gl_fast_epoch_forward):
+    #   boot ~500 K + CPU_INIT ~5 K + SLEEP ~1 K + timer fire ~1 K
+    #   + epoch-1 ~10 M (1000 I2C reads) + ML-1 ~3 M (SPI weight reads)
+    #   + CPU_FEAT-1 ~5 K + epoch-2 ~10 M + ML-2 ~3 M + CPU_FEAT-2 ~5 K → ALARM
+    #   ≈ 27 M cycles.  35 M gives comfortable headroom.
+    RUNTIME_TIMEOUT = _env_int("RUNTIME_TIMEOUT_CYCLES", 35_000_000 if gl else 4_000_000)
+    logger.info(f"Waiting for alarm_o (timeout={RUNTIME_TIMEOUT} cycles)...")
+
     for cycle in range(RUNTIME_TIMEOUT):
         await RisingEdge(_clk_handle(dut))
 
-        if cycle % 10_000 == 0:
+        if cycle % 25_000 == 0:
             if gl:
                 try:
                     p = _gl_progress(dut)
-                    print(f"[GL @{cycle:7d}] rst_n={p['rst_n']} reset_i={p['reset_i']} core_clk={p['core_clk']} cpu_clk={p['cpu_clk']} cpu_clk_lat={p['cpu_clk_lat']}", flush=True)
-                    print(f"[GL @{cycle:7d}] fsm={p['fsm']} boot={p['boot']} feat_en={p['feat_en']} ml_en={p['ml_en']} cpu_en={p['cpu_en']} tmode={p['fsm_tmode']} start={p['fsm_starti']} feat_v={p['fsm_featvi']} ml_irq={p['fsm_mlirq']} alarm={p['fsm_alarm_o']}", flush=True)
-                    print(f"[GL @{cycle:7d}] cpu_sleep={p['sleep']} trap={p['trap']} status={p['status']} code={p['code']}", flush=True)
-                    print(f"[GL @{cycle:7d}] mem_v={p['mem_v']} mem_rdy={p['mem_rdy']} mem_addr={p['mem_addr']} wflash={p['wflash_state']}", flush=True)
-                    print(f"[GL @{cycle:7d}] timer_evt={p['tim_evt']} tim_ctrl={p['tim_ctrl']} tim_count={p['tim_count']}", flush=True)
-                    print(f"[GL @{cycle:7d}] irq_pend={p['irq_pend']} irq_mask={p['irq_mask']} irq_to_cpu={p['irq_to_cpu']} wake_en={p['irq_wake_en']} wake_req={p['irq_wake_req']} pwr_sleep={p['pwr_sleep_req']}", flush=True)
-                    print(f"[GL @{cycle:7d}] accel_v={p['accel_v']} ppg_v={p['ppg_v']} feat_valid={p['feat_valid']} feat_latched={p['feat_latched']} logit0={p['logit0']} logit1={p['logit1']}", flush=True)
-                    print(f"[GL @{cycle:7d}] sensor_scl={p['sensor_scl_w']} feat_en_top={p['feat_en_top']} i2c_en={p['i2c_en']}", flush=True)
-                    print(f"[GL @{cycle:7d}] pad_alarm={dut.alarm_o.value}", flush=True)
+                    print(f"[GL @{cycle:8d}] rst_n={p['rst_n']} reset_i={p['reset_i']} core_clk={p['core_clk']} cpu_clk={p['cpu_clk']}", flush=True)
+                    print(f"[GL @{cycle:8d}] fsm={p['fsm']} boot={p['boot']} feat_en={p['feat_en']} ml_en={p['ml_en']} cpu_en={p['cpu_en']} start={p['fsm_starti']} feat_v={p['fsm_featvi']} ml_irq={p['fsm_mlirq']} alarm={p['fsm_alarm_o']}", flush=True)
+                    print(f"[GL @{cycle:8d}] cpu_sleep={p['sleep']} trap={p['trap']} status={p['status']} code={p['code']}", flush=True)
+                    print(f"[GL @{cycle:8d}] irq_pend={p['irq_pend']} irq_mask={p['irq_mask']} wake_en={p['irq_wake_en']} wake_req={p['irq_wake_req']} pwr_sleep={p['pwr_sleep_req']}", flush=True)
+                    print(f"[GL @{cycle:8d}] accel_v={p['accel_v']} ppg_v={p['ppg_v']} feat_valid={p['feat_valid']} feat_latched={p['feat_latched']} logit0={p['logit0']} logit1={p['logit1']}", flush=True)
+                    print(f"[GL @{cycle:8d}] tim_evt={p['tim_evt']} tim_ctrl={p['tim_ctrl']} tim_count={p['tim_count']} pad_alarm={dut.alarm_o.value}", flush=True)
                 except Exception as e:
-                    print(f"[GL @{cycle:7d}] _gl_progress ERROR: {e}", flush=True)
+                    print(f"[GL @{cycle:8d}] _gl_progress error: {e}", flush=True)
             else:
                 try:
                     ts = int(u_top.test_status.value)
-                    alarm = dut.alarm_o.value
-                    cocotb.log.info(
-                        f"  cycle {cycle}: test_status=0x{ts:08X} alarm={alarm}"
-                    )
+                    cocotb.log.info(f"  cycle {cycle}: test_status=0x{ts:08X} alarm={dut.alarm_o.value}")
                 except Exception:
                     pass
 
-        # CPU trap check (RTL-only — pico_trap_w doesn't survive synthesis flattening)
         if not gl:
             try:
                 if core.pico_trap_w.value == 1:
                     raise AssertionError("CPU trapped during runtime")
             except AttributeError:
                 pass
-
-        # Fast-fail on firmware-reported error in RTL. In GL, these debug
-        # mailbox vectors are flattened into per-bit escaped nets; keep the
-        # GL pass/fail criterion focused on the real pad-level alarm output.
-        if not gl:
             try:
                 status = int(u_top.test_status.value)
                 if status == 0xDEAD_BEEF:
@@ -1511,12 +1382,11 @@ async def test_chip_top_normal(dut):
             except ValueError:
                 pass
 
-        # Pass condition: alarm_o rose (output pad is always observable, even in GL)
         try:
             if int(dut.alarm_o.value) == 1:
                 await ClockCycles(_clk_handle(dut), 10)
                 if int(dut.alarm_o.value) == 1:
-                    cocotb.log.info(f"alarm_o asserted at cycle {cycle} — test passed.")
+                    logger.info(f"alarm_o asserted at cycle {cycle} — test PASSED.")
                     return
         except ValueError:
             continue
@@ -1814,9 +1684,11 @@ def chip_top_runner():
                 sources.append(proj_path / "sensors/i2c_slave_lis2dw12.sv")
                 sources.append(proj_path / "sensors/i2c_slave_adpd144ri.sv")
             elif hdl_toplevel == _GL_SENSOR_BRIDGE:
-                # Sensor bridge uses Python cocotbext I2C slaves (no SV models).
-                # Flash model still needed for SPI boot + weight loading.
+                # Sensor bridge now uses Verilog raw I2C slaves (instantiated
+                # inside the GL wrapper) — no Python cocotbext-i2c needed.
                 sources.append(proj_path / "sim/tb/spi_flash_model.v")
+                sources.append(proj_path / "sensors/i2c_slave_lis2dw12_raw.sv")
+                sources.append(proj_path / "sensors/i2c_slave_adpd144ri_raw.sv")
 
         defines = {"FUNCTIONAL": True, "functional": True, "USE_POWER_PINS": True}
     else:
